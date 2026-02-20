@@ -1,0 +1,12 @@
+{
+	"devDependencies": {
+		"@types/papaparse": "^5.5.2"
+	},
+	"dependencies": {
+		"@supabase/supabase-js": "^2.97.0",
+		"openai": "^6.22.0",
+		"papaparse": "^5.5.3",
+		"recharts": "^3.7.0",
+		"zod": "^4.3.6"
+	}
+}

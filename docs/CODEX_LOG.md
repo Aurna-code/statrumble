@@ -233,3 +233,72 @@ DoD:
 - [x] `npm run verify` 실행 통과
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt 02 (commit: TODO)
+#### Prompt
+```text
+[Prompt 02] Supabase SSR 세션 + 로그인/로그아웃 + 라우트 보호 (statrumble/ 기준)
+
+레포 구조:
+- Next.js 앱 루트는 statrumble/ 디렉토리다.
+- 앞으로 Next 관련 파일(middleware.ts, lib 등)은 statrumble/ 아래에 둔다.
+
+요구사항:
+1) Supabase 클라이언트 유틸 생성
+- statrumble/lib/supabase/server.ts
+  - @supabase/ssr의 createServerClient 사용
+  - cookies를 읽고/쓰는 헬퍼 포함(Next headers cookies 사용)
+- statrumble/lib/supabase/client.ts
+  - createBrowserClient 사용
+
+2) middleware.ts (라우트 보호 + 세션 갱신)
+- statrumble/middleware.ts 생성
+- Supabase SSR 공식 패턴으로:
+  - createServerClient로 auth.getUser() 호출하여 세션 갱신
+  - 미로그인 + 보호경로면 /login으로 redirect
+  - /login, /_next, /favicon.ico 등은 예외 처리
+  - 로그인 상태로 /login 접근 시 / 로 redirect(옵션)
+
+3) 로그인 UI
+- statrumble/app/login/page.tsx
+  - email OTP(magic link) 방식으로 로그인 구현
+  - supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: ... } })
+  - 성공/실패 메시지 표시
+
+4) 로그아웃
+- statrumble/app/auth/signout/route.ts (POST)
+  - 서버에서 createServerClient로 supabase.auth.signOut()
+  - 완료 후 /login redirect
+- statrumble/app/layout.tsx nav에서 로그아웃 버튼은 form POST로 연결
+
+5) DoD
+- 로그인 없이 / 접근 → /login redirect
+- 로그인 후 / 접근 가능
+- 로그아웃하면 /login으로 이동
+- lint/typecheck/verify 통과
+
+추가:
+- README에 “Supabase Auth 설정(OTP 이메일)”과 env 위치(statrumble/.env.local) 짧게 명시
+- docs/CODEX_LOG.md에 Prompt 02 기록(원문/요약/체크리스트/(commit: TODO))
+
+커밋 메시지:
+- "feat: supabase ssr auth and protected routes"
+```
+#### Result
+- `statrumble/lib/supabase/server.ts`와 `statrumble/lib/supabase/client.ts`를 추가해 SSR/브라우저 Supabase 클라이언트를 분리했다.
+- `statrumble/middleware.ts`에서 `auth.getUser()` 기반 세션 갱신과 보호 라우트 리다이렉트를 구현했다.
+- `statrumble/app/login/page.tsx`에 Email OTP(Magic Link) 로그인 폼과 성공/실패 메시지를 구현했다.
+- `statrumble/app/auth/signout/route.ts`(POST)와 `statrumble/app/auth/callback/route.ts`를 추가해 로그아웃 및 OTP 콜백 세션 확정을 연결했다.
+- `statrumble/app/layout.tsx` 네비게이션에 로그인 상태 표시/로그아웃 POST 폼을 반영했다.
+- `README.md`에 Supabase Auth(OTP 이메일) 설정 및 `statrumble/.env.local` 위치를 추가했다.
+#### Manual Checklist
+- [x] Supabase SSR/browser client 유틸 추가
+- [x] middleware 라우트 보호 + 세션 갱신 구현
+- [x] 로그인 UI(Email OTP) 구현
+- [x] 로그아웃 POST route + layout form 연결
+- [x] README Auth/env 안내 추가
+- [x] `npm run lint` 실행
+- [x] `npm run typecheck` 실행
+- [x] `./scripts/verify.sh` 실행
+#### Commit Link
+- TODO

@@ -32,6 +32,7 @@ npm install
 ```bash
 cp ../.env.example .env.local
 ```
+   - local env file path: `statrumble/.env.local`
 3. Start dev server:
 ```bash
 npm run dev
@@ -47,6 +48,12 @@ npm run verify
 1. Supabase Dashboard -> SQL Editor에서 `statrumble/supabase/migrations/000_init.sql` 내용을 실행합니다.
 2. (선택) Supabase CLI를 쓰는 경우 기본 경로는 `statrumble/supabase/migrations` 입니다.
 3. 기본 워크스페이스 UUID는 `11111111-1111-1111-1111-111111111111` 입니다.
+
+## Supabase Auth (OTP Email)
+1. Supabase Dashboard -> Authentication -> Providers -> Email에서 Email OTP(Magic Link)를 활성화합니다.
+2. Authentication -> URL Configuration에서 Site URL을 `http://localhost:3000`으로 설정합니다.
+3. Redirect URLs에 `http://localhost:3000/auth/callback`을 추가합니다.
+4. Supabase URL/Anon Key는 `statrumble/.env.local`에 설정합니다.
 
 ## Notes
 - Codex is used as the Referee model via the OpenAI Responses API.

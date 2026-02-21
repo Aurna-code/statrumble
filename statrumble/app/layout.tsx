@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,11 +19,16 @@ export const metadata: Metadata = {
   description: "StatRumble MVP scaffolding",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
@@ -32,12 +38,27 @@ export default function RootLayout({
               <Link href="/" className="font-semibold">
                 StatRumble
               </Link>
-              <Link href="/login" className="text-zinc-600 hover:text-zinc-900">
-                Login
-              </Link>
               <Link href="/decisions" className="text-zinc-600 hover:text-zinc-900">
                 Decisions
               </Link>
+              <div className="ml-auto flex items-center gap-3">
+                {user?.email ? <p className="text-zinc-500">{user.email}</p> : null}
+                {user ? (
+                  <form action="/auth/signout" method="post">
+                    <button
+                      type="submit"
+                      className="text-zinc-600 hover:text-zinc-900"
+                      aria-label="Sign out"
+                    >
+                      Logout
+                    </button>
+                  </form>
+                ) : (
+                  <Link href="/login" className="text-zinc-600 hover:text-zinc-900">
+                    Login
+                  </Link>
+                )}
+              </div>
             </nav>
           </header>
           {children}

@@ -1,2 +1,6 @@
 packages:
-  - "statrumble"
+  - statrumble
+
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver

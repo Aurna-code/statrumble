@@ -1,0 +1,71 @@
+import "server-only";
+
+import { createClient } from "@/lib/supabase/server";
+
+export type ThreadMetricMeta = {
+  name: string;
+  unit: string | null;
+};
+
+type ThreadRow = {
+  id: string;
+  workspace_id: string;
+  metric_id: string | null;
+  import_id: string;
+  start_ts: string;
+  end_ts: string;
+  snapshot: unknown;
+  referee_report: unknown;
+  created_at: string;
+  metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
+};
+
+export type ArenaThread = Omit<ThreadRow, "metrics"> & {
+  metric: ThreadMetricMeta | null;
+};
+
+function pickMetric(metrics: ThreadRow["metrics"]): ThreadMetricMeta | null {
+  if (!metrics) {
+    return null;
+  }
+
+  if (Array.isArray(metrics)) {
+    return metrics[0] ?? null;
+  }
+
+  return metrics;
+}
+
+export async function getThread(threadId: string): Promise<ArenaThread | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("arena_threads")
+    .select(
+      "id, workspace_id, metric_id, import_id, start_ts, end_ts, snapshot, referee_report, created_at, metrics(name, unit)",
+    )
+    .eq("id", threadId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load thread: ${error.message}`);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  const row = data as ThreadRow;
+
+  return {
+    id: row.id,
+    workspace_id: row.workspace_id,
+    metric_id: row.metric_id,
+    import_id: row.import_id,
+    start_ts: row.start_ts,
+    end_ts: row.end_ts,
+    snapshot: row.snapshot,
+    referee_report: row.referee_report,
+    created_at: row.created_at,
+    metric: pickMetric(row.metrics),
+  };
+}

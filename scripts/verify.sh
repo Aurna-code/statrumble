@@ -4,8 +4,22 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${ROOT_DIR}/statrumble"
 
-cd "${APP_DIR}"
+if command -v pnpm >/dev/null 2>&1; then
+  echo "==> pnpm -C statrumble lint"
+  pnpm -C "${APP_DIR}" lint
 
-npm run lint
-npm run typecheck
-npm run test --if-present
+  echo "==> pnpm -C statrumble typecheck"
+  pnpm -C "${APP_DIR}" typecheck
+
+  echo "==> pnpm -C statrumble test"
+  pnpm -C "${APP_DIR}" test
+else
+  echo "==> npm --prefix statrumble run lint"
+  npm --prefix "${APP_DIR}" run lint
+
+  echo "==> npm --prefix statrumble run typecheck"
+  npm --prefix "${APP_DIR}" run typecheck
+
+  echo "==> npm --prefix statrumble run test --if-present"
+  npm --prefix "${APP_DIR}" run test --if-present
+fi

@@ -302,3 +302,594 @@ DoD:
 - [x] `./scripts/verify.sh` 실행
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt 03 (commit: TODO)
+#### Prompt
+```text
+[Prompt 03] DB 접근 레이어 + 샘플 CSV + 메인 페이지 목록 표시 (statrumble/ 기준, pnpm workspace)
+
+레포 구조:
+- Next 앱 루트: statrumble/
+- Supabase: statrumble/lib/supabase/{server,client}.ts 사용
+- workspace_id는 MVP에서 NEXT_PUBLIC_DEFAULT_WORKSPACE_ID(1111...)를 기본값으로 쓴다.
+
+요구사항:
+1) DB 헬퍼 추가 (statrumble/lib/db/)
+- statrumble/lib/db/metrics.ts
+  - listMetrics(): metrics 목록 (workspace_id=default)
+  - getOrCreateMetric(name, unit): (workspace_id, name) unique 기준 upsert로 하나 반환
+- statrumble/lib/db/imports.ts
+  - listImports(limit=20): metric_imports 목록 + metrics(name,unit) join해서 반환
+  - createImport(metricId, fileName, rowCount): import row 반환
+- statrumble/lib/db/points.ts
+  - insertPointsBulk(importId, rows): rows = {ts,value}[]
+    - 배치 insert(예: 500개 단위 chunk)
+    - 각 row에 workspace_id, import_id, ts, value 넣기
+    - MVP 안전장치: 최대 rows 50,000 제한(넘으면 에러)
+  - fetchPoints(importId, range?): range는 start/end timestamptz optional
+    - ts 오름차순 정렬로 반환
+- statrumble/lib/db/index.ts 에서 export 정리
+
+구현 규칙:
+- 서버에서 실행되는 함수는 createServerClient를 사용(= statrumble/lib/supabase/server.ts)
+- default workspace id는 process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID에서 읽고, 없으면 에러 throw
+- 각 함수는 Supabase 에러를 throw로 올리고, 호출자가 사용자 메시지로 처리할 수 있게 메시지 포함
+
+2) 샘플 CSV 추가
+- docs/sample.csv 생성(최소 200행)
+  - header: ts,value
+  - ts는 ISO8601, 1분 간격 정도로 생성
+  - value는 적당히 변동 있는 숫자
+
+3) 메인 페이지(app/page.tsx) 개선(아직 업로드 구현은 X)
+- “CSV 업로드/차트/스레드” 자리표시는 유지하되,
+- 아래에 현재 DB의:
+  - Metrics 목록(빈 상태면 “아직 없음”)
+  - Imports 최신 10개 목록(파일명/row_count/metric 이름/created_at)
+  을 표시해라.
+- 이 목록 조회는 서버 컴포넌트에서 listMetrics/listImports로 가져와도 되고,
+  또는 간단한 server action을 써도 된다. (클라이언트 호출은 아직 하지 말 것)
+
+4) docs/CODEX_LOG.md에 Prompt 03 기록 추가(원문/요약/체크리스트/(commit: TODO))
+
+DoD:
+- pnpm -C statrumble lint / typecheck / verify 통과
+- docs/sample.csv 존재
+- 로그인 후 / 에서 metrics/imports 목록 섹션이 보임(없으면 empty state)
+
+커밋 메시지 제안:
+- "feat: db helpers and sample csv"
+```
+#### Result
+- `statrumble/lib/db/metrics.ts`, `statrumble/lib/db/imports.ts`, `statrumble/lib/db/points.ts`, `statrumble/lib/db/index.ts`를 추가해 기본 workspace 기준 DB 접근 레이어를 구현했다.
+- `statrumble/app/page.tsx`에서 서버 컴포넌트로 metrics/imports 목록(빈 상태/에러 상태 포함)을 렌더링하도록 확장했다.
+- `docs/sample.csv`를 `ts,value` 헤더와 1분 간격 ISO8601 데이터 240행으로 생성했다.
+#### Manual Checklist
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+- [x] `docs/sample.csv` 생성
+- [x] `/` 페이지에 Metrics/Imports 목록 섹션 반영
+#### Commit Link
+- TODO
+
+### Prompt ID: Prompt 04 (commit: TODO)
+#### Prompt
+```text
+[Prompt 04] CSV 업로드 플로우 구현 (server action + FormData, statrumble/ 기준)
+
+목표:
+- 메인 페이지에서 CSV 파일을 업로드하면
+  metrics/metric_imports/metric_points가 저장되고,
+  업로드 후 메인(/)으로 돌아와 Imports 목록에서 방금 import가 보이게 한다.
+
+요구사항:
+1) 업로드 서버 액션 추가
+- 파일: statrumble/app/actions/uploadCsv.ts (또는 uploadCsvAction.ts)
+- 'use server'
+- export async function uploadCsvAction(prevState, formData)
+
+입력(FormData):
+- metric_name: string (필수)
+- unit: string (옵션)
+- file: File (필수)
+
+동작:
+- file.text()로 CSV 문자열 읽기
+- papaparse로 header 기반 파싱
+  - header: true, skipEmptyLines: true
+  - 컬럼: ts,value
+- 유효성 검사:
+  - ts: Date로 파싱 가능해야 함
+  - value: number로 파싱 가능해야 함
+  - rows <= 50,000 (초과 시 에러)
+- 저장:
+  - getOrCreateMetric(metric_name, unit) 호출
+  - createImport(metric.id, file.name, rows.length) 호출
+  - insertPointsBulk(import.id, rows) 호출
+    - rows는 { ts: string, value: number }[]
+    - ts는 new Date(ts).toISOString() 형태로 정규화해서 넣기
+- 성공 시:
+  - revalidatePath('/') 호출
+  - redirect('/') (또는 redirect('/?uploaded=1') 같은 방식)
+- 실패 시:
+  - { ok:false, error:'...' } 형태로 state 반환
+
+2) 메인 페이지 UI(app/page.tsx)에서 업로드 폼 구현
+- statrumble/app/components/UploadCsvForm.tsx (클라이언트 컴포넌트) 생성 권장
+  - 'use client'
+  - useFormState + useFormStatus 사용해서 서버 액션 연결
+  - 입력:
+    - metric_name (text)
+    - unit (text)
+    - file (input type="file" accept=".csv,text/csv")
+  - 제출 버튼은 pending일 때 disabled + “Uploading...” 표시
+  - state.error 있으면 화면에 표시
+- app/page.tsx에는 기존 자리표시 유지 + 상단에 UploadCsvForm 렌더링
+
+3) UX/제약
+- file이 없거나 metric_name이 비면 즉시 에러 표시
+- parse errors(잘못된 행)는:
+  - MVP에서는 “첫 N개만 보고 전체 실패”로 처리해도 OK
+  - 에러 메시지에 문제 예시(행 번호/값)를 간단히 포함
+
+4) 로그
+- docs/CODEX_LOG.md에 Prompt 04 기록 추가(원문/요약/체크리스트/(commit: TODO))
+
+DoD:
+- 로그인 후 / 에서 CSV 업로드 가능
+- 업로드 성공 시 Imports 최신 10개 목록에 새 import가 보임
+- pnpm -C statrumble lint/typecheck/verify 통과
+
+커밋 메시지 제안:
+- "feat: csv upload to metric imports and points"
+```
+#### Result
+- `statrumble/app/actions/uploadCsv.ts` 서버 액션을 추가해 CSV 파싱/검증/저장(`metrics`, `metric_imports`, `metric_points`) 후 `revalidatePath('/')` + `redirect('/')` 흐름을 구현했다.
+- `statrumble/app/components/UploadCsvForm.tsx`를 추가해 `useFormState + useFormStatus` 기반 업로드 폼, pending 상태, 즉시 입력 검증, 서버 에러 표시를 구현했다.
+- `statrumble/app/page.tsx`의 CSV 업로드 섹션에 업로드 폼을 연결했다.
+#### Manual Checklist
+- [ ] 로그인 후 `/` 에서 CSV 업로드 가능
+- [ ] 업로드 성공 시 Imports 최신 10개 목록에 신규 import 표시
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix 04a (commit: TODO)
+#### Prompt
+```text
+[Hotfix 04a] Fix server action export rule + React hook rename + ensure list refresh
+
+문제:
+1) Next runtime error:
+   "A 'use server' file can only export async functions, found object."
+   in statrumble/app/actions/uploadCsv.ts
+2) Console error:
+   "ReactDOM.useFormState has been renamed to React.useActionState."
+   in statrumble/app/components/UploadCsvForm.tsx
+3) 업로드 후 Imports 목록이 즉시 갱신되지 않는 듯함(캐시/리렌더 영향 가능)
+
+작업:
+A) statrumble/app/actions/uploadCsv.ts
+- 파일 최상단의 "use server" 디렉티브를 제거한다.
+- 대신 export async function uploadCsvAction(...) 함수 바디 첫 줄에 'use server'를 넣는다.
+- 이렇게 하면 이 파일에서 state 타입/초기 state 객체(상수)를 export 해도 Next 규칙 위반이 아니다.
+- upload 성공 시 revalidatePath("/", "page") 호출 후 redirect("/") 유지.
+- (옵션) 업로드된 import_id를 redirect query로 붙여도 됨: redirect("/?uploaded=1")
+
+B) statrumble/app/components/UploadCsvForm.tsx
+- useFormState 사용을 중단하고, React에서 useActionState를 사용한다.
+  예:
+    import React, { useActionState, useState } from "react";
+    const [state, formAction, pending] = useActionState(uploadCsvAction, initialState);
+- 기존 useFormStatus 로직이 있으면, pending(3번째 반환값)로 대체하거나 useFormStatus를 유지해도 됨.
+- 에러 메시지 출력/버튼 disable이 정상 동작하게 한다.
+
+C) statrumble/app/page.tsx
+- 업로드 직후 목록 갱신이 안 될 수 있으니, 안전하게 페이지를 dynamic으로 만든다.
+  파일 상단에:
+    export const dynamic = "force-dynamic";
+  또는 Home() 안에서 noStore()를 호출해도 됨.
+- Metrics/Imports 섹션은 그대로 유지.
+
+D) docs/CODEX_LOG.md에 Hotfix 04a 기록 추가
+
+DoD:
+- 페이지 로드 시 위 2개 에러가 더 이상 뜨지 않는다.
+- 업로드 성공 후 / 로 돌아오면 Imports 최신 목록에 방금 업로드가 보인다(또는 새로고침 없이도 보임).
+- pnpm -C statrumble lint/typecheck/verify 통과
+
+커밋 메시지:
+- "fix: server actions and upload form hooks"
+```
+#### Result
+- `statrumble/app/actions/uploadCsv.ts`에서 파일 레벨 `"use server"`를 제거하고, `uploadCsvAction` 함수 내부로 이동해 Next 서버 액션 export 규칙 오류를 해결했다.
+- 업로드 성공 시 `revalidatePath("/", "page")` 후 `redirect("/")`를 수행하도록 갱신했다.
+- `statrumble/app/components/UploadCsvForm.tsx`를 `useFormState/useFormStatus`에서 `useActionState` 기반으로 전환해 React 훅 rename 경고를 제거했다.
+- `statrumble/app/page.tsx`에 `export const dynamic = "force-dynamic";`를 추가해 업로드 직후 목록 갱신을 보수적으로 보장했다.
+#### Manual Checklist
+- [ ] 페이지 로드 시 server action export/runtime 에러 미발생 확인
+- [ ] 페이지 로드 시 React 훅 rename 콘솔 에러 미발생 확인
+- [ ] 업로드 성공 후 `/` Imports 최신 목록 즉시 갱신 확인
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix 04b (commit: TODO)
+#### Prompt
+```text
+[Hotfix 04b] Fix server action placement + split types/state + useActionState
+
+문제:
+- build error: inline "use server" in uploadCsvAction inside file imported by client component
+- 이전 에러 방지: "use server" 파일은 async 함수만 export 가능
+
+작업:
+1) 새 파일 생성: statrumble/app/actions/uploadCsv.types.ts
+- 여기에는 클라이언트에서도 안전한 것만 둔다(서버 import 금지)
+- export type UploadCsvActionState = { ok: boolean; error?: string };
+- export const initialUploadCsvActionState: UploadCsvActionState = { ok: true };
+
+2) statrumble/app/actions/uploadCsv.ts 수정
+- 파일 최상단에 "use server"; 를 둔다.
+- export는 async function uploadCsvAction(...) 단 하나만 한다.
+- 함수 바디 안의 "use server" 문자열은 제거한다.
+- UploadCsvActionState 타입은 uploadCsv.types.ts에서 import type으로 가져온다.
+- revalidatePath("/") + redirect("/") 유지
+
+3) statrumble/app/components/UploadCsvForm.tsx 수정
+- useFormState를 쓰지 말고 react의 useActionState로 변경
+- import { useActionState, useState } from "react";
+- import { uploadCsvAction } from "../actions/uploadCsv";
+- import { initialUploadCsvActionState } from "../actions/uploadCsv.types";
+- const [state, formAction, pending] = useActionState(uploadCsvAction, initialUploadCsvActionState);
+- <form action={formAction}> 형태 유지
+- pending으로 버튼 disable + "Uploading..." 표시
+- state.error 렌더 유지
+
+4) statrumble/app/page.tsx
+- 업로드 후 목록 갱신 이슈 방지로 파일 상단에:
+  export const dynamic = "force-dynamic";
+  추가(이미 있으면 중복 금지)
+
+5) docs/CODEX_LOG.md에 Hotfix 04b 기록 추가
+
+DoD:
+- 빌드 에러 사라짐
+- 업로드 후 /로 돌아오면 Imports 최신 목록에 새 import가 보임
+- pnpm -C statrumble lint/typecheck/verify 통과
+
+커밋 메시지:
+- "fix: server action module boundaries and hooks"
+```
+#### Result
+- `statrumble/app/actions/uploadCsv.types.ts`를 추가해 업로드 액션 상태 타입/초기 상태를 서버 액션 파일에서 분리했다.
+- `statrumble/app/actions/uploadCsv.ts`를 파일 레벨 `"use server"` + `uploadCsvAction` 단일 async export 구조로 정리하고, 함수 내부 `"use server"`를 제거했다.
+- `statrumble/app/components/UploadCsvForm.tsx`에서 `useActionState`를 유지하되 액션/초기 상태 import를 `../actions/*` 경계로 분리했다.
+- `statrumble/app/page.tsx`의 `export const dynamic = "force-dynamic";`는 이미 존재하여 유지했다.
+#### Manual Checklist
+- [ ] 빌드 에러(서버 액션 배치/exports) 미발생 확인
+- [ ] 업로드 후 `/` Imports 최신 목록에 신규 import 반영 확인
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix 04c (commit: TODO)
+#### Prompt
+```text
+[Hotfix 04c] Remove encType/method from Server Action form
+
+- statrumble/app/components/UploadCsvForm.tsx에서
+  <form action={formAction} ... encType="multipart/form-data"> 를
+  encType 속성 없이 사용하도록 수정한다.
+- 혹시 method="post"도 있으면 같이 제거한다.
+- lint/typecheck/verify 통과 확인
+- docs/CODEX_LOG.md에 Hotfix 04c 기록 추가
+
+커밋 메시지: "fix: remove encType from server action form"
+```
+#### Result
+- `statrumble/app/components/UploadCsvForm.tsx`의 서버 액션 form에서 `encType="multipart/form-data"`를 제거했다.
+- `method="post"` 속성은 기존 코드에 없어서 추가 변경 없이 유지했다.
+#### Manual Checklist
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix 04d (commit: TODO)
+#### Prompt
+```text
+[Hotfix 04d] Remove npm usage from verify script; standardize on pnpm workspace
+
+상황:
+- pnpm workspace로 통일했는데 verify.sh가 npm을 호출해서 "npm warn Unknown env config..." 같은 잡음이 뜬다.
+
+작업:
+1) scripts/verify.sh 수정
+- set -euo pipefail
+- 기본 실행은 pnpm으로 고정:
+  - pnpm -C statrumble lint
+  - pnpm -C statrumble typecheck
+  - pnpm -C statrumble test (없으면 existing behavior 유지: "No tests configured"면 0)
+- (옵션) pnpm이 없을 때만 npm fallback:
+  - npm --prefix statrumble run lint 등
+- 출력은 지금처럼 단계별로 보이게.
+
+2) package.json(루트) 스크립트도 pnpm 기준으로 정리
+- "lint": "pnpm -C statrumble lint"
+- "typecheck": "pnpm -C statrumble typecheck"
+- "test": "pnpm -C statrumble test"
+- "verify": "./scripts/verify.sh"
+(이미 비슷하면 최소 diff)
+
+3) docs/CODEX_LOG.md에 Hotfix 04d 기록 추가
+
+DoD:
+- pnpm -C statrumble verify 실행 시 npm warn 문구가 더 이상 안 뜬다.
+- 종료코드 0 유지
+- lint/typecheck/verify 통과
+
+커밋 메시지:
+- "chore: run verify via pnpm"
+```
+#### Result
+- `scripts/verify.sh`를 pnpm 우선 실행(`lint/typecheck/test`)으로 변경하고, pnpm 미설치 환경에서만 npm fallback 하도록 정리했다.
+- 루트 `package.json`의 `lint/typecheck/test` 스크립트를 `pnpm -C statrumble ...` 형태로 통일했다.
+#### Manual Checklist
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+- [x] `pnpm -C statrumble verify` 출력에서 npm warn 문구 없음 확인
+#### Commit Link
+- TODO
+
+### Prompt ID: Prompt 05 (commit: TODO)
+#### Prompt
+```text
+[Prompt 05] 차트 + 구간 선택 + Arena 스레드 생성 (snapshot 고정) — statrumble/ 기준
+
+목표:
+- 로그인 후 / 에서 import를 선택하고,
+- 해당 import의 points를 차트로 보고,
+- Brush(또는 간단 선택 UI)로 구간을 선택한 뒤,
+- "Create Thread"를 누르면:
+  - 서버에서 compute_snapshot RPC 실행
+  - arena_threads에 snapshot 포함 insert
+  - /threads/{id}로 이동
+
+요구사항 A) API: points 조회
+1) Route 생성:
+- statrumble/app/api/imports/[importId]/points/route.ts (GET)
+- 인증: 현재 세션 쿠키 기반(기존 supabase server client util 사용)
+- 입력:
+  - importId: params
+  - (옵션) query: start_ts, end_ts
+- 동작:
+  - metric_points에서 import_id=importId 필터, ts ASC 정렬
+  - (옵션) range 있으면 ts 범위 필터
+  - 반환 형태:
+    { ok: true, points: Array<{ ts: string; value: number }>, total?: number, sampled?: boolean }
+  - 차트 성능을 위해:
+    - points가 5000개 초과면 downsample해서 최대 5000개만 반환(예: stride)
+    - total, sampled 플래그 포함
+- 에러 시:
+  { ok:false, error:"..." }
+
+요구사항 B) API: thread 생성 + snapshot 고정
+2) Route 생성:
+- statrumble/app/api/threads/create/route.ts (POST, JSON)
+- 입력 body:
+  { import_id: string, start_ts: string, end_ts: string }
+- 검증:
+  - start_ts/end_ts가 Date 파싱 가능
+  - end_ts > start_ts
+- 서버 동작:
+  1) metric_imports에서 import_id로 row 조회하여 metric_id + workspace_id 확보
+  2) RPC 호출:
+     supabase.rpc("compute_snapshot", {
+       p_import_id: import_id,
+       p_start_ts: start_ts,
+       p_end_ts: end_ts
+     })
+  3) arena_threads insert:
+     { workspace_id, metric_id, import_id, start_ts, end_ts, snapshot: rpcResult }
+     반환: inserted id
+- 반환:
+  { ok:true, thread_id:"uuid" }
+- 실패:
+  { ok:false, error:"..." }
+
+요구사항 C) UI: 차트 + 구간 선택 + Create Thread
+3) Client component 추가:
+- statrumble/app/components/ImportChart.tsx (또는 ChartThreadCreator.tsx)
+- 'use client'
+- props로 imports(최신 10개 정도)를 app/page.tsx에서 내려받아 사용(서버 컴포넌트에서 listImports 호출)
+- UI 구성:
+  - Import 선택 dropdown(파일명 + created_at)
+  - 선택되면 /api/imports/{id}/points GET으로 points 로딩
+  - Recharts LineChart로 렌더
+  - 구간 선택은 우선 Recharts <Brush> 사용 추천:
+    - startIndex/endIndex 상태 유지
+    - onChange로 선택된 index 업데이트
+  - 선택 구간 start_ts/end_ts 표시
+  - "Create Thread" 버튼:
+    - 선택된 인덱스 기준으로 start_ts/end_ts 계산
+    - 주의: DB 함수는 ts < end_ts 이므로, endIndex를 포함하려면:
+      - end_ts = points[endIndex+1].ts (가능하면)
+      - 마지막이면 end_ts = new Date(points[endIndex].ts).getTime()+1ms 로 ISO 생성
+    - POST /api/threads/create 호출
+    - 성공 시 next/navigation의 useRouter로 router.push(`/threads/${thread_id}`)
+  - 로딩/에러 표시(포인트 로딩, 스레드 생성 중)
+
+4) app/page.tsx 업데이트
+- 이미 Upload 폼/목록이 있는 상태에서:
+  - chart 섹션에 ImportChart 컴포넌트 렌더
+  - imports는 서버에서 listImports(10) 호출한 결과를 props로 내려줘
+- 캐시 문제 방지:
+  - 이미 force-dynamic을 넣어뒀으면 유지
+  - 없으면 상단에 export const dynamic="force-dynamic" 추가
+
+요구사항 D) threads/[id] 최소 표시
+5) statrumble/app/threads/[id]/page.tsx 업데이트(최소)
+- thread id로 arena_threads 조회해서 snapshot/start/end를 화면에 간단히 표시
+- snapshot은 <pre>{JSON.stringify(snapshot,null,2)}</pre> 정도면 충분
+(메시지/투표는 Prompt 06에서 함)
+
+6) 로그/검증
+- docs/CODEX_LOG.md에 Prompt 05 기록 추가(원문/요약/체크리스트/(commit: TODO))
+- pnpm -C statrumble lint/typecheck/verify 통과
+
+DoD:
+- /에서 sample.csv import 선택 → 차트가 뜬다
+- Brush로 구간 선택 → Create Thread → /threads/{id} 이동
+- DB의 arena_threads에 snapshot jsonb가 저장되어 있다(그리고 화면에 보여진다)
+
+커밋 메시지:
+- "feat: chart interval selection and thread creation with snapshot"
+```
+#### Result
+- `statrumble/app/api/imports/[importId]/points/route.ts`를 추가해 세션 인증 기반 points 조회, optional `start_ts`/`end_ts` 필터, 최대 5000개 stride downsample(`total`, `sampled`) 응답을 구현했다.
+- `statrumble/app/api/threads/create/route.ts`를 추가해 입력 검증 후 `metric_imports` 조회, `compute_snapshot` RPC 호출, `arena_threads` insert, `thread_id` 반환까지 구현했다.
+- `statrumble/app/components/ImportChart.tsx`를 추가해 import 선택, points 로딩, Recharts `LineChart + Brush` 구간 선택, `Create Thread` 생성/이동(`router.push`) 흐름과 로딩/에러 표시를 구현했다.
+- `statrumble/app/page.tsx`의 차트 섹션을 `ImportChart`로 연결하고 서버에서 받은 imports를 props로 전달하도록 업데이트했다(`dynamic = "force-dynamic"` 유지).
+- `statrumble/app/threads/[id]/page.tsx`를 업데이트해 `arena_threads` 조회 후 `start_ts`, `end_ts`, `snapshot` JSON을 최소 표시하도록 구현했다.
+#### Manual Checklist
+- [ ] `/`에서 import 선택 시 차트 노출 동작 확인
+- [ ] Brush 선택 후 `Create Thread`로 `/threads/{id}` 이동 확인
+- [ ] `arena_threads.snapshot` DB 저장 및 상세 페이지 표시 확인
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Prompt 06 (commit: TODO)
+#### Prompt
+```text
+[Prompt 06] Arena 스레드: 메시지/투표/Quote stats (statrumble/ 기준)
+
+목표:
+- /threads/[id] 페이지에서
+  1) snapshot 요약 카드(선택구간/직전구간/변화) 표시
+  2) 메시지 목록 + 작성(enter 전송)
+  3) A/B/C 투표(1인 1표, 변경 가능) + 카운트
+  4) Quote stats 버튼: snapshot 기반 문장 자동 생성 → 입력창에 삽입
+
+요구사항 A) DB 헬퍼 추가 (statrumble/lib/db/)
+1) statrumble/lib/db/threads.ts 생성
+- getThread(threadId): arena_threads 단건 + snapshot/referee_report + metric(name,unit) join해서 반환
+
+2) statrumble/lib/db/messages.ts 생성
+- listMessages(threadId, limit=50): arena_messages 최신순 50개를 created_at ASC로 반환
+- createMessage(threadId, content): 현재 user_id(auth.uid)로 insert
+  - workspace_id는 thread에서 가져오거나(권장) thread row를 먼저 조회해서 사용
+
+3) statrumble/lib/db/votes.ts 생성
+- getVoteSummary(threadId):
+  - A/B/C 각각 count 반환
+  - 현재 유저의 내 투표(없으면 null)도 같이 반환
+- upsertVote(threadId, stance):
+  - (thread_id, user_id) unique 기반 upsert
+  - workspace_id는 thread에서 가져오거나 thread row를 먼저 조회해서 사용
+
+4) statrumble/lib/db/index.ts에 export 추가
+
+구현 규칙:
+- 서버에서만 실행. createServerClient 사용.
+- workspace_id는 항상 thread의 workspace_id를 신뢰해서 사용(클라 입력 금지).
+
+요구사항 B) API 라우트 (클라에서 호출할 부분만)
+5) GET /api/threads/[id]/messages
+- query: limit optional
+- 응답: { ok:true, messages:[{id,user_id,content,created_at}] }
+
+6) POST /api/threads/[id]/messages
+- body: { content: string }
+- 응답: { ok:true }
+
+7) GET /api/threads/[id]/votes
+- 응답: { ok:true, counts:{A:number,B:number,C:number}, my_stance: "A"|"B"|"C"|null }
+
+8) POST /api/threads/[id]/votes
+- body: { stance:"A"|"B"|"C" }
+- 응답: { ok:true, my_stance:"A"|"B"|"C" }
+
+(모든 라우트는 세션 필요. 에러는 {ok:false,error:"..."})
+
+요구사항 C) /threads/[id] UI 완성
+9) statrumble/app/threads/[id]/page.tsx
+- 서버 컴포넌트로 thread 기본 정보(snapshot 포함) 로드해서 상단에 표시:
+  - metric name/unit
+  - 선택구간 avg, 직전 avg, delta.abs, delta.rel(%) , n
+  - start/end 표시
+- 아래에 클라이언트 컴포넌트 <ThreadArena threadId=... snapshot=... /> 렌더
+
+10) statrumble/app/components/ThreadArena.tsx ('use client') 생성
+- 상태:
+  - messages, loadingMessages
+  - voteCounts, myStance, voting
+  - draft(입력창)
+  - sending
+- mount 시:
+  - /api/threads/{id}/messages GET
+  - /api/threads/{id}/votes GET
+- 메시지 UI:
+  - 메시지 목록(간단 카드)
+  - 입력창(textarea 또는 input)
+  - Enter 전송(shift+enter는 줄바꿈)
+  - 전송 성공 시 메시지 다시 fetch (또는 optimistic append)
+- 투표 UI:
+  - A/B/C 버튼 3개 + 카운트 표시
+  - 내 선택(myStance)은 강조
+  - 클릭 시 POST /votes → 성공하면 counts 재fetch 또는 응답으로 업데이트
+- Quote stats 버튼:
+  - snapshot으로 문장 생성 후 draft 앞/뒤에 삽입
+  - 예시 문장(국문/영문 아무거나 일관성 있게):
+    "선택 구간 평균은 {sel.avg}({sel.n}개), 직전 구간 평균은 {bef.avg}({bef.n}개), 변화는 {delta.abs} / {delta.rel*100}%."
+  - 숫자 포맷은 소수 2자리 정도로 정리
+  - snapshot에 before.avg가 null이면 그에 맞게 문장 조정
+- 에러 처리:
+  - 메시지/투표 API 실패 시 사용자에게 간단히 표시
+
+요구사항 D) 새로고침/갱신
+11) 메시지 전송/투표 후:
+- 간단하게는 fetch 재호출로 갱신(초기 MVP OK)
+- 서버 캐시 문제 있으면 fetch에 cache:"no-store" 옵션
+
+요구사항 E) 로그/검증
+12) docs/CODEX_LOG.md에 Prompt 06 기록 추가(원문/요약/체크리스트/(commit: TODO))
+13) pnpm -C statrumble lint/typecheck/verify 통과
+
+DoD:
+- /threads/[id]에서 snapshot 요약이 보인다
+- 메시지 작성/표시가 된다(새로고침 후에도 유지)
+- A/B/C 투표가 된다(카운트/내 선택 표시)
+- Quote stats 버튼이 draft에 문장을 삽입한다
+
+커밋 메시지:
+- "feat: arena thread messaging, voting, and quote stats"
+```
+#### Result
+- `statrumble/lib/db/threads.ts`, `statrumble/lib/db/messages.ts`, `statrumble/lib/db/votes.ts`를 추가해 thread 조회, 메시지 조회/작성, 투표 요약/업서트를 서버 전용 헬퍼로 구현했다.
+- `statrumble/lib/db/index.ts`에 신규 DB 헬퍼 export를 추가했다.
+- `statrumble/app/api/threads/[id]/messages/route.ts`, `statrumble/app/api/threads/[id]/votes/route.ts`를 추가해 세션 필수 API(GET/POST)와 `{ ok:false, error }` 응답 형식을 구현했다.
+- `statrumble/app/threads/[id]/page.tsx`를 업데이트해 snapshot 요약 카드(선택/직전/변화/기간/metric)를 서버 렌더링하고 `ThreadArena`를 연결했다.
+- `statrumble/app/components/ThreadArena.tsx`를 신규 생성해 메시지 목록/작성(Enter 전송), A/B/C 투표(1인 1표 변경), Quote stats 문장 삽입, 실패 메시지 표시를 구현했다.
+#### Manual Checklist
+- [x] `/threads/[id]` snapshot 요약 카드 표시 구현
+- [x] 메시지 작성/표시 및 전송 후 재조회 구현
+- [x] A/B/C 투표/카운트/내 선택 표시 구현
+- [x] Quote stats 문장 삽입 구현
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO

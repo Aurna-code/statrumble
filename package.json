@@ -3,9 +3,9 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix statrumble run dev",
-    "lint": "npm --prefix statrumble run lint",
-    "typecheck": "npm --prefix statrumble run typecheck",
-    "test": "npm --prefix statrumble run test --if-present",
+    "lint": "pnpm -C statrumble lint",
+    "typecheck": "pnpm -C statrumble typecheck",
+    "test": "pnpm -C statrumble test",
     "verify": "./scripts/verify.sh"
   }
 }

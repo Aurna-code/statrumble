@@ -893,3 +893,274 @@ DoD:
 - [x] `pnpm -C statrumble verify` 실행
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt 07 (commit: TODO)
+#### Prompt
+```text
+[Prompt 07] Referee 버튼: OpenAI Responses + Structured Outputs(JSON Schema) + DB 저장 + UI 렌더
+
+목표:
+- /threads/[id]에서 "Referee" 버튼 클릭 시:
+  1) thread snapshot + vote counts + 최근 메시지 N개를 서버에서 모아서
+  2) OpenAI Responses API 호출(Structured Outputs로 JSON schema 강제)
+  3) arena_threads.referee_report(jsonb)에 저장
+  4) 화면에 보기 좋게 렌더링
+
+참고(공식 스펙):
+- Responses API에서 Structured Outputs는 text.format(type:"json_schema", strict:true, schema:...)를 사용한다.
+- SDK에는 response.output_text(문자열) 헬퍼가 있다. (JSON이면 JSON.parse 가능)
+(문서: developers.openai.com)
+
+요구사항 A) Referee JSON Schema 정의
+1) 파일 추가:
+- statrumble/lib/referee/schema.ts
+- export const refereeJsonSchema = { ... } (JSON Schema object literal)
+- 스키마 요구:
+  - 최상위 type: object, additionalProperties:false
+  - required: ["tldr","data_facts","stances","confounders","next_checks","verdict"]
+  - tldr: string (1문단 요약)
+  - data_facts: array of { fact: string, support: string } (additionalProperties:false)
+  - stances: object with required keys A,B,C
+    - A/B/C 각각 { steelman: string, weakness: string } (additionalProperties:false)
+  - confounders: string[]
+  - next_checks: array of { what: string, why: string } (additionalProperties:false)
+  - verdict:
+    - leading: enum ["A","B","C","unclear"]
+    - confidence_0_100: number [0..100]
+    - reason: string
+    - additionalProperties:false
+
+요구사항 B) API: POST /api/threads/[id]/judge
+2) 라우트 생성:
+- statrumble/app/api/threads/[id]/judge/route.ts (POST)
+
+동작:
+- 세션 필수. supabase.auth.getUser()로 미로그인 401.
+- thread 로드: lib/db/threads.getThread(threadId) 사용(없으면 404)
+- vote 요약: lib/db/votes.getVoteSummary(threadId)
+- 최근 메시지: lib/db/messages.listMessages(threadId, 30) (너무 길면 마지막 20개만 모델에 전달)
+- OPENAI_API_KEY 없으면:
+  - 500 + { ok:false, error:"OPENAI_API_KEY not set" }
+
+OpenAI 호출:
+- openai 패키지 사용
+  - import OpenAI from "openai";
+  - const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+- 모델:
+  - 기본값 "gpt-5-mini"
+  - env로 override 가능: process.env.OPENAI_REFEREE_MODEL
+- 요청 형태(Responses API):
+  await openai.responses.create({
+    model,
+    input: [
+      { role:"system", content: "<Referee 역할/출력 규칙/금지사항>" },
+      { role:"user", content: "<snapshot/votes/messages를 구조적으로 제공>" }
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "referee_report",
+        strict: true,
+        schema: refereeJsonSchema
+      }
+    },
+    temperature: 0.2,
+    max_output_tokens: 1200,
+    store: false
+  })
+
+- system content 지침(요지):
+  - 너는 논쟁/데이터 해석의 Referee다.
+  - 주어진 데이터(스냅샷/투표/메시지)만 근거로 쓴다. 모르면 confounders/next_checks에 적고 verdict는 unclear 가능.
+  - 출력은 반드시 JSON만(스키마 준수). 모든 문자열은 가능한 한 한국어로.
+  - 데이터 사실(data_facts)은 snapshot 수치/메시지에서 “직접” 뽑아라.
+
+- user content에는 아래를 넣어라(가능하면 JSON-like로):
+  - metric: {name, unit}
+  - range: {start_ts, end_ts}
+  - snapshot.selected/before/delta 전부
+  - votes: {A,B,C, my_stance?}
+  - messages: [{created_at, user_id, content}] (최근 N개)
+
+응답 처리:
+- const raw = response.output_text;
+- const report = JSON.parse(raw);
+- DB 저장:
+  - supabase.from("arena_threads").update({ referee_report: report }).eq("id", threadId)
+- 반환:
+  { ok:true, report }
+
+에러:
+- OpenAI 호출 실패/JSON parse 실패/DB 실패는 { ok:false, error:"..." }로 통일
+
+요구사항 C) UI: ThreadArena에 Referee 버튼 + 렌더
+3) statrumble/app/components/ThreadArena.tsx 수정
+- props에 initialRefereeReport(없으면 null) 추가
+- state: refereeReport, judging(boolean), judgeError
+- UI:
+  - 투표 영역 근처에 "Run Referee" 버튼 추가
+  - 클릭 시 POST /api/threads/{id}/judge
+  - 로딩 표시
+  - 성공 시 refereeReport state 업데이트
+  - 실패 시 에러 표시
+
+4) report 렌더 컴포넌트 추가(선택이지만 권장)
+- statrumble/app/components/RefereeReportView.tsx ('use client' 아니어도 됨)
+- report를 섹션별로 보기 좋게 렌더:
+  - TL;DR
+  - Data facts (bullet)
+  - Stances A/B/C (steelman/weakness)
+  - Confounders
+  - Next checks
+  - Verdict(leading/confidence/reason)
+
+요구사항 D) /threads/[id] 서버 페이지에서 report 전달
+5) statrumble/app/threads/[id]/page.tsx 수정
+- getThread 결과에 referee_report가 있으니 ThreadArena에 initialRefereeReport로 넘긴다.
+- 캐시 이슈 방지:
+  - 페이지 상단에 export const dynamic = "force-dynamic" 추가(없으면)
+
+요구사항 E) 문서/검증
+6) README에 Referee 설정 한 줄 추가:
+- statrumble/.env.local에 OPENAI_API_KEY 필요
+- (선택) OPENAI_REFEREE_MODEL로 모델 변경 가능
+
+7) docs/CODEX_LOG.md에 Prompt 07 기록 추가(원문/요약/체크리스트/(commit: TODO))
+
+DoD:
+- 스레드 화면에서 Referee 버튼 클릭 → 수 초 내 report 생성/표시
+- 새로고침 후에도 referee_report가 DB에서 로드되어 그대로 보임
+- pnpm -C statrumble lint/typecheck/verify 통과
+
+커밋 메시지:
+- "feat: referee judge via openai responses structured outputs"
+```
+#### Result
+- `statrumble/lib/referee/schema.ts`를 추가해 Structured Outputs용 Referee JSON Schema와 `RefereeReport` 타입을 정의했다.
+- `statrumble/app/api/threads/[id]/judge/route.ts`를 추가해 세션 검증, thread/votes/messages 수집, OpenAI Responses(`json_schema`, `strict:true`) 호출, `arena_threads.referee_report` 저장, 에러 일관 응답을 구현했다.
+- `statrumble/app/components/RefereeReportView.tsx`를 추가해 Referee report를 TL;DR/Data facts/Stances/Confounders/Next checks/Verdict 섹션으로 렌더하도록 구현했다.
+- `statrumble/app/components/ThreadArena.tsx`에 `initialRefereeReport`, `Run Referee` 버튼, `judging/judgeError/refereeReport` 상태 및 API 연동을 추가했다.
+- `statrumble/app/threads/[id]/page.tsx`에 `export const dynamic = "force-dynamic"`를 추가하고 `initialRefereeReport`를 전달하도록 수정했다.
+- `README.md`에 `.env.local`의 `OPENAI_API_KEY` 필요 및 `OPENAI_REFEREE_MODEL` 선택 설정 문구를 추가했다.
+#### Manual Checklist
+- [x] Referee JSON Schema 파일 추가
+- [x] `/api/threads/[id]/judge` 구현 (OpenAI 호출 + DB 저장)
+- [x] ThreadArena Referee 버튼/로딩/에러/결과 반영 구현
+- [x] `/threads/[id]` 초기 report 전달 + force-dynamic 반영
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix 07a (commit: TODO)
+#### Prompt
+```text
+[Hotfix 07a] Fix 400: remove unsupported temperature for gpt-5-mini (Responses API)
+
+증상:
+- Run Referee 시 400: Unsupported parameter "temperature" is not supported with this model.
+
+원인:
+- /api/threads/[id]/judge에서 openai.responses.create 호출에 temperature를 넣고 있음.
+- 현재 모델(기본 gpt-5-mini)이 temperature를 지원하지 않아 400 발생.
+
+작업:
+1) statrumble/app/api/threads/[id]/judge/route.ts 수정
+- openai.responses.create({...}) payload에서 temperature 필드를 제거한다.
+- top_p를 쓰고 있으면 그것도 제거한다(혹시 같은 계열 제한일 수 있음).
+- max_output_tokens, text.format(json_schema/strict/schema) 등은 유지한다.
+- 나머지 로직(DB 저장/응답)은 그대로.
+
+2) (선택) README에 "일부 모델은 temperature 미지원" 짧게 메모 추가.
+
+3) docs/CODEX_LOG.md에 Hotfix 07a 기록 추가.
+
+DoD:
+- Run Referee 버튼 클릭 시 더 이상 400이 나지 않고 report가 생성/저장/표시된다.
+- pnpm -C statrumble lint/typecheck/verify 통과.
+
+커밋 메시지:
+- "fix: remove unsupported temperature from referee request"
+```
+#### Result
+- `statrumble/app/api/threads/[id]/judge/route.ts`의 `openai.responses.create` payload에서 `temperature`를 제거했다 (`top_p`는 기존에도 사용하지 않음).
+- `README.md` Run Locally env 안내에 일부 모델의 샘플링 파라미터 미지원 가능성을 메모로 추가했다.
+#### Manual Checklist
+- [x] Referee 요청 payload에서 `temperature` 제거
+- [x] (`top_p` 미사용 확인)
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+- [ ] Run Referee 400 해소 및 report 생성/저장/표시 동작 확인
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix 07b (commit: TODO)
+#### Prompt
+```text
+[Hotfix 07b] Make Referee JSON parsing robust + minimize reasoning noise
+
+증상:
+- Run Referee → "Failed to parse referee JSON: Unterminated string ..."
+
+원인 후보:
+- 모델 출력에 JSON 외 텍스트가 섞이거나(예: Reasoning prefix), 줄바꿈/잡문이 끼어서 JSON.parse 실패
+- 출력이 중간에 잘려 JSON이 닫히지 않음
+
+작업:
+1) statrumble/app/api/threads/[id]/judge/route.ts 수정 (핵심)
+A) OpenAI 요청 파라미터 보강
+- text는 format만 주지 말고 verbosity도 낮게:
+  text: {
+    verbosity: "low",
+    format: { type:"json_schema", name:"referee_report", strict:true, schema: refereeJsonSchema }
+  }
+- GPT-5 계열 minimal reasoning 적용:
+  reasoning: { effort: "minimal" }
+- max_output_tokens는 너무 낮으면 잘리니 1800~2500으로 올려라(예: 2000)
+
+B) JSON 파싱 방어 로직 추가
+- const raw = (response.output_text ?? "").trim();
+- JSON 후보만 추출:
+  - const first = raw.indexOf("{");
+  - const last = raw.lastIndexOf("}");
+  - const candidate = (first !== -1 && last !== -1 && last > first) ? raw.slice(first, last + 1) : raw;
+- JSON.parse(candidate)를 시도
+- 실패하면:
+  - 서버 로그에 raw 앞부분/뒷부분 일부(예: 300자씩)만 찍고(키/민감정보는 없음)
+  - { ok:false, error:"Failed to parse referee JSON: ..." } 반환
+
+C) (선택) 1회 재시도(fallback)
+- 첫 파싱 실패 시에만 1번 더 호출:
+  - 모델을 fallback으로 바꿔서 재시도 (기본: "gpt-4o-mini" 또는 env OPENAI_REFEREE_FALLBACK_MODEL)
+  - 두 번째도 실패하면 최종 실패 반환
+
+2) system prompt에 한 줄 추가(안전장치)
+- "모든 string 필드는 줄바꿈 없이 한 줄로 작성(필요하면 \\n 사용)" 정도 추가
+
+3) docs/CODEX_LOG.md에 Hotfix 07b 기록 추가
+
+DoD:
+- Run Referee가 성공해서 report 생성/저장/표시된다
+- pnpm -C statrumble lint/typecheck/verify 통과
+
+커밋 메시지:
+- "fix: harden referee structured output parsing"
+```
+#### Result
+- `statrumble/app/api/threads/[id]/judge/route.ts`에 `text.verbosity: "low"`, GPT-5 계열 `reasoning.effort: "minimal"`, `max_output_tokens: 2000`을 반영했다.
+- JSON 파싱을 `output_text` 직접 parse에서 `raw trim -> JSON candidate 추출 -> parse` 방식으로 강화하고, 실패 시 raw/candidate 앞뒤 300자 스니펫을 서버 로그로 남기도록 추가했다.
+- 1차 파싱 실패 시 fallback 모델(`OPENAI_REFEREE_FALLBACK_MODEL` 또는 기본 `gpt-4o-mini`)로 1회 재시도하도록 구현했다.
+- system prompt에 "모든 string 필드는 줄바꿈 없이 한 줄" 제약을 추가했다.
+#### Manual Checklist
+- [x] low verbosity + minimal reasoning + max_output_tokens 상향 반영
+- [x] JSON candidate 추출/파싱 방어 로직 반영
+- [x] 파싱 실패 시 서버 로그 스니펫 추가
+- [x] 1회 fallback 재시도 구현
+- [x] `pnpm -C statrumble lint` 실행
+- [x] `pnpm -C statrumble typecheck` 실행
+- [x] `pnpm -C statrumble verify` 실행
+- [ ] Run Referee 성공(생성/저장/표시) 수동 확인
+#### Commit Link
+- TODO

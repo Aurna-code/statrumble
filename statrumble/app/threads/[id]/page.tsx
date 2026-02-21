@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import ThreadArena from "@/app/components/ThreadArena";
 import { getThread } from "@/lib/db/threads";
+import type { RefereeReport } from "@/lib/referee/schema";
+
+export const dynamic = "force-dynamic";
 
 interface ThreadPageProps {
   params: Promise<{ id: string }>;
@@ -147,7 +150,11 @@ export default async function ThreadDetailPage({ params }: ThreadPageProps) {
         </div>
       </div>
 
-      <ThreadArena threadId={thread.id} snapshot={thread.snapshot} />
+      <ThreadArena
+        threadId={thread.id}
+        snapshot={thread.snapshot}
+        initialRefereeReport={(thread.referee_report as RefereeReport | null) ?? null}
+      />
     </main>
   );
 }

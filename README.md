@@ -33,6 +33,9 @@ npm install
 cp ../.env.example .env.local
 ```
    - local env file path: `statrumble/.env.local`
+   - Referee 사용을 위해 `OPENAI_API_KEY`가 필요합니다.
+   - (선택) `OPENAI_REFEREE_MODEL`로 Referee 모델을 변경할 수 있습니다. 기본값은 `gpt-5-mini`입니다.
+   - 일부 모델은 `temperature` 같은 샘플링 파라미터를 지원하지 않을 수 있습니다.
 3. Start dev server:
 ```bash
 npm run dev

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import RefereeReportView from "@/app/components/RefereeReportView";
+import type { RefereeReport } from "@/lib/referee/schema";
 
 type VoteStance = "A" | "B" | "C";
 
@@ -32,6 +34,12 @@ type VoteSubmitApiResponse = {
   error?: string;
 };
 
+type JudgeApiResponse = {
+  ok: boolean;
+  report?: RefereeReport;
+  error?: string;
+};
+
 type SnapshotSummary = {
   selectedAvg: number | null;
   selectedN: number | null;
@@ -44,6 +52,7 @@ type SnapshotSummary = {
 type ThreadArenaProps = {
   threadId: string;
   snapshot: unknown;
+  initialRefereeReport?: RefereeReport | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -124,7 +133,7 @@ function buildQuoteSentence(snapshot: unknown) {
   return `선택 구간 평균은 ${selectedAvg}(${selectedN}개), 직전 구간 평균은 ${beforeAvg}(${beforeN}개), 변화는 ${deltaAbs} / ${deltaRelPercent}%.`;
 }
 
-export default function ThreadArena({ threadId, snapshot }: ThreadArenaProps) {
+export default function ThreadArena({ threadId, snapshot, initialRefereeReport = null }: ThreadArenaProps) {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
@@ -132,6 +141,9 @@ export default function ThreadArena({ threadId, snapshot }: ThreadArenaProps) {
   const [myStance, setMyStance] = useState<VoteStance | null>(null);
   const [voting, setVoting] = useState(false);
   const [votesError, setVotesError] = useState<string | null>(null);
+  const [refereeReport, setRefereeReport] = useState<RefereeReport | null>(initialRefereeReport);
+  const [judging, setJudging] = useState(false);
+  const [judgeError, setJudgeError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -253,112 +265,162 @@ export default function ThreadArena({ threadId, snapshot }: ThreadArenaProps) {
     setDraft((prev) => (prev.trim().length === 0 ? quoteSentence : `${prev}\n${quoteSentence}`));
   }
 
+  async function onRunReferee() {
+    if (judging) {
+      return;
+    }
+
+    setJudging(true);
+    setJudgeError(null);
+
+    try {
+      const response = await fetch(`/api/threads/${threadId}/judge`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as JudgeApiResponse;
+
+      if (!response.ok || !payload.ok || !payload.report) {
+        throw new Error(payload.error ?? "Failed to run referee.");
+      }
+
+      setRefereeReport(payload.report);
+    } catch (error) {
+      setJudgeError(error instanceof Error ? error.message : "Unknown referee error");
+    } finally {
+      setJudging(false);
+    }
+  }
+
   return (
-    <section className="mt-6 grid gap-6 lg:grid-cols-2">
-      <div className="rounded-lg border border-zinc-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Messages</h2>
-          <button
-            type="button"
-            className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
-            onClick={() => void fetchMessages()}
-          >
-            새로고침
-          </button>
-        </div>
-
-        <div className="mt-4 max-h-80 space-y-3 overflow-auto pr-1">
-          {loadingMessages ? <p className="text-sm text-zinc-600">메시지 로딩 중...</p> : null}
-          {!loadingMessages && messages.length === 0 ? (
-            <p className="text-sm text-zinc-600">아직 메시지가 없습니다.</p>
-          ) : null}
-          {messages.map((message) => (
-            <article key={message.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-              <p className="text-xs text-zinc-600">{message.user_id}</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-900">{message.content}</p>
-              <p className="mt-2 text-[11px] text-zinc-500">{formatDateLabel(message.created_at)}</p>
-            </article>
-          ))}
-        </div>
-
-        {messagesError ? <p className="mt-3 text-sm text-red-600">{messagesError}</p> : null}
-
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-zinc-600">Enter 전송 / Shift+Enter 줄바꿈</p>
+    <div className="mt-6 space-y-6">
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-lg border border-zinc-200 bg-white p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Messages</h2>
             <button
               type="button"
               className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
-              onClick={onInsertQuoteStats}
+              onClick={() => void fetchMessages()}
             >
-              Quote stats
+              새로고침
             </button>
           </div>
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void onSendMessage();
-              }
-            }}
-            placeholder="메시지를 입력하세요."
-            rows={4}
-            className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
-          />
-          <div className="flex justify-end">
+
+          <div className="mt-4 max-h-80 space-y-3 overflow-auto pr-1">
+            {loadingMessages ? <p className="text-sm text-zinc-600">메시지 로딩 중...</p> : null}
+            {!loadingMessages && messages.length === 0 ? (
+              <p className="text-sm text-zinc-600">아직 메시지가 없습니다.</p>
+            ) : null}
+            {messages.map((message) => (
+              <article key={message.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                <p className="text-xs text-zinc-600">{message.user_id}</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-900">{message.content}</p>
+                <p className="mt-2 text-[11px] text-zinc-500">{formatDateLabel(message.created_at)}</p>
+              </article>
+            ))}
+          </div>
+
+          {messagesError ? <p className="mt-3 text-sm text-red-600">{messagesError}</p> : null}
+
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-zinc-600">Enter 전송 / Shift+Enter 줄바꿈</p>
+              <button
+                type="button"
+                className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
+                onClick={onInsertQuoteStats}
+              >
+                Quote stats
+              </button>
+            </div>
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void onSendMessage();
+                }
+              }}
+              placeholder="메시지를 입력하세요."
+              rows={4}
+              className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+            />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void onSendMessage()}
+                disabled={sending || !draft.trim()}
+                className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sending ? "전송 중..." : "전송"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-zinc-200 bg-white p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Vote</h2>
             <button
               type="button"
-              onClick={() => void onSendMessage()}
-              disabled={sending || !draft.trim()}
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
+              onClick={() => void fetchVotes()}
             >
-              {sending ? "전송 중..." : "전송"}
+              새로고침
             </button>
           </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {(Object.keys(voteCounts) as VoteStance[]).map((stance) => {
+              const selected = myStance === stance;
+
+              return (
+                <button
+                  key={stance}
+                  type="button"
+                  onClick={() => void onVote(stance)}
+                  disabled={voting}
+                  className={`rounded-md border px-3 py-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    selected
+                      ? "border-zinc-900 bg-zinc-900 text-white"
+                      : "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
+                  }`}
+                >
+                  <span className="font-semibold">{stance}</span>
+                  <span className="ml-2 text-xs">({voteCounts[stance]})</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-3 text-xs text-zinc-600">1인 1표이며, 다시 선택하면 투표가 변경됩니다.</p>
+          {myStance ? <p className="mt-2 text-sm text-zinc-800">내 선택: {myStance}</p> : null}
+          {votesError ? <p className="mt-2 text-sm text-red-600">{votesError}</p> : null}
+
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => void onRunReferee()}
+              disabled={judging}
+              className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {judging ? "Referee 실행 중..." : "Run Referee"}
+            </button>
+            {judgeError ? <p className="mt-2 text-sm text-red-600">{judgeError}</p> : null}
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="rounded-lg border border-zinc-200 bg-white p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Vote</h2>
-          <button
-            type="button"
-            className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
-            onClick={() => void fetchVotes()}
-          >
-            새로고침
-          </button>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {(Object.keys(voteCounts) as VoteStance[]).map((stance) => {
-            const selected = myStance === stance;
-
-            return (
-              <button
-                key={stance}
-                type="button"
-                onClick={() => void onVote(stance)}
-                disabled={voting}
-                className={`rounded-md border px-3 py-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                  selected
-                    ? "border-zinc-900 bg-zinc-900 text-white"
-                    : "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
-                }`}
-              >
-                <span className="font-semibold">{stance}</span>
-                <span className="ml-2 text-xs">({voteCounts[stance]})</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <p className="mt-3 text-xs text-zinc-600">1인 1표이며, 다시 선택하면 투표가 변경됩니다.</p>
-        {myStance ? <p className="mt-2 text-sm text-zinc-800">내 선택: {myStance}</p> : null}
-        {votesError ? <p className="mt-2 text-sm text-red-600">{votesError}</p> : null}
-      </div>
-    </section>
+      {refereeReport ? (
+        <RefereeReportView report={refereeReport} />
+      ) : (
+        <section className="rounded-lg border border-zinc-200 bg-white p-5">
+          <h2 className="text-base font-semibold">Referee Report</h2>
+          <p className="mt-2 text-sm text-zinc-600">아직 생성된 Referee report가 없습니다.</p>
+        </section>
+      )}
+    </div>
   );
 }

@@ -1,5 +1,7 @@
 import Link from "next/link";
+import OnboardingCard from "@/app/components/OnboardingCard";
 import { listImports, listMetrics, listThreads, type MetricImportRow } from "@/lib/db";
+import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import UploadCsvForm from "@/app/components/UploadCsvForm";
 import ImportChart from "@/app/components/ImportChart";
 
@@ -26,6 +28,19 @@ function formatDateLabel(value: string) {
 }
 
 export default async function Home() {
+  const memberships = await listMemberWorkspaceSummaries();
+  const hasMembership = memberships.length > 0;
+
+  if (!hasMembership) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
+        <p className="mt-2 text-sm text-zinc-600">데이터 토론을 시작하려면 먼저 워크스페이스가 필요합니다.</p>
+        <OnboardingCard />
+      </main>
+    );
+  }
+
   const [metricsResult, importsResult, threadsResult] = await Promise.allSettled([
     listMetrics(),
     listImports(10),
@@ -42,10 +57,6 @@ export default async function Home() {
   const metricsError = metricsResult.status === "rejected" ? metricsResult.reason : null;
   const importsError = importsResult.status === "rejected" ? importsResult.reason : null;
   const threadsError = threadsResult.status === "rejected" ? threadsResult.reason : null;
-  const hasNoWorkspaceMembership =
-    (metricsError instanceof Error && metricsError.message === "No workspace membership.") ||
-    (importsError instanceof Error && importsError.message === "No workspace membership.") ||
-    (threadsError instanceof Error && threadsError.message === "No workspace membership.");
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
@@ -53,26 +64,11 @@ export default async function Home() {
       <p className="mt-2 text-sm text-zinc-600">
         Prompt 00 scaffolding page. Functional logic will be implemented in later prompts.
       </p>
-      {hasNoWorkspaceMembership ? (
-        <section className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm text-amber-900">No workspace membership. Join하거나 workspace를 먼저 생성하세요.</p>
-          <Link
-            href="/join"
-            className="mt-3 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-2 text-sm font-medium text-amber-900 hover:bg-amber-100"
-          >
-            Go to Join
-          </Link>
-        </section>
-      ) : null}
 
       <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
         <h2 className="font-medium">CSV 업로드</h2>
         <p className="mt-1 text-sm text-zinc-600">업로드 UI 자리표시</p>
-        {hasNoWorkspaceMembership ? (
-          <p className="mt-3 text-sm text-zinc-600">워크스페이스 멤버가 되면 업로드를 시작할 수 있습니다.</p>
-        ) : (
-          <UploadCsvForm />
-        )}
+        <UploadCsvForm />
       </section>
 
       <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-5">

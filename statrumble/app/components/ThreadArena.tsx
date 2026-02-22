@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefereeReportView from "@/app/components/RefereeReportView";
 import type { RefereeReport } from "@/lib/referee/schema";
 
@@ -133,7 +133,33 @@ function buildQuoteSentence(snapshot: unknown) {
   return `선택 구간 평균은 ${selectedAvg}(${selectedN}개), 직전 구간 평균은 ${beforeAvg}(${beforeN}개), 변화는 ${deltaAbs} / ${deltaRelPercent}%.`;
 }
 
+function areMessagesEqual(left: MessageItem[], right: MessageItem[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => {
+    const next = right[index];
+    return (
+      Boolean(next) &&
+      item.id === next.id &&
+      item.user_id === next.user_id &&
+      item.content === next.content &&
+      item.created_at === next.created_at
+    );
+  });
+}
+
+function buildVoteSignature(counts: VoteCounts, myStance: VoteStance | null) {
+  return `${counts.A}:${counts.B}:${counts.C}:${myStance ?? "-"}`;
+}
+
 export default function ThreadArena({ threadId, snapshot, initialRefereeReport = null }: ThreadArenaProps) {
+  const renderWindowRef = useRef({
+    windowStart: Date.now(),
+    renderCount: 0,
+    lastWarnAt: 0,
+  });
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
@@ -141,11 +167,39 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
   const [myStance, setMyStance] = useState<VoteStance | null>(null);
   const [voting, setVoting] = useState(false);
   const [votesError, setVotesError] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const [refereeReport, setRefereeReport] = useState<RefereeReport | null>(initialRefereeReport);
   const [judging, setJudging] = useState(false);
   const [judgeError, setJudgeError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const votesInFlightRef = useRef(false);
+  const votesSignatureRef = useRef(buildVoteSignature(voteCounts, myStance));
+
+  if (process.env.NEXT_PUBLIC_DEBUG_RENDER_LOOP === "1") {
+    const now = Date.now();
+    const windowMs = 1000;
+    const warnCooldownMs = 5000;
+
+    if (now - renderWindowRef.current.windowStart >= windowMs) {
+      renderWindowRef.current.windowStart = now;
+      renderWindowRef.current.renderCount = 1;
+    } else {
+      renderWindowRef.current.renderCount += 1;
+    }
+
+    if (
+      renderWindowRef.current.renderCount > 30 &&
+      now - renderWindowRef.current.lastWarnAt >= warnCooldownMs
+    ) {
+      renderWindowRef.current.lastWarnAt = now;
+      console.error("[ThreadArena] high render rate detected", {
+        threadId,
+        rendersPerSecond: renderWindowRef.current.renderCount,
+        windowMs,
+      });
+    }
+  }
 
   const quoteSentence = useMemo(() => buildQuoteSentence(snapshot), [snapshot]);
 
@@ -164,7 +218,8 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
         throw new Error(payload.error ?? "Failed to load messages.");
       }
 
-      setMessages(payload.messages ?? []);
+      const nextMessages = payload.messages ?? [];
+      setMessages((prev) => (areMessagesEqual(prev, nextMessages) ? prev : nextMessages));
     } catch (error) {
       setMessagesError(error instanceof Error ? error.message : "Unknown messages error");
     } finally {
@@ -172,13 +227,19 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
     }
   }, [threadId]);
 
-  const fetchVotes = useCallback(async () => {
+  const fetchVotes = useCallback(async (signal: AbortSignal) => {
+    if (votesInFlightRef.current) {
+      return;
+    }
+
+    votesInFlightRef.current = true;
     setVotesError(null);
 
     try {
       const response = await fetch(`/api/threads/${threadId}/votes`, {
         method: "GET",
         cache: "no-store",
+        signal,
       });
       const payload = (await response.json()) as VotesApiResponse;
 
@@ -186,16 +247,39 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
         throw new Error(payload.error ?? "Failed to load votes.");
       }
 
-      setVoteCounts(payload.counts);
-      setMyStance(payload.my_stance ?? null);
+      const nextCounts = payload.counts;
+      const nextMyStance = payload.my_stance ?? null;
+      const nextSignature = buildVoteSignature(nextCounts, nextMyStance);
+
+      if (votesSignatureRef.current !== nextSignature) {
+        votesSignatureRef.current = nextSignature;
+        setVoteCounts(nextCounts);
+        setMyStance(nextMyStance);
+      }
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
       setVotesError(error instanceof Error ? error.message : "Unknown votes error");
+    } finally {
+      votesInFlightRef.current = false;
     }
   }, [threadId]);
 
   useEffect(() => {
-    void Promise.all([fetchMessages(), fetchVotes()]);
-  }, [fetchMessages, fetchVotes]);
+    void fetchMessages();
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchVotes(controller.signal);
+
+    return () => {
+      controller.abort();
+      votesInFlightRef.current = false;
+    };
+  }, [threadId, refreshNonce, fetchVotes]);
 
   async function onSendMessage() {
     if (sending || !draft.trim()) {
@@ -252,8 +336,7 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
         throw new Error(payload.error ?? "Failed to submit vote.");
       }
 
-      setMyStance(payload.my_stance);
-      await fetchVotes();
+      setRefreshNonce((current) => current + 1);
     } catch (error) {
       setVotesError(error instanceof Error ? error.message : "Unknown vote error");
     } finally {
@@ -366,7 +449,7 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
             <button
               type="button"
               className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
-              onClick={() => void fetchVotes()}
+              onClick={() => setRefreshNonce((current) => current + 1)}
             >
               새로고침
             </button>

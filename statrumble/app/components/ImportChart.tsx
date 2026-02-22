@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Brush,
@@ -57,6 +57,17 @@ function formatDateLabel(value: string) {
   return date.toLocaleString();
 }
 
+function arePointsEqual(left: PointItem[], right: PointItem[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((item, index) => {
+    const next = right[index];
+    return Boolean(next) && item.ts === next.ts && item.value === next.value;
+  });
+}
+
 function getDefaultBrushRange(pointsLength: number): BrushRange {
   if (pointsLength === 0) {
     return { startIndex: 0, endIndex: 0 };
@@ -70,6 +81,8 @@ function getDefaultBrushRange(pointsLength: number): BrushRange {
 
 export default function ImportChart({ imports }: ImportChartProps) {
   const router = useRouter();
+  const renderCountRef = useRef(0);
+  const didWarnRenderLoopRef = useRef(false);
   const [selectedImportId, setSelectedImportId] = useState(imports[0]?.id ?? "");
   const [points, setPoints] = useState<PointItem[]>([]);
   const [totalPoints, setTotalPoints] = useState<number | null>(null);
@@ -79,17 +92,35 @@ export default function ImportChart({ imports }: ImportChartProps) {
   const [brushRange, setBrushRange] = useState<BrushRange>(getDefaultBrushRange(0));
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
+  const importIds = useMemo(() => imports.map((item) => item.id), [imports]);
+  const firstImportId = importIds[0] ?? "";
+  const importIdsKey = useMemo(() => importIds.join("|"), [importIds]);
+
+  renderCountRef.current += 1;
+  if (
+    process.env.NEXT_PUBLIC_DEBUG_RENDER_LOOP === "1" &&
+    renderCountRef.current > 60 &&
+    !didWarnRenderLoopRef.current
+  ) {
+    didWarnRenderLoopRef.current = true;
+    console.error("[ImportChart] render count exceeded 60", {
+      selectedImportId,
+      importCount: imports.length,
+      renderCount: renderCountRef.current,
+    });
+  }
 
   useEffect(() => {
-    if (imports.length === 0) {
-      setSelectedImportId("");
+    if (!firstImportId) {
+      setSelectedImportId((prev) => (prev === "" ? prev : ""));
       return;
     }
 
-    if (!selectedImportId || !imports.some((item) => item.id === selectedImportId)) {
-      setSelectedImportId(imports[0].id);
-    }
-  }, [imports, selectedImportId]);
+    const idSet = new Set(importIdsKey.split("|"));
+    setSelectedImportId((prev) => {
+      return idSet.has(prev) ? prev : firstImportId;
+    });
+  }, [firstImportId, importIdsKey]);
 
   useEffect(() => {
     if (!selectedImportId) {
@@ -121,19 +152,29 @@ export default function ImportChart({ imports }: ImportChartProps) {
         }
 
         const loadedPoints = payload.points ?? [];
-        setPoints(loadedPoints);
-        setTotalPoints(typeof payload.total === "number" ? payload.total : loadedPoints.length);
-        setSampled(Boolean(payload.sampled));
-        setBrushRange(getDefaultBrushRange(loadedPoints.length));
+        const nextTotalPoints = typeof payload.total === "number" ? payload.total : loadedPoints.length;
+        const nextSampled = Boolean(payload.sampled);
+
+        setPoints((prev) => (arePointsEqual(prev, loadedPoints) ? prev : loadedPoints));
+        setTotalPoints((prev) => (prev === nextTotalPoints ? prev : nextTotalPoints));
+        setSampled((prev) => (prev === nextSampled ? prev : nextSampled));
+
+        const nextBrushRange = getDefaultBrushRange(loadedPoints.length);
+        setBrushRange((prev) =>
+          prev.startIndex === nextBrushRange.startIndex && prev.endIndex === nextBrushRange.endIndex ? prev : nextBrushRange,
+        );
       } catch (error) {
         if (controller.signal.aborted) {
           return;
         }
 
-        setPoints([]);
-        setTotalPoints(null);
-        setSampled(false);
-        setBrushRange(getDefaultBrushRange(0));
+        const nextDefaultRange = getDefaultBrushRange(0);
+        setPoints((prev) => (prev.length === 0 ? prev : []));
+        setTotalPoints((prev) => (prev === null ? prev : null));
+        setSampled((prev) => (prev === false ? prev : false));
+        setBrushRange((prev) =>
+          prev.startIndex === nextDefaultRange.startIndex && prev.endIndex === nextDefaultRange.endIndex ? prev : nextDefaultRange,
+        );
         setPointsError(error instanceof Error ? error.message : "Unknown points error");
       } finally {
         if (!controller.signal.aborted) {

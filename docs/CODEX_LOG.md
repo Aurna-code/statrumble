@@ -1637,3 +1637,75 @@ Commit separation:
 #### Commit Link
 - 3c5c5f4 (`fix(ux): gate dashboard when no workspace membership`)
 - TODO (`feat(workspace): create workspace bootstrap flow`)
+
+### Prompt ID: Onboarding-Unblock-2026-02-22 (commit: TODO)
+#### Prompt
+```text
+[Unblock onboarding] Make new users land in a workspace after Join/Create
+
+Goal:
+- A brand-new account can:
+  1) Create workspace (no invite needed) OR Join by invite code
+  2) Immediately see that workspace and proceed to dashboard (imports/threads)
+- No dead-end "No workspace membership" after successful join/create.
+
+Phase 1) Fix create_workspace RPC not found
+1) Verify DB has the function signature expected by client:
+- If client calls rpc('create_workspace', { p_name }), then DB function must be:
+  create_workspace(p_name text) returns workspace_id + invite_code
+- If DB uses (name text), then change client to pass { name } instead of { p_name }.
+
+2) Ensure migration exists and is applied:
+- Add/verify migration that creates public.create_workspace(...)
+- User will run `npx -y supabase db push` after merge; document this in CODEX_LOG/README.
+
+Phase 2) Make Join/Create set active workspace and redirect
+Option A (simplest now): no “active workspace” feature yet; just pick first membership
+- On every server page load, fetch user's workspace memberships.
+- If count >=1, treat the first workspace as current and render dashboard.
+- If count ==0, show onboarding screen only.
+
+Option B (better): set cookie "sr_workspace_id"
+- After join/create API returns workspace_id, set cookie in the API response.
+- Server uses cookie to select workspace; fallback to first membership if cookie missing/invalid.
+
+Required UX:
+- After successful /join:
+  - redirect to /workspace and show membership list (including the joined one)
+  - and/or redirect to / (dashboard) that now loads with that membership
+- After successful create:
+  - user becomes owner member
+  - redirect to /workspace or / and dashboard loads.
+
+Phase 3) Reduce scary screens
+- If no membership: do NOT call imports/threads/metrics APIs; render only Join/Create CTA.
+
+Commits:
+- fix(workspace): restore create_workspace RPC and align rpc arg names
+- fix(onboarding): after join/create, user lands in a workspace (no dead-end)
+- fix(ux): gate dashboard when no membership
+```
+#### Result
+- Phase 1 (`a8cd242`): restored and aligned `create_workspace` RPC contract.
+  - Added migration `statrumble/supabase/migrations/006_restore_create_workspace_rpc.sql` with `public.create_workspace(name text)` returning `(workspace_id, invite_code)`.
+  - Updated `statrumble/app/api/workspaces/create/route.ts` to call `rpc("create_workspace", { name })`.
+  - Updated `README.md` migration section with `npx -y supabase db push` guidance and onboarding RPC note.
+- Phase 2 (`f0d1ded`): join/create now land users in workspace view.
+  - `statrumble/app/join/page.tsx` now redirects to `/workspace` after success.
+  - `statrumble/app/create-workspace/page.tsx` now redirects to `/workspace` after success.
+  - Active workspace cookie/localStorage behavior remains in place, preventing dead-end onboarding.
+- Phase 3 (`fix(ux)` commit below): hardened no-membership gating path.
+  - `statrumble/app/page.tsx` wraps membership check defensively and renders onboarding-only view on no-membership/fetch-failure.
+  - `statrumble/app/workspace/page.tsx` no longer renders an empty member section when membership is zero.
+#### Manual Checklist
+- [x] `create_workspace` RPC signature and client arg names aligned
+- [x] migration apply guidance added (`npx -y supabase db push`)
+- [x] join/create success redirects land user in workspace context
+- [x] no-membership path skips dashboard data APIs and shows onboarding CTA only
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- a8cd242 (`fix(workspace): restore create_workspace RPC and align rpc arg names`)
+- f0d1ded (`fix(onboarding): after join/create, user lands in a workspace (no dead-end)`)
+- TODO (`fix(ux): gate dashboard when no membership`)

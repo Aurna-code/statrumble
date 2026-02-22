@@ -28,14 +28,20 @@ function formatDateLabel(value: string) {
 }
 
 export default async function Home() {
-  const memberships = await listMemberWorkspaceSummaries();
-  const hasMembership = memberships.length > 0;
+  let hasMembership = false;
+
+  try {
+    const memberships = await listMemberWorkspaceSummaries();
+    hasMembership = memberships.length > 0;
+  } catch {
+    hasMembership = false;
+  }
 
   if (!hasMembership) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
-        <p className="mt-2 text-sm text-zinc-600">데이터 토론을 시작하려면 먼저 워크스페이스가 필요합니다.</p>
+        <p className="mt-2 text-sm text-zinc-600">데이터 토론을 시작하려면 워크스페이스에 먼저 참여하세요.</p>
         <OnboardingCard />
       </main>
     );

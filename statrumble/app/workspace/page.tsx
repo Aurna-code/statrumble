@@ -43,27 +43,25 @@ export default async function WorkspacePage() {
         />
       ) : null}
 
-      <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-        {!loadError && workspaces.length > 0 ? (
-          <>
-            <p className="text-sm text-zinc-600">내가 속한 workspace 목록입니다.</p>
-            <ul className="mt-4 space-y-4">
-              {workspaces.map((workspace) => (
-                <li key={workspace.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                  <p className="font-medium">{workspace.name}</p>
-                  <p className="mt-1 text-xs text-zinc-500">role: {workspace.role}</p>
-                  <p className="mt-3 text-xs text-zinc-500">Invite code</p>
-                  <p className="mt-1 font-mono text-xl font-semibold tracking-wide">{workspace.invite_code}</p>
-                  <p className="mt-2 text-xs text-zinc-500">
-                    초대 상태: {workspace.invite_enabled ? "enabled" : "disabled"}
-                  </p>
-                  <InviteCodeCopyButton inviteCode={workspace.invite_code} />
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-      </section>
+      {!loadError && workspaces.length > 0 ? (
+        <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
+          <p className="text-sm text-zinc-600">내가 속한 workspace 목록입니다.</p>
+          <ul className="mt-4 space-y-4">
+            {workspaces.map((workspace) => (
+              <li key={workspace.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                <p className="font-medium">{workspace.name}</p>
+                <p className="mt-1 text-xs text-zinc-500">role: {workspace.role}</p>
+                <p className="mt-3 text-xs text-zinc-500">Invite code</p>
+                <p className="mt-1 font-mono text-xl font-semibold tracking-wide">{workspace.invite_code}</p>
+                <p className="mt-2 text-xs text-zinc-500">
+                  초대 상태: {workspace.invite_enabled ? "enabled" : "disabled"}
+                </p>
+                <InviteCodeCopyButton inviteCode={workspace.invite_code} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {!loadError && membershipCount === 0 ? (
         <div className="mt-4 flex gap-3">

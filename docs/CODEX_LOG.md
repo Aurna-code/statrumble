@@ -1457,3 +1457,57 @@ Tasks:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Plan-2026-02-22-Phase-3 (commit: TODO)
+#### Prompt
+```text
+PHASE 3) COLLAB MVP: workspace invite_code + /join flow
+
+Goal:
+- Provide a legitimate way for other users to join and see threads/imports.
+
+Tasks:
+1) DB:
+- workspaces.invite_code unique + optional invite_enabled
+- RPC/API join by code -> insert workspace_members(workspace_id, auth.uid())
+
+2) UI:
+- /workspace (or /settings/workspace): show invite code + copy
+- /join: enter code -> join -> redirect to imports/threads list
+
+DoD:
+- User B joins via code and can access A’s workspace threads/imports
+- Non-member C still cannot access via URL
+```
+#### Result
+- Added `statrumble/supabase/migrations/003_workspace_invite_code_join.sql`:
+  - `workspaces.invite_code` + unique index, `invite_enabled` flag.
+  - `generate_workspace_invite_code()` helper.
+  - `join_workspace_by_code(p_invite_code text)` SECURITY DEFINER RPC inserting `workspace_members(workspace_id, auth.uid())`.
+- Added workspace invite data helper:
+  - `statrumble/lib/db/workspaces.ts` (`getDefaultWorkspaceInvite`).
+- Added API join endpoint:
+  - `statrumble/app/api/workspaces/join/route.ts`.
+- Added UI pages/components:
+  - `statrumble/app/workspace/page.tsx` (invite code display + copy button).
+  - `statrumble/app/join/page.tsx` (code input + join submit + redirect to `/`).
+  - `statrumble/app/components/InviteCodeCopyButton.tsx`.
+  - Navigation links in `statrumble/app/layout.tsx` for `/workspace` and `/join`.
+- Non-member access model after Phase 1 + Phase 3:
+  - Non-members remain blocked by RLS/404 on direct URLs.
+  - Users can now become members only via invite-code join flow.
+- Multi-user browser DoD status:
+  - Not executable in this sandbox due local server listen restriction (`listen EPERM`).
+  - Functional validation of SQL/API flow completed via static/code-path verification; browser A/B/C scenario is pending manual run locally.
+#### Manual Checklist
+- [x] `invite_code` + `invite_enabled` schema changes added
+- [x] secure join RPC added and granted to authenticated users
+- [x] join API route added
+- [x] `/workspace` invite UI added (show + copy)
+- [x] `/join` form flow added (join + redirect)
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Real browser multi-user A/B/C repro (blocked in sandbox; pending manual)
+#### Commit Link
+- TODO

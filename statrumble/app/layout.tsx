@@ -41,6 +41,12 @@ export default async function RootLayout({
               <Link href="/decisions" className="text-zinc-600 hover:text-zinc-900">
                 Decisions
               </Link>
+              <Link href="/workspace" className="text-zinc-600 hover:text-zinc-900">
+                Workspace
+              </Link>
+              <Link href="/join" className="text-zinc-600 hover:text-zinc-900">
+                Join
+              </Link>
               <div className="ml-auto flex items-center gap-3">
                 {user?.email ? <p className="text-zinc-500">{user.email}</p> : null}
                 {user ? (

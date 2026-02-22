@@ -1164,3 +1164,253 @@ DoD:
 - [ ] Run Referee 성공(생성/저장/표시) 수동 확인
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt Hotfix (commit: TODO)
+#### Prompt
+```text
+[Hotfix] Fix "Maximum update depth exceeded" right after OTP login
+
+OTP 로그인 후 화면에서 "Maximum update depth exceeded"가 발생함. 원인 후보 탐색 및 정적 수정.
+```
+#### Result
+- `app/components/ImportChart.tsx`에서 `useEffect`의 셋업 루프 위험 구간을 정리.
+  - `useEffect`의 deps에서 상태값(`selectedImportId`)를 제거해 자기 참조 재평가를 최소화.
+  - 포인트/메타 상태 업데이트를 `prev/next` 비교 가드로 감싸서 동일 데이터에 대한 불필요한 setState를 제거.
+- 런타임 브라우저 재현은 현재 환경에서 `pnpm -C statrumble dev`가 포트 바인딩(`EPERM 0.0.0.0:3000`)으로 실행되지 않아 직접 확인 불가.
+- 원인 후보로는 로그인 직후 Landing(`/`)에 마운트되는 `ImportChart`의 초기 `useEffect`/상태 갱신 경로를 우선 후보로 기록.
+#### Manual Checklist
+- [x] `rg -n "Maximum update depth"`, `router.(refresh|push|replace)`, `onAuthStateChange|getSession|getUser`, `useEffect\(` 패턴 탐색
+- [x] 로그인 후 무한 루프 패턴으로 보이는 `useEffect` 상태 갱신 구간에서 prev/next 가드 적용
+- [x] `pnpm -C statrumble lint`
+- [x] `pnpm -C statrumble typecheck`
+- [x] `bash scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Follow-up Hotfix (commit: TODO)
+#### Prompt
+```text
+[Follow-up Hotfix] Validate max update-depth fix + enable reproduction
+
+- loopback bind로 dev 재현 시도
+- ImportChart/ThreadArena의 max update-depth 패턴 점검
+- 필요 시 dev-only render loop detector 추가
+```
+#### Result
+- 런타임 재현 시도 결과:
+  - `pnpm -C statrumble dev -- --hostname 127.0.0.1 --port 3000` 실패 (Next CLI 인자 파싱으로 `--hostname`을 프로젝트 경로로 해석)
+  - `HOSTNAME=127.0.0.1 PORT=3000 pnpm -C statrumble dev`도 `listen EPERM ... 0.0.0.0:3000` 실패
+  - 현재 sandbox는 소켓 listen이 제한되어 브라우저 런타임 재현 불가
+- 의심 원인/패턴:
+  - 로그인 직후 landing에서 마운트되는 `ImportChart`의 props->state 동기화 effect + 연속 setState 경로에서 반복 렌더 유발 가능성
+- 수정 전략:
+  - `ImportChart`:
+    - props 기반 선택 ID 동기화 effect를 ID primitive(`firstImportId`, `importIdsKey`) 의존으로 고정
+    - 선택 ID는 `prev/next` 가드로 값이 달라질 때만 업데이트
+  - `ThreadArena`:
+    - 메시지/투표 응답 반영 시 `prev/next` 비교 가드로 동일 payload 재설정 방지
+  - `ImportChart`/`ThreadArena` 공통:
+    - `NEXT_PUBLIC_DEBUG_RENDER_LOOP=1`일 때만 동작하는 render counter 추가(60회 초과 시 `console.error`)
+- 실제 브라우저 검증 방법(OTP 로그인 후):
+  1. `NEXT_PUBLIC_DEBUG_RENDER_LOOP=1 pnpm -C statrumble dev` 실행
+  2. OTP 로그인 완료 후 `/` 또는 next 리다이렉트 페이지 진입
+  3. 화면 정상 렌더 확인 + 콘솔에 `render count exceeded 60` 에러 미발생 확인
+  4. Import 변경, Brush 드래그, Thread 생성 버튼 동작 확인
+#### Manual Checklist
+- [x] loopback/hostname 기반 dev 실행 시도
+- [x] `rg -n "useEffect\(" statrumble/app/components`로 effect 전수 점검
+- [x] `ImportChart`/`ThreadArena`에 deps/prev-next 가드 적용
+- [x] env-gated render loop detector 추가
+- [ ] 실제 OTP 브라우저 재현(샌드박스 제한으로 미실행)
+#### Commit Link
+- TODO
+
+### Prompt ID: Prompt Auth Rate Limit UX (commit: TODO)
+#### Prompt
+```text
+Auth email rate limit 대응 UX 추가:
+- Send Magic Link 버튼 클릭 후 60초 쿨다운(버튼 disable + 카운트다운)
+- Supabase 429/“email rate limit exceeded” 에러를 친절하게 표시:
+  "Too many login emails. Use the last email you received or try again later."
+- 네트워크 응답에서 endpoint(/auth/v1/otp vs /signup 등) 로그로 남기기
+```
+#### Result
+- `statrumble/app/login/page.tsx`에 Magic Link 제출 후 60초 쿨다운(`disabled` + 초 단위 카운트다운)을 추가했다.
+- Supabase OTP 요청 오류에서 `status === 429` 또는 `email rate limit exceeded` 메시지를 감지해 친화적인 문구로 치환했다.
+- `statrumble/lib/supabase/client.ts`에 브라우저 Supabase 클라이언트용 `fetch` 래퍼를 추가해 auth 응답의 endpoint(`pathname`)와 상태코드를 콘솔 로그로 남기도록 했다.
+#### Manual Checklist
+- [x] Send Magic Link 60초 쿨다운 UI/동작 반영
+- [x] 429 / email rate limit exceeded 에러 문구 치환
+- [x] auth endpoint 응답 로그 추가
+- [x] `npm run lint` 실행
+- [x] `npm run typecheck` 실행
+- [x] `./scripts/verify.sh` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Prompt Dev Auth Unblock (commit: TODO)
+#### Prompt
+```text
+[Dev Auth Unblock] Add password login for development only
+
+- Goal: avoid Supabase email rate limits; keep Magic Link but add dev-only password login.
+
+1) Login UI:
+- Add email+password form and a "Sign in with password" button.
+- Call supabase.auth.signInWithPassword({ email, password }).
+- Show this form only when NEXT_PUBLIC_DEV_PASSWORD_LOGIN=1 (or NODE_ENV=development).
+
+2) Magic Link UX hardening:
+- Disable "Send Magic Link" for 60 seconds after click (countdown).
+- If error contains "email rate limit exceeded" / 429:
+  show message: "Email sending is rate-limited. Use dev password login or try later."
+- No auto-retry.
+
+3) docs/CODEX_LOG.md:
+- Document how to create the dev user in Supabase Dashboard and how to enable the env flag.
+```
+#### Result
+- `statrumble/app/login/page.tsx`에 Magic Link 흐름과 분리된 dev 전용 password 로그인 폼을 추가했다.
+- Password 로그인은 `NEXT_PUBLIC_DEV_PASSWORD_LOGIN=1` 또는 `NODE_ENV=development`일 때만 노출되며, `supabase.auth.signInWithPassword({ email, password })`를 사용한다.
+- Magic Link는 클릭 즉시 60초 쿨다운(버튼 비활성 + 카운트다운)을 유지하고, 429 / `email rate limit exceeded` 감지 시 메시지를 `Email sending is rate-limited. Use dev password login or try later.`로 고정했다.
+- `.env.example`에 `NEXT_PUBLIC_DEV_PASSWORD_LOGIN=0` 플레이스홀더를 추가했다.
+- Dev user 생성/활성화 방법:
+  1. Supabase Dashboard -> Authentication -> Users -> Add user.
+  2. 테스트용 이메일/비밀번호를 입력하고 사용자 생성(필요 시 Email Confirmed로 설정).
+  3. 로컬 `.env.local`에 `NEXT_PUBLIC_DEV_PASSWORD_LOGIN=1` 설정 후 앱 재시작.
+  4. 배포/공유 환경에서는 `NEXT_PUBLIC_DEV_PASSWORD_LOGIN`을 `0` 또는 미설정으로 유지.
+#### Manual Checklist
+- [x] dev 전용 password 로그인 UI 추가
+- [x] `signInWithPassword` 호출 추가
+- [x] password 폼 노출 조건(env flag/development) 반영
+- [x] Magic Link 60초 쿨다운 유지
+- [x] 429/rate-limit 메시지 문구 요구사항대로 반영
+- [x] `npm run lint` 실행
+- [x] `npm run typecheck` 실행
+- [x] `./scripts/verify.sh` 실행
+#### Commit Link
+- TODO
+
+### Prompt ID: Bugfix 2026-02-22-01 (commit: TODO)
+#### Prompt
+```text
+[Bugfix] votes fetch loop after clicking vote (ThreadArena initiator)
+
+Symptom:
+- After clicking a vote, Network shows repeated GET fetches to "votes" endpoint (200).
+- Console shows render loop detector warning in ThreadArena.
+
+Goal:
+- A vote click should trigger at most:
+  - 1 write request (POST/PUT)
+  - optional 0~1 follow-up GET (or state update)
+- No continuous polling / no request loop.
+
+Steps:
+1) Identify the exact fetch caller:
+- In browser DevTools, open one repeated "votes" request → Initiator tab
+- Note the exact file:line (likely app/components/ThreadArena.tsx:???)
+- Fix the code at that line.
+
+2) Fix common anti-patterns in ThreadArena.tsx:
+- Ensure fetchVotes() is NOT called from:
+  - component body render
+  - useEffect that depends on votes state
+  - useEffect that runs every render (missing deps)
+  - interval/timer without proper cleanup
+- fetchVotes should run ONLY on:
+  - [threadId] change
+  - manual Refresh click (refreshNonce)
+  - optional: after successful vote submit (one-shot)
+
+3) Implement a refreshNonce pattern:
+- Add state: const [refreshNonce, setRefreshNonce] = useState(0)
+- Manual refresh: setRefreshNonce(n => n + 1)
+- useEffect(() => fetchVotes(), [threadId, refreshNonce])  // no votes in deps
+- Guard setVotes with a stable signature compare (counts + myVote), not reference.
+
+4) Prevent overlapping requests:
+- Use AbortController or an inFlight ref so repeated triggers don’t stack:
+  - if (inFlight.current) return
+  - finally set inFlight.current = false
+
+5) Verify:
+- Clicking vote produces exactly 1 write request and then settles.
+- No more repeated GETs.
+- Keep debug render detector but switch it to time-window based (renders/sec), not total renders.
+- Log root cause + fix in docs/CODEX_LOG.md
+```
+#### Result
+- Root fetch initiator is the votes loading effect in `statrumble/app/components/ThreadArena.tsx` (now `useEffect` at `statrumble/app/components/ThreadArena.tsx:274` invoking `fetchVotes` at `statrumble/app/components/ThreadArena.tsx:230`).
+- Root cause: vote refresh could be triggered through multiple paths without a dedicated nonce gate or overlap protection (`POST` path + shared data-loading effect), which allowed stacked/re-entrant votes GET calls during rapid updates.
+- Added `refreshNonce` and changed vote fetching to run only from `[threadId, refreshNonce]` effect; manual vote refresh and post-vote success now increment nonce instead of directly calling fetch.
+- Added in-flight guard + `AbortController` support in vote fetch, and moved vote state updates behind a stable signature compare (`A/B/C` counts + `my_stance`).
+- Updated debug render detector from total render count to time-window render rate (renders/sec).
+- Verification: `npm run lint` (pass), `npm run typecheck` (pass), `./scripts/verify.sh` from repo root (pass).
+#### Manual Checklist
+- [x] Identified and fixed votes fetch caller in `ThreadArena.tsx`
+- [x] Added `refreshNonce`-driven vote refresh flow
+- [x] Removed direct post-vote `fetchVotes()` call and replaced with one-shot nonce trigger
+- [x] Added in-flight/abort protection for vote GET
+- [x] Switched render loop detector to time-window renders/sec
+- [x] `npm run lint` executed
+- [x] `npm run typecheck` executed
+- [x] `./scripts/verify.sh` executed
+#### Commit Link
+- TODO
+
+### Prompt ID: Plan-2026-02-22-Phase-1 (commit: TODO)
+#### Prompt
+```text
+PHASE 1) SECURITY HOTFIX: enforce workspace membership (block URL access)
+
+Goal:
+- Non-members cannot read/write threads/messages/votes/imports even with direct URL.
+- Do real multi-user repro via Chrome normal(User A) + Incognito(User B) (or another browser).
+
+Tasks:
+1) Repro:
+- A creates thread, copy /threads/[id]
+- B opens URL and tries: load thread/messages/votes, post message, cast vote
+Expected: denied (404/permission) and cannot write.
+
+2) Audit for RLS bypass:
+- rg -n "SERVICE_ROLE|service_role|SUPABASE_SERVICE_ROLE_KEY" statrumble
+- Remove service-role usage from any user-facing page/route. Use session-based anon client.
+
+3) RLS policy audit & enforcement:
+- Ensure membership checks exist for:
+  arena_threads, thread_messages, thread_votes, imports, metric_points, (future) decision_cards
+- Use workspace_members exists(auth.uid()) pattern.
+- If child tables lack workspace_id, join through arena_threads in policy.
+
+4) App behavior:
+- When select returns 0 rows (RLS blocked), treat as 404 (don’t leak existence).
+- Writes should fail cleanly for non-members.
+```
+#### Result
+- Added `statrumble/supabase/migrations/001_authz_workspace_membership.sql`:
+  - `handle_new_user()` changed to no-op so membership is explicit (invite/join) instead of auto-added.
+  - Hardened RLS policies for `metric_imports`, `metric_points`, `arena_threads`, `arena_messages`, `arena_votes`, `decision_cards` with `workspace_members` membership checks plus parent-row consistency checks.
+- Updated route behavior so RLS-blocked resources return 404 and do not leak existence:
+  - `statrumble/app/api/threads/[id]/messages/route.ts`
+  - `statrumble/app/api/threads/[id]/votes/route.ts`
+  - `statrumble/app/api/imports/[importId]/points/route.ts`
+- Updated DB write helpers to treat RLS-blocked thread lookup as not found:
+  - `statrumble/lib/db/messages.ts`
+  - `statrumble/lib/db/votes.ts`
+- RLS bypass grep audit executed with no `service_role` usage found:
+  - `rg -n "SERVICE_ROLE|service_role|SUPABASE_SERVICE_ROLE_KEY" statrumble` -> no matches.
+- Multi-user Chrome repro status:
+  - Not executable in this sandbox due local server listen restrictions (`listen EPERM`), so browser-normal/incognito validation is pending manual run in a local non-sandbox environment.
+#### Manual Checklist
+- [x] RLS policy hardening migration added for thread/message/vote/import/points/decision tables
+- [x] `service_role` usage audit executed (no matches)
+- [x] RLS-blocked thread/import reads now map to 404 in app routes
+- [x] Non-member writes fail cleanly without existence leak
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Chrome normal/incognito multi-user repro (blocked in sandbox; pending manual)
+#### Commit Link
+- TODO

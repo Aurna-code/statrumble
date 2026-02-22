@@ -43,10 +43,14 @@ async function getThreadWorkspaceId(supabase: Awaited<ReturnType<typeof createCl
     .from("arena_threads")
     .select("workspace_id")
     .eq("id", threadId)
-    .single();
+    .maybeSingle();
 
-  if (error || !thread) {
-    throw new Error("Thread not found.");
+  if (error) {
+    throw new Error(`Failed to load thread: ${error.message}`);
+  }
+
+  if (!thread) {
+    return null;
   }
 
   return (thread as ThreadWorkspaceRow).workspace_id;
@@ -78,6 +82,10 @@ export async function createMessage(threadId: string, content: string): Promise<
 
   const { supabase, userId } = await getAuthenticatedUserId();
   const workspaceId = await getThreadWorkspaceId(supabase, threadId);
+
+  if (!workspaceId) {
+    throw new Error("Thread not found.");
+  }
   const { error } = await supabase.from("arena_messages").insert({
     workspace_id: workspaceId,
     thread_id: threadId,

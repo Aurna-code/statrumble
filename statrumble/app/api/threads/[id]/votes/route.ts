@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVoteSummary, type VoteStance, upsertVote } from "@/lib/db/votes";
+import { getThread } from "@/lib/db/threads";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -40,6 +41,11 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
+  const thread = await getThread(id);
+  if (!thread) {
+    return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
+  }
+
   try {
     const summary = await getVoteSummary(id);
 
@@ -50,7 +56,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const status = message === "Thread not found." ? 404 : 500;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
 
@@ -64,6 +71,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const user = await requireUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  const thread = await getThread(id);
+  if (!thread) {
+    return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
   }
 
   let body: VoteRequest | null = null;
@@ -83,6 +95,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: true, my_stance: myStance });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const status = message === "Thread not found." ? 404 : 500;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

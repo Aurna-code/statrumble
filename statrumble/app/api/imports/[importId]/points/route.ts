@@ -80,6 +80,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
     }
 
+    const { data: metricImport, error: importError } = await supabase
+      .from("metric_imports")
+      .select("id")
+      .eq("id", importId)
+      .maybeSingle();
+
+    if (importError) {
+      return NextResponse.json({ ok: false, error: importError.message }, { status: 500 });
+    }
+
+    if (!metricImport) {
+      return NextResponse.json({ ok: false, error: "Import not found." }, { status: 404 });
+    }
+
     let query = supabase
       .from("metric_points")
       .select("ts, value")

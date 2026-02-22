@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMessage, listMessages } from "@/lib/db/messages";
+import { getThread } from "@/lib/db/threads";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -50,6 +51,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
+  const thread = await getThread(id);
+  if (!thread) {
+    return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
+  }
+
   const limit = parseLimit(request.nextUrl.searchParams.get("limit"));
 
   if (limit === null) {
@@ -61,7 +67,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: true, messages });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    const status = message === "Thread not found." ? 404 : 500;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }
 
@@ -75,6 +82,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const user = await requireUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+  }
+
+  const thread = await getThread(id);
+  if (!thread) {
+    return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
   }
 
   let body: CreateMessageRequest | null = null;
@@ -96,7 +108,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    const status = message === "content is required." ? 400 : 500;
+    const status = message === "content is required." ? 400 : message === "Thread not found." ? 404 : 500;
     return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

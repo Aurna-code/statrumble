@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 
 export type ThreadMetricMeta = {
   name: string;
@@ -22,6 +23,20 @@ type ThreadRow = {
 };
 
 export type ArenaThread = Omit<ThreadRow, "metrics"> & {
+  metric: ThreadMetricMeta | null;
+};
+
+type ThreadListRow = {
+  id: string;
+  created_at: string;
+  start_ts: string;
+  end_ts: string;
+  metric_id: string | null;
+  visibility: "workspace" | "invite" | "public";
+  metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
+};
+
+export type ArenaThreadListItem = Omit<ThreadListRow, "metrics"> & {
   metric: ThreadMetricMeta | null;
 };
 
@@ -70,4 +85,29 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
     created_at: row.created_at,
     metric: pickMetric(row.metrics),
   };
+}
+
+export async function listThreads(limit = 20): Promise<ArenaThreadListItem[]> {
+  const supabase = await createClient();
+  const workspaceId = await getRequiredActiveWorkspaceId();
+  const { data, error } = await supabase
+    .from("arena_threads")
+    .select("id, created_at, start_ts, end_ts, metric_id, visibility, metrics(name, unit)")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(`Failed to list threads: ${error.message}`);
+  }
+
+  return ((data as ThreadListRow[] | null) ?? []).map((row) => ({
+    id: row.id,
+    created_at: row.created_at,
+    start_ts: row.start_ts,
+    end_ts: row.end_ts,
+    metric_id: row.metric_id,
+    visibility: row.visibility,
+    metric: pickMetric(row.metrics),
+  }));
 }

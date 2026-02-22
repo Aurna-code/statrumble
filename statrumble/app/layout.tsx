@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import WorkspaceSwitcher from "@/app/components/WorkspaceSwitcher";
+import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -28,6 +30,21 @@ export default async function RootLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  let workspaceSelection = {
+    workspaces: [],
+    activeWorkspaceId: null,
+  } as Awaited<ReturnType<typeof getActiveWorkspaceSelection>>;
+
+  if (user) {
+    try {
+      workspaceSelection = await getActiveWorkspaceSelection();
+    } catch {
+      workspaceSelection = {
+        workspaces: [],
+        activeWorkspaceId: null,
+      };
+    }
+  }
 
   return (
     <html lang="en">
@@ -48,6 +65,12 @@ export default async function RootLayout({
                 Join
               </Link>
               <div className="ml-auto flex items-center gap-3">
+                {workspaceSelection.activeWorkspaceId ? (
+                  <WorkspaceSwitcher
+                    workspaces={workspaceSelection.workspaces}
+                    activeWorkspaceId={workspaceSelection.activeWorkspaceId}
+                  />
+                ) : null}
                 {user?.email ? <p className="text-zinc-500">{user.email}</p> : null}
                 {user ? (
                   <form action="/auth/signout" method="post">

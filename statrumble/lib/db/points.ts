@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 
 const BULK_INSERT_CHUNK_SIZE = 500;
 const MAX_BULK_INSERT_ROWS = 50_000;
@@ -24,16 +25,6 @@ export type MetricPointRow = {
   created_at: string;
 };
 
-function getDefaultWorkspaceId() {
-  const workspaceId = process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID;
-
-  if (!workspaceId) {
-    throw new Error("Missing NEXT_PUBLIC_DEFAULT_WORKSPACE_ID");
-  }
-
-  return workspaceId;
-}
-
 export async function insertPointsBulk(importId: string, rows: PointInput[]): Promise<void> {
   if (rows.length > MAX_BULK_INSERT_ROWS) {
     throw new Error(`Too many rows for bulk insert: ${rows.length}. Max is ${MAX_BULK_INSERT_ROWS}.`);
@@ -44,7 +35,7 @@ export async function insertPointsBulk(importId: string, rows: PointInput[]): Pr
   }
 
   const supabase = await createClient();
-  const workspaceId = getDefaultWorkspaceId();
+  const workspaceId = await getRequiredActiveWorkspaceId();
 
   for (let start = 0; start < rows.length; start += BULK_INSERT_CHUNK_SIZE) {
     const chunk = rows.slice(start, start + BULK_INSERT_CHUNK_SIZE);
@@ -65,7 +56,7 @@ export async function insertPointsBulk(importId: string, rows: PointInput[]): Pr
 
 export async function fetchPoints(importId: string, range?: PointRange): Promise<MetricPointRow[]> {
   const supabase = await createClient();
-  const workspaceId = getDefaultWorkspaceId();
+  const workspaceId = await getRequiredActiveWorkspaceId();
 
   let query = supabase
     .from("metric_points")

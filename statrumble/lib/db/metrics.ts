@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 
 export type MetricRow = {
   id: string;
@@ -10,19 +11,9 @@ export type MetricRow = {
   created_at: string;
 };
 
-function getDefaultWorkspaceId() {
-  const workspaceId = process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID;
-
-  if (!workspaceId) {
-    throw new Error("Missing NEXT_PUBLIC_DEFAULT_WORKSPACE_ID");
-  }
-
-  return workspaceId;
-}
-
 export async function listMetrics(): Promise<MetricRow[]> {
   const supabase = await createClient();
-  const workspaceId = getDefaultWorkspaceId();
+  const workspaceId = await getRequiredActiveWorkspaceId();
   const { data, error } = await supabase
     .from("metrics")
     .select("id, workspace_id, name, unit, created_at")
@@ -38,7 +29,7 @@ export async function listMetrics(): Promise<MetricRow[]> {
 
 export async function getOrCreateMetric(name: string, unit: string | null): Promise<MetricRow> {
   const supabase = await createClient();
-  const workspaceId = getDefaultWorkspaceId();
+  const workspaceId = await getRequiredActiveWorkspaceId();
   const { data, error } = await supabase
     .from("metrics")
     .upsert(

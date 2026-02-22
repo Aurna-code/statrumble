@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
 
 type JoinResponse = {
   ok: boolean;
@@ -41,6 +42,10 @@ export default function JoinPage() {
         setErrorMessage(payload.error ?? "Join failed.");
         setIsSubmitting(false);
         return;
+      }
+
+      if (payload.workspace_id) {
+        window.localStorage.setItem(ACTIVE_WORKSPACE_STORAGE_KEY, payload.workspace_id);
       }
 
       router.push("/");

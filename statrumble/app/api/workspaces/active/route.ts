@@ -2,23 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
 
-type JoinWorkspaceRequest = {
-  code?: string;
+type SetActiveWorkspaceRequest = {
+  workspace_id?: string;
 };
 
 export async function POST(request: NextRequest) {
-  let body: JoinWorkspaceRequest | null = null;
+  let body: SetActiveWorkspaceRequest | null = null;
 
   try {
-    body = (await request.json()) as JoinWorkspaceRequest;
+    body = (await request.json()) as SetActiveWorkspaceRequest;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const inviteCode = body?.code?.trim();
+  const workspaceId = body?.workspace_id?.trim();
 
-  if (!inviteCode) {
-    return NextResponse.json({ ok: false, error: "code is required." }, { status: 400 });
+  if (!workspaceId) {
+    return NextResponse.json({ ok: false, error: "workspace_id is required." }, { status: 400 });
   }
 
   const supabase = await createClient();
@@ -31,19 +31,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const { data, error } = await supabase.rpc("join_workspace_by_code", {
-    p_invite_code: inviteCode,
-  });
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_members")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  if (error) {
-    const normalized = error.message.toLowerCase();
-    const isUserInputError =
-      normalized.includes("invite code") || normalized.includes("required") || normalized.includes("invalid");
-    const status = isUserInputError ? 400 : 500;
-    return NextResponse.json({ ok: false, error: error.message }, { status });
+  if (membershipError) {
+    return NextResponse.json({ ok: false, error: membershipError.message }, { status: 500 });
   }
 
-  const workspaceId = data as string;
+  if (!membership) {
+    return NextResponse.json({ ok: false, error: "Workspace not found." }, { status: 404 });
+  }
+
   const response = NextResponse.json({ ok: true, workspace_id: workspaceId });
   response.cookies.set(ACTIVE_WORKSPACE_COOKIE, workspaceId, {
     path: "/",

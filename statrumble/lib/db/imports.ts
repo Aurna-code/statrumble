@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 
 export type ImportMetricMeta = {
   name: string;
@@ -17,19 +18,9 @@ export type MetricImportRow = {
   metrics: ImportMetricMeta | ImportMetricMeta[] | null;
 };
 
-function getDefaultWorkspaceId() {
-  const workspaceId = process.env.NEXT_PUBLIC_DEFAULT_WORKSPACE_ID;
-
-  if (!workspaceId) {
-    throw new Error("Missing NEXT_PUBLIC_DEFAULT_WORKSPACE_ID");
-  }
-
-  return workspaceId;
-}
-
 export async function listImports(limit = 20): Promise<MetricImportRow[]> {
   const supabase = await createClient();
-  const workspaceId = getDefaultWorkspaceId();
+  const workspaceId = await getRequiredActiveWorkspaceId();
   const { data, error } = await supabase
     .from("metric_imports")
     .select("id, workspace_id, metric_id, file_name, row_count, created_at, metrics(name, unit)")
@@ -50,7 +41,7 @@ export async function createImport(
   rowCount: number,
 ): Promise<MetricImportRow> {
   const supabase = await createClient();
-  const workspaceId = getDefaultWorkspaceId();
+  const workspaceId = await getRequiredActiveWorkspaceId();
   const { data, error } = await supabase
     .from("metric_imports")
     .insert({

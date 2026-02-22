@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 
 type CreateThreadRequest = {
@@ -56,10 +57,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
     }
 
+    const activeWorkspaceId = await getRequiredActiveWorkspaceId();
+
     const { data: metricImport, error: importError } = await supabase
       .from("metric_imports")
       .select("id, workspace_id, metric_id")
       .eq("id", importId)
+      .eq("workspace_id", activeWorkspaceId)
       .single();
 
     if (importError || !metricImport) {

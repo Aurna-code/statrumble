@@ -1511,3 +1511,60 @@ DoD:
 - [ ] Real browser multi-user A/B/C repro (blocked in sandbox; pending manual)
 #### Commit Link
 - TODO
+
+### Prompt ID: Next-2026-02-22-Workspace-Auth-Active-Onboarding (commit: TODO)
+#### Prompt
+```text
+[Next] Fix workspace page auth + add active-workspace selection
+
+1) /workspace must only show workspaces the user is a member of
+- Query workspaces via workspace_members filter (user_id = auth.uid()).
+- If none, show "No workspace membership" + link to /join.
+- Ensure invite_code is not visible to non-members.
+
+2) Implement active workspace
+- Load list of member workspaces
+- Store selected workspace_id in localStorage/cookie
+- Add nav dropdown switcher
+- Make imports/threads list + create use active workspace_id
+
+3) Onboarding
+- If user has 0 workspaces, provide "Create workspace" flow OR auto-create personal workspace on first login.
+- Do NOT auto-join all users into a shared Default workspace.
+
+Commit(s) separated:
+- fix(workspace): restrict workspace page to members
+- feat(workspace): active workspace selector
+- feat(onboarding): create personal workspace when none
+```
+#### Result
+- Unrelated dirty changes were inspected first and reconciled:
+  - Reverted `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `statrumble/package.json` (out-of-scope dependency/CLI changes).
+  - Removed untracked `statrumble/supabase/.temp/`.
+- Member-restricted workspace page commit:
+  - `/workspace` now queries membership via `workspace_members` + `auth.uid()` and only renders workspaces the user belongs to.
+  - If none, shows `No workspace membership` and `/join` link.
+- Active workspace selector commit:
+  - Added active workspace cookie/localStorage keys and `/api/workspaces/active` setter route.
+  - Added nav dropdown workspace switcher in layout.
+  - Active workspace is resolved from cookie + membership validation.
+  - Metrics/imports/points/thread listing/thread creation now scope to active workspace.
+  - Home now shows active-workspace threads list.
+  - Join flow sets active workspace cookie/localStorage on success.
+- Onboarding commit:
+  - Added `ensure_personal_workspace()` migration RPC to create a personal workspace + owner membership when user has zero memberships.
+  - Layout invokes onboarding ensure step for authenticated users before loading workspace selection.
+#### Manual Checklist
+- [x] Inspected and reverted unrelated `pnpm`/package/workspace changes
+- [x] Removed `statrumble/supabase/.temp/` from working tree
+- [x] `/workspace` access/listing restricted to member workspaces
+- [x] Active workspace selector added (cookie + localStorage)
+- [x] imports/threads listing + thread create use active workspace
+- [x] Personal workspace auto-create onboarding added for zero-membership users
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- 9740066 (`fix(workspace): restrict workspace page to members`)
+- 8001d02 (`feat(workspace): active workspace selector`)
+- TODO (`feat(onboarding): create personal workspace when none`)

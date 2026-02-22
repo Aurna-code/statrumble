@@ -167,3 +167,23 @@ export async function getRequiredActiveWorkspaceId(): Promise<string> {
 
   return workspaceId;
 }
+
+export async function ensurePersonalWorkspaceMembership(): Promise<string> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error("Unauthorized.");
+  }
+
+  const { data, error } = await supabase.rpc("ensure_personal_workspace");
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to ensure personal workspace.");
+  }
+
+  return data as string;
+}

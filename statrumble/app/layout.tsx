@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import WorkspaceSwitcher from "@/app/components/WorkspaceSwitcher";
-import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
+import { ensurePersonalWorkspaceMembership, getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -37,6 +37,7 @@ export default async function RootLayout({
 
   if (user) {
     try {
+      await ensurePersonalWorkspaceMembership();
       workspaceSelection = await getActiveWorkspaceSelection();
     } catch {
       workspaceSelection = {

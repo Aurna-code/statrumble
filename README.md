@@ -49,8 +49,10 @@ npm run verify
 
 ## Apply Migration
 1. Supabase Dashboard -> SQL Editor에서 `statrumble/supabase/migrations/000_init.sql` 내용을 실행합니다.
-2. (선택) Supabase CLI를 쓰는 경우 기본 경로는 `statrumble/supabase/migrations` 입니다.
-3. 기본 워크스페이스 UUID는 `11111111-1111-1111-1111-111111111111` 입니다.
+2. (권장) Supabase CLI를 쓰는 경우 repo root에서 `npx -y supabase db push`를 실행해 최신 migration을 모두 반영합니다.
+3. (선택) CLI 기본 migration 경로는 `statrumble/supabase/migrations` 입니다.
+4. `create_workspace`, `join_workspace_by_code` 같은 onboarding RPC도 migration 적용 후에만 동작합니다.
+5. 기본 워크스페이스 UUID는 `11111111-1111-1111-1111-111111111111` 입니다.
 
 ## Supabase Auth (OTP Email)
 1. Supabase Dashboard -> Authentication -> Providers -> Email에서 Email OTP(Magic Link)를 활성화합니다.

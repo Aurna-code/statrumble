@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data, error } = await supabase.rpc("create_workspace", {
-    p_name: name,
+    name,
   });
 
   if (error) {

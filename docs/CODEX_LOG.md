@@ -1414,3 +1414,46 @@ Expected: denied (404/permission) and cannot write.
 - [ ] Chrome normal/incognito multi-user repro (blocked in sandbox; pending manual)
 #### Commit Link
 - TODO
+
+### Prompt ID: Plan-2026-02-22-Phase-2 (commit: TODO)
+#### Prompt
+```text
+PHASE 2) SCHEMA PREP (NO BEHAVIOR CHANGE): thread visibility flag
+
+Goal:
+- Prepare for separating public vs invite/work threads later.
+- Keep current behavior unchanged: all threads effectively workspace-private.
+
+Tasks:
+1) Migration:
+- Add arena_threads.visibility: 'workspace'|'invite'|'public' default 'workspace' not null
+- Add index (workspace_id, visibility, created_at) for future listing
+
+2) Types/UI:
+- Update TS types if any
+- Thread creation sets visibility='workspace' (or rely on default)
+
+3) Docs:
+- Note: public threads require public-data policy (do not expose private imports/snapshots yet)
+```
+#### Result
+- Added `statrumble/supabase/migrations/002_arena_threads_visibility.sql`:
+  - `arena_threads.visibility` text column with default `'workspace'`, backfill for null rows, `NOT NULL`, and check constraint for `workspace|invite|public`.
+  - Added index: `idx_arena_threads_workspace_visibility_created_at` on `(workspace_id, visibility, created_at)`.
+- Updated thread typing and select projection:
+  - `statrumble/lib/db/threads.ts` now includes `visibility` in the selected row shape.
+- Updated thread creation to be explicit and behavior-stable:
+  - `statrumble/app/api/threads/create/route.ts` inserts `visibility: 'workspace'`.
+- Added docs note for future public-thread policy requirements:
+  - `README.md` Notes section now states that public visibility still requires separate public-data policies.
+#### Manual Checklist
+- [x] visibility schema migration added (default + not null + constrained values)
+- [x] listing index `(workspace_id, visibility, created_at)` added
+- [x] TS thread row type/select updated
+- [x] thread create path sets `visibility='workspace'`
+- [x] docs note added for future public-data policy requirements
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

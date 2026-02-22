@@ -10,6 +10,7 @@ export type ThreadMetricMeta = {
 type ThreadRow = {
   id: string;
   workspace_id: string;
+  visibility: "workspace" | "invite" | "public";
   metric_id: string | null;
   import_id: string;
   start_ts: string;
@@ -41,7 +42,7 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
   const { data, error } = await supabase
     .from("arena_threads")
     .select(
-      "id, workspace_id, metric_id, import_id, start_ts, end_ts, snapshot, referee_report, created_at, metrics(name, unit)",
+      "id, workspace_id, visibility, metric_id, import_id, start_ts, end_ts, snapshot, referee_report, created_at, metrics(name, unit)",
     )
     .eq("id", threadId)
     .maybeSingle();
@@ -59,6 +60,7 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
   return {
     id: row.id,
     workspace_id: row.workspace_id,
+    visibility: row.visibility,
     metric_id: row.metric_id,
     import_id: row.import_id,
     start_ts: row.start_ts,

@@ -62,3 +62,5 @@ npm run verify
 - Codex is used as the Referee model via the OpenAI Responses API.
 - Development process and prompt-by-prompt outcomes are logged in `docs/CODEX_LOG.md`.
 - No API keys in repository. Use local environment variables only.
+- `arena_threads.visibility` exists for future public/invite flows, but current RLS behavior remains workspace-private.
+- Public thread exposure will require separate public-data policies for imports/snapshots before enabling `visibility='public'`.

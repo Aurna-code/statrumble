@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
       .from("arena_threads")
       .insert({
         workspace_id: metricImport.workspace_id,
+        visibility: "workspace",
         metric_id: metricImport.metric_id,
         import_id: importId,
         start_ts: startTs,

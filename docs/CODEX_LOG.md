@@ -1568,3 +1568,72 @@ Commit(s) separated:
 - 9740066 (`fix(workspace): restrict workspace page to members`)
 - 8001d02 (`feat(workspace): active workspace selector`)
 - TODO (`feat(onboarding): create personal workspace when none`)
+
+### Prompt ID: UX-Onboarding-2026-02-22 (commit: TODO)
+#### Prompt
+```text
+[UX/Onboarding] Make "no workspace membership" non-scary + add Create Workspace
+
+Goal:
+- If user has no workspace membership, do NOT render the dashboard components that error.
+- Show a clean onboarding view with:
+  1) Join workspace (invite code)
+  2) Create workspace (personal/work)
+
+Phase A) UI gating (no behavior change in DB yet)
+1) Detect membership once at the top-level page (server component preferred):
+- If no membership:
+  - Render only an OnboardingCard (Join + Create buttons)
+  - Hide/skip CSV upload, imports list, chart, thread list, metrics cards.
+  - Remove red "조회 실패" blocks; replace with friendly copy.
+
+2) Workspace page:
+- If no membership, show only "Go to Join" + "Create workspace" CTA
+- Do not attempt to load invite_code (avoid extra errors).
+
+Phase B) Create workspace flow (bootstrap)
+1) Add RPC (security definer) to create a workspace + membership in one call:
+- create_workspace(name text) returns workspace_id + invite_code
+- Implementation:
+  - insert into workspaces (name, invite_code, invite_enabled=true)
+  - insert into workspace_members (workspace_id, auth.uid(), role='owner')
+- Ensure it works even when user has 0 memberships.
+
+2) Add API route /api/workspaces/create calling the RPC with session-based client.
+3) Add /create-workspace page or modal:
+- input workspace name
+- call create
+- redirect to /workspace and/or set active workspace.
+
+Phase C) Optional polish
+- After successful join/create, redirect to main dashboard.
+- Add a “Switch workspace” dropdown later (active workspace), but not required for MVP unblock.
+
+Commit separation:
+- fix(ux): gate dashboard when no workspace membership
+- feat(workspace): create workspace bootstrap flow
+```
+#### Result
+- Phase A UI gating:
+  - Added `statrumble/app/components/OnboardingCard.tsx` with Join/Create CTA.
+  - Updated `statrumble/app/page.tsx` to detect membership once (`listMemberWorkspaceSummaries`) and short-circuit render to onboarding when membership is empty.
+  - Dashboard sections (CSV/chart/threads/metrics/imports) are skipped entirely when no membership.
+  - Updated `statrumble/app/workspace/page.tsx` to avoid invite-code loading path when membership is empty and show onboarding + `Go to Join` + `Create workspace` CTA.
+  - Removed layout auto-bootstrap call so zero-membership users can actually see onboarding (`statrumble/app/layout.tsx`).
+- Phase B create flow:
+  - Added migration `statrumble/supabase/migrations/005_create_workspace_rpc.sql` with `create_workspace(p_name text)` SECURITY DEFINER RPC returning `(workspace_id, invite_code)` and creating owner membership.
+  - Added API route `statrumble/app/api/workspaces/create/route.ts` to call RPC via session client and set active workspace cookie.
+  - Added page `statrumble/app/create-workspace/page.tsx` (name input -> create -> store localStorage active workspace -> redirect `/`).
+#### Manual Checklist
+- [x] No-membership dashboard gating applied
+- [x] Friendly onboarding card shown instead of red dashboard errors
+- [x] Workspace page no-membership CTA path added (Join + Create)
+- [x] `create_workspace` RPC migration added
+- [x] `/api/workspaces/create` added
+- [x] `/create-workspace` UI added
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- 3c5c5f4 (`fix(ux): gate dashboard when no workspace membership`)
+- TODO (`feat(workspace): create workspace bootstrap flow`)

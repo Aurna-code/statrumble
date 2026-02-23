@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const name = body?.name?.trim() ?? "";
+  const workspaceName = body?.name?.trim() ?? "";
 
-  if (!name) {
+  if (!workspaceName) {
     return NextResponse.json({ ok: false, error: "name is required." }, { status: 400 });
   }
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data, error } = await supabase.rpc("create_workspace", {
-    name,
+    p_name: workspaceName,
   });
 
   if (error) {

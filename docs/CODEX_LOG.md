@@ -1785,3 +1785,76 @@ Commits:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Fix-Workspace-Create-2026-02-23 (commit: TODO)
+#### Prompt
+```text
+Fix app/api/workspaces/create/route.ts:
+- workspaceName is not defined causing 500.
+- Parse req.json() and derive workspaceName from body.name (trim + validation).
+- Call supabase.rpc("create_workspace", { p_name: workspaceName }).
+- Return 400 if workspaceName empty.
+Keep lint/typecheck passing.
+```
+#### Result
+- Derived `workspaceName` from the request body, validated empty names, and used it in the `create_workspace` RPC call.
+- Verified lint, typecheck, and project verify script.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Disable-Last-Owner-Leave-2026-02-23 (commit: TODO)
+#### Prompt
+```text
+[Codex Prompt] Disable "Leave workspace" when user is last owner; show helpful message
+
+Goal:
+- In WorkspacesHub UI, if current user is the only owner of a workspace, do not allow leave.
+- Instead disable the Leave button and show a Korean message:
+  "마지막 owner라서 나갈 수 없습니다. 다른 owner를 지정하거나 워크스페이스를 삭제하세요."
+
+Implementation:
+- Determine last-owner status from memberships data (count owners per workspace).
+- Keep server-side guard in leave_workspace RPC as-is (still enforce in DB).
+- Update UI to prevent pointless POST and to show clear guidance.
+```
+#### Result
+- Added a workspace owner-count RPC and surfaced `owner_count` on member workspace rows to detect last-owner 상태.
+- Disabled Leave in the hub when the user is the only owner and displayed the requested Korean guidance.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Promote-Workspace-Owner-2026-02-23 (commit: TODO)
+#### Prompt
+```text
+[Codex Prompt] Add minimal member role management (promote to owner) for workspace
+
+Goal:
+- Allow an existing owner to promote a member to owner so the original owner can leave.
+
+DB:
+- Add RPC: promote_workspace_member(p_workspace_id uuid, p_user_id uuid, p_role text)
+  - Only current owners can call
+  - p_role limited to ('member','owner')
+  - Prevent demoting/removing last owner (same guard idea)
+
+UI:
+- On WorkspacesHub (or workspace settings page), show members list + promote button.
+- Keep simple: only "Promote to owner" action is enough for now.
+```
+#### Result
+- Added member list + role update RPCs with owner-only checks and last-owner guard.
+- Loaded active workspace members for owners and wired a Promote to owner action in the hub UI.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

@@ -2,7 +2,12 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import OnboardingCard from "@/app/components/OnboardingCard";
 import WorkspacesHub from "@/app/components/WorkspacesHub";
-import { listMemberWorkspaces, type MemberWorkspaceRow } from "@/lib/db/workspaces";
+import {
+  listMemberWorkspaces,
+  listWorkspaceMembers,
+  type MemberWorkspaceRow,
+  type WorkspaceMemberRow,
+} from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
 
@@ -18,6 +23,9 @@ export default async function WorkspacesPage() {
   let workspaces: MemberWorkspaceRow[] = [];
   let loadError: string | null = null;
   let activeWorkspaceId: string | null = null;
+  let workspaceMembers: WorkspaceMemberRow[] = [];
+  let membersWorkspaceId: string | null = null;
+  let membersError: string | null = null;
 
   if (authError || !user) {
     loadError = "로그인이 필요합니다.";
@@ -34,6 +42,19 @@ export default async function WorkspacesPage() {
     const candidate = cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value?.trim();
     activeWorkspaceId =
       candidate && workspaces.some((workspace) => workspace.id === candidate) ? candidate : workspaces[0].id;
+  }
+
+  if (!loadError && activeWorkspaceId) {
+    const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+
+    if (activeWorkspace?.role === "owner") {
+      try {
+        workspaceMembers = await listWorkspaceMembers(activeWorkspaceId);
+        membersWorkspaceId = activeWorkspaceId;
+      } catch (error) {
+        membersError = error instanceof Error ? error.message : "Unknown error";
+      }
+    }
   }
 
   return (
@@ -60,7 +81,13 @@ export default async function WorkspacesPage() {
       ) : null}
 
       {!loadError && workspaces.length > 0 ? (
-        <WorkspacesHub workspaces={workspaces} activeWorkspaceId={activeWorkspaceId} />
+        <WorkspacesHub
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          workspaceMembers={workspaceMembers}
+          membersWorkspaceId={membersWorkspaceId}
+          membersError={membersError}
+        />
       ) : null}
     </main>
   );

@@ -11,11 +11,18 @@ export type MemberWorkspaceRow = {
   invite_enabled: boolean;
   role: string;
   joined_at: string;
+  owner_count: number;
 };
 
 export type MemberWorkspaceSummary = {
   id: string;
   name: string;
+  role: string;
+  joined_at: string;
+};
+
+export type WorkspaceMemberRow = {
+  user_id: string;
   role: string;
   joined_at: string;
 };
@@ -37,6 +44,17 @@ type MemberWorkspaceQueryRow = {
         invite_enabled: boolean;
       }[]
     | null;
+};
+
+type WorkspaceOwnerCountRow = {
+  workspace_id: string;
+  owner_count: number;
+};
+
+type WorkspaceMemberQueryRow = {
+  user_id: string;
+  role: string;
+  joined_at: string;
 };
 
 function pickWorkspace(
@@ -81,6 +99,19 @@ async function listMemberWorkspaceRows(): Promise<MemberWorkspaceRow[]> {
   }
 
   const rows = (data as MemberWorkspaceQueryRow[] | null) ?? [];
+  const ownerCountsByWorkspace = new Map<string, number>();
+
+  if (rows.length > 0) {
+    const { data: ownerCounts, error: ownerCountError } = await supabase.rpc("list_workspace_owner_counts");
+
+    if (!ownerCountError) {
+      const ownerRows = (ownerCounts as WorkspaceOwnerCountRow[] | null) ?? [];
+
+      for (const row of ownerRows) {
+        ownerCountsByWorkspace.set(row.workspace_id, row.owner_count);
+      }
+    }
+  }
 
   return rows
     .map((row) => {
@@ -97,6 +128,7 @@ async function listMemberWorkspaceRows(): Promise<MemberWorkspaceRow[]> {
         invite_enabled: workspace.invite_enabled,
         role: row.role,
         joined_at: row.created_at,
+        owner_count: ownerCountsByWorkspace.get(workspace.id) ?? 0,
       } satisfies MemberWorkspaceRow;
     })
     .filter((row): row is MemberWorkspaceRow => row !== null);
@@ -112,6 +144,29 @@ export async function listMemberWorkspaceSummaries(): Promise<MemberWorkspaceSum
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
+    role: row.role,
+    joined_at: row.joined_at,
+  }));
+}
+
+export async function listWorkspaceMembers(workspaceId: string): Promise<WorkspaceMemberRow[]> {
+  if (!workspaceId) {
+    throw new Error("workspace_id is required.");
+  }
+
+  const { supabase } = await getAuthenticatedUserId();
+  const { data, error } = await supabase.rpc("list_workspace_members", {
+    p_workspace_id: workspaceId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to load workspace members: ${error.message}`);
+  }
+
+  const rows = (data as WorkspaceMemberQueryRow[] | null) ?? [];
+
+  return rows.map((row) => ({
+    user_id: row.user_id,
     role: row.role,
     joined_at: row.joined_at,
   }));

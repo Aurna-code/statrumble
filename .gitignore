@@ -1,24 +1,19 @@
-# dependencies
-node_modules/
-statrumble/node_modules/
+# deps
+**/node_modules/
 
-# build artifacts
-.next/
+# build
+**/.next/
 out/
 build/
 dist/
 coverage/
 
-# env and secrets
-.env
-.env.local
-.env.*.local
-statrumble/.env
-statrumble/.env.local
-statrumble/.env.*.local
+# env (ignore all, keep example)
+.env*
 !.env.example
 
 # logs
+**/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -26,4 +21,7 @@ pnpm-debug.log*
 
 # misc
 .DS_Store
-*.tsbuildinfo
+**/*.tsbuildinfo
+
+# supabase cli temp
+statrumble/supabase/.temp/

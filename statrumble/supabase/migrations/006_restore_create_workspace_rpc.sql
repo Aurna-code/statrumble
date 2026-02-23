@@ -1,4 +1,4 @@
-create or replace function public.create_workspace(name text)
+create or replace function public.create_workspace(p_name text)
 returns table(workspace_id uuid, invite_code text)
 language plpgsql
 security definer
@@ -13,7 +13,7 @@ begin
     raise exception 'Unauthorized';
   end if;
 
-  normalized_name := btrim(coalesce(name, ''));
+  normalized_name := btrim(coalesce(p_name, ''));
 
   if normalized_name = '' then
     raise exception 'Workspace name is required';

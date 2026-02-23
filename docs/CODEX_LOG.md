@@ -1709,3 +1709,79 @@ Commits:
 - a8cd242 (`fix(workspace): restore create_workspace RPC and align rpc arg names`)
 - f0d1ded (`fix(onboarding): after join/create, user lands in a workspace (no dead-end)`)
 - TODO (`fix(ux): gate dashboard when no membership`)
+
+### Prompt ID: Workspaces-Hub-2026-02-23 (commit: TODO)
+#### Prompt
+```text
+[Codex Prompt] Add /workspaces hub page UI and redirect /workspace -> /workspaces (UI-only)
+
+현 상태(확정):
+- UI 라우트는 statrumble/app/workspace/page.tsx만 존재
+- statrumble/app/workspaces/page.tsx, statrumble/app/components/WorkspacesHub.tsx 는 없음
+- API는 statrumble/app/api/workspaces/* 는 존재
+
+목표:
+1) /workspaces 페이지 추가 (허브)
+   - 내가 속한 workspace 목록 표시 (role, joined_at, invite_code, invite_enabled)
+   - active workspace 표시 + 전환 버튼
+   - leave workspace 버튼
+   - Create/Join 페이지로 이동 버튼
+2) /workspace(단수)는 /workspaces로 리다이렉트 처리
+   - statrumble/app/workspace/page.tsx에서 redirect('/workspaces') 형태로
+3) 상단 네비/링크도 가능하면 /workspaces로 통일
+
+구현 힌트:
+- 기존에 workspace 목록/active 해석 유틸이 있으면 재사용하고, 없으면 최소 구현
+- 서버 컴포넌트 + 클라이언트 컴포넌트 분리:
+  - app/workspaces/page.tsx: 서버에서 user + memberships 로드
+  - app/components/WorkspacesHub.tsx: 전환/leave 액션(fetch to API)
+- leave 후 active 폴백 처리(남은 membership 중 첫 번째 등)는 API 또는 클라이언트에서 처리
+
+완료 조건:
+- /workspaces 접속 시 허브 UI가 뜬다
+- /workspace 접속 시 /workspaces로 이동된다
+- pnpm run lint / pnpm run typecheck 통과
+- 변경사항은 커밋 1개로 정리
+```
+#### Result
+- `/workspaces` 허브 서버 페이지와 `WorkspacesHub` 클라이언트 컴포넌트를 추가해 멤버십 목록/활성/전환/Leave UI를 구성했다.
+- `/workspace`는 `/workspaces`로 리다이렉트하도록 변경하고, 상단 네비 및 join/create 리다이렉트를 `/workspaces`로 통일했다.
+- Leave 동작을 위한 API와 self-delete RLS 정책을 추가하고, 남은 멤버십 기반 활성 워크스페이스 쿠키 폴백을 처리했다.
+#### Manual Checklist
+- [x] `pnpm run lint`
+- [x] `pnpm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Leave-RPC-2026-02-23 (commit: TODO)
+#### Prompt
+```text
+[Codex Prompt] Refactor leave flow to use leave_workspace RPC; remove/limit self-delete RLS policy
+
+목표:
+- Leave는 반드시 DB RPC leave_workspace를 통해서만 수행되게 하여
+  "마지막 owner leave 차단" 등 비즈니스 로직이 우회되지 않게 한다.
+- workspace_members self-delete RLS 정책에 의존하지 않도록 만든다(또는 최소화).
+
+해야 할 일:
+1) statrumble/app/api/workspaces/leave/route.ts
+   - 직접 delete를 하고 있다면 제거
+   - supabase.rpc('leave_workspace', { p_workspace_id: ... }) 형태로 호출로 변경
+   - 성공 시 active workspace 폴백 처리 유지
+2) WorkspacesHub 클라이언트도 leave는 위 API만 호출하게 유지
+3) 새로 만든 RLS policy migration(007_workspace_members_leave_policy.sql)이 불필요해지면:
+   - 새 migration(다음 번호)으로 해당 policy를 drop 하거나
+   - 최소한 범위를 엄격히 줄여서(본인 row delete만) 리스크를 낮춰라
+4) migration 번호 충돌 가능성 점검:
+   - 이미 007이 있으면 새 migration은 008/009 등으로 맞춰라
+```
+#### Result
+- Leave API를 `leave_workspace` RPC 호출로 변경하고, 성공 시 active workspace 폴백 처리 흐름을 유지했다.
+- `leave_workspace` RPC를 추가하고, `workspace_members` self-delete 정책을 드롭하는 migration을 추가했다.
+#### Manual Checklist
+- [x] `pnpm run lint`
+- [x] `pnpm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

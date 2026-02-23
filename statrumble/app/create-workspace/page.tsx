@@ -52,7 +52,7 @@ export default function CreateWorkspacePage() {
       }
 
       window.localStorage.setItem(ACTIVE_WORKSPACE_STORAGE_KEY, payload.workspace_id);
-      router.push("/workspace");
+      router.push("/workspaces");
       router.refresh();
     } catch {
       setErrorMessage("Network error.");

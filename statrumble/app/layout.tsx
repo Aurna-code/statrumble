@@ -58,8 +58,8 @@ export default async function RootLayout({
               <Link href="/decisions" className="text-zinc-600 hover:text-zinc-900">
                 Decisions
               </Link>
-              <Link href="/workspace" className="text-zinc-600 hover:text-zinc-900">
-                Workspace
+              <Link href="/workspaces" className="text-zinc-600 hover:text-zinc-900">
+                Workspaces
               </Link>
               <Link href="/join" className="text-zinc-600 hover:text-zinc-900">
                 Join

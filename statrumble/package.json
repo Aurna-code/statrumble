@@ -24,12 +24,13 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/papaparse": "^5.5.2",
     "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "supabase": "^2.76.14",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

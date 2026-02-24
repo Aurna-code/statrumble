@@ -18,6 +18,7 @@ type ThreadRow = {
   end_ts: string;
   snapshot: unknown;
   referee_report: unknown;
+  referee_report_updated_at: string | null;
   created_at: string;
   metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
 };
@@ -57,7 +58,7 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
   const { data, error } = await supabase
     .from("arena_threads")
     .select(
-      "id, workspace_id, visibility, metric_id, import_id, start_ts, end_ts, snapshot, referee_report, created_at, metrics(name, unit)",
+      "id, workspace_id, visibility, metric_id, import_id, start_ts, end_ts, snapshot, referee_report, referee_report_updated_at, created_at, metrics(name, unit)",
     )
     .eq("id", threadId)
     .maybeSingle();
@@ -82,6 +83,7 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
     end_ts: row.end_ts,
     snapshot: row.snapshot,
     referee_report: row.referee_report,
+    referee_report_updated_at: row.referee_report_updated_at,
     created_at: row.created_at,
     metric: pickMetric(row.metrics),
   };

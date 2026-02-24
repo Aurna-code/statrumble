@@ -15,28 +15,25 @@ type MessageItem = {
   created_at: string;
 };
 
-type MessagesApiResponse = {
-  ok: boolean;
-  messages?: MessageItem[];
-  error?: string;
-};
-
-type VotesApiResponse = {
-  ok: boolean;
-  counts?: VoteCounts;
-  my_stance?: VoteStance | null;
-  error?: string;
-};
-
 type VoteSubmitApiResponse = {
   ok: boolean;
   my_stance?: VoteStance;
   error?: string;
 };
 
+type RefreshApiResponse = {
+  ok: boolean;
+  messages?: MessageItem[];
+  counts?: VoteCounts;
+  my_stance?: VoteStance | null;
+  referee_report?: RefereeReport | null;
+  error?: string;
+};
+
 type JudgeApiResponse = {
   ok: boolean;
   report?: RefereeReport;
+  reused?: boolean;
   error?: string;
 };
 
@@ -161,19 +158,19 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
     lastWarnAt: 0,
   });
   const [messages, setMessages] = useState<MessageItem[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
   const [messagesError, setMessagesError] = useState<string | null>(null);
   const [voteCounts, setVoteCounts] = useState<VoteCounts>({ A: 0, B: 0, C: 0 });
   const [myStance, setMyStance] = useState<VoteStance | null>(null);
   const [voting, setVoting] = useState(false);
   const [votesError, setVotesError] = useState<string | null>(null);
-  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const [refereeReport, setRefereeReport] = useState<RefereeReport | null>(initialRefereeReport);
+  const [refereeReused, setRefereeReused] = useState<boolean | null>(null);
   const [judging, setJudging] = useState(false);
   const [judgeError, setJudgeError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const votesInFlightRef = useRef(false);
+  const refreshInFlightRef = useRef(false);
   const votesSignatureRef = useRef(buildVoteSignature(voteCounts, myStance));
 
   if (process.env.NEXT_PUBLIC_DEBUG_RENDER_LOOP === "1") {
@@ -202,49 +199,34 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
   }
 
   const quoteSentence = useMemo(() => buildQuoteSentence(snapshot), [snapshot]);
+  const loadingMessages = refreshing && messages.length === 0;
 
-  const fetchMessages = useCallback(async () => {
-    setLoadingMessages(true);
+  const refreshThreadData = useCallback(async () => {
+    if (refreshInFlightRef.current) {
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+    setRefreshing(true);
     setMessagesError(null);
+    setVotesError(null);
 
     try {
-      const response = await fetch(`/api/threads/${threadId}/messages`, {
+      const response = await fetch(`/api/threads/${threadId}/refresh`, {
         method: "GET",
         cache: "no-store",
       });
-      const payload = (await response.json()) as MessagesApiResponse;
+      const payload = (await response.json()) as RefreshApiResponse;
 
       if (!response.ok || !payload.ok) {
-        throw new Error(payload.error ?? "Failed to load messages.");
+        throw new Error(payload.error ?? "Failed to refresh thread.");
       }
 
       const nextMessages = payload.messages ?? [];
       setMessages((prev) => (areMessagesEqual(prev, nextMessages) ? prev : nextMessages));
-    } catch (error) {
-      setMessagesError(error instanceof Error ? error.message : "Unknown messages error");
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, [threadId]);
 
-  const fetchVotes = useCallback(async (signal: AbortSignal) => {
-    if (votesInFlightRef.current) {
-      return;
-    }
-
-    votesInFlightRef.current = true;
-    setVotesError(null);
-
-    try {
-      const response = await fetch(`/api/threads/${threadId}/votes`, {
-        method: "GET",
-        cache: "no-store",
-        signal,
-      });
-      const payload = (await response.json()) as VotesApiResponse;
-
-      if (!response.ok || !payload.ok || !payload.counts) {
-        throw new Error(payload.error ?? "Failed to load votes.");
+      if (!payload.counts) {
+        throw new Error("Failed to load votes.");
       }
 
       const nextCounts = payload.counts;
@@ -256,30 +238,22 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
         setVoteCounts(nextCounts);
         setMyStance(nextMyStance);
       }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
 
-      setVotesError(error instanceof Error ? error.message : "Unknown votes error");
+      setRefereeReport(payload.referee_report ?? null);
+      setRefereeReused(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown refresh error";
+      setMessagesError(message);
+      setVotesError(message);
     } finally {
-      votesInFlightRef.current = false;
+      refreshInFlightRef.current = false;
+      setRefreshing(false);
     }
   }, [threadId]);
 
   useEffect(() => {
-    void fetchMessages();
-  }, [fetchMessages]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetchVotes(controller.signal);
-
-    return () => {
-      controller.abort();
-      votesInFlightRef.current = false;
-    };
-  }, [threadId, refreshNonce, fetchVotes]);
+    void refreshThreadData();
+  }, [refreshThreadData]);
 
   async function onSendMessage() {
     if (sending || !draft.trim()) {
@@ -305,7 +279,7 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
       }
 
       setDraft("");
-      await fetchMessages();
+      await refreshThreadData();
     } catch (error) {
       setMessagesError(error instanceof Error ? error.message : "Unknown send error");
     } finally {
@@ -336,7 +310,7 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
         throw new Error(payload.error ?? "Failed to submit vote.");
       }
 
-      setRefreshNonce((current) => current + 1);
+      await refreshThreadData();
     } catch (error) {
       setVotesError(error instanceof Error ? error.message : "Unknown vote error");
     } finally {
@@ -348,16 +322,18 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
     setDraft((prev) => (prev.trim().length === 0 ? quoteSentence : `${prev}\n${quoteSentence}`));
   }
 
-  async function onRunReferee() {
+  async function onRunReferee(force = false) {
     if (judging) {
       return;
     }
 
     setJudging(true);
     setJudgeError(null);
+    setRefereeReused(null);
 
     try {
-      const response = await fetch(`/api/threads/${threadId}/judge`, {
+      const endpoint = force ? `/api/threads/${threadId}/judge?force=1` : `/api/threads/${threadId}/judge`;
+      const response = await fetch(endpoint, {
         method: "POST",
         cache: "no-store",
       });
@@ -368,6 +344,7 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
       }
 
       setRefereeReport(payload.report);
+      setRefereeReused(payload.reused === true ? true : null);
     } catch (error) {
       setJudgeError(error instanceof Error ? error.message : "Unknown referee error");
     } finally {
@@ -384,9 +361,10 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
             <button
               type="button"
               className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
-              onClick={() => void fetchMessages()}
+              onClick={() => void refreshThreadData()}
+              disabled={refreshing}
             >
-              새로고침
+              {refreshing ? "새로고침 중..." : "새로고침"}
             </button>
           </div>
 
@@ -449,9 +427,10 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
             <button
               type="button"
               className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
-              onClick={() => setRefreshNonce((current) => current + 1)}
+              onClick={() => void refreshThreadData()}
+              disabled={refreshing}
             >
-              새로고침
+              {refreshing ? "새로고침 중..." : "새로고침"}
             </button>
           </div>
 
@@ -483,14 +462,39 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
           {votesError ? <p className="mt-2 text-sm text-red-600">{votesError}</p> : null}
 
           <div className="mt-4">
-            <button
-              type="button"
-              onClick={() => void onRunReferee()}
-              disabled={judging}
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {judging ? "Referee 실행 중..." : "Run Referee"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void onRunReferee(false)}
+                disabled={judging}
+                className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {judging ? "Referee 실행 중..." : "Run Referee"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (judging) {
+                    return;
+                  }
+
+                  const confirmed = window.confirm("비용이 발생할 수 있습니다. 재판정하시겠습니까?");
+
+                  if (confirmed) {
+                    void onRunReferee(true);
+                  }
+                }}
+                disabled={judging}
+                className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {judging ? "재판정 중..." : "Re-run (costs)"}
+              </button>
+              {refereeReused ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                  Reused
+                </span>
+              ) : null}
+            </div>
             {judgeError ? <p className="mt-2 text-sm text-red-600">{judgeError}</p> : null}
           </div>
         </div>

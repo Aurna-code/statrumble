@@ -23,6 +23,65 @@ function asErrorMessage(error: unknown) {
   return "Unknown error";
 }
 
+function parseForceValue(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+
+  if (["1", "true", "yes", "y"].includes(normalized)) {
+    return true;
+  }
+
+  if (["0", "false", "no", "n"].includes(normalized)) {
+    return false;
+  }
+
+  return null;
+}
+
+async function readForceFromBody(request: NextRequest) {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (!contentType.includes("application/json")) {
+    return { value: null as boolean | null, invalid: false };
+  }
+
+  let body: unknown = null;
+
+  try {
+    body = await request.json();
+  } catch {
+    return { value: null as boolean | null, invalid: true };
+  }
+
+  if (!body || typeof body !== "object") {
+    return { value: null as boolean | null, invalid: false };
+  }
+
+  const force = (body as Record<string, unknown>).force;
+
+  if (typeof force === "boolean") {
+    return { value: force, invalid: false };
+  }
+
+  if (typeof force === "number") {
+    return { value: force === 1, invalid: false };
+  }
+
+  if (typeof force === "string") {
+    const parsed = parseForceValue(force);
+    return { value: parsed, invalid: parsed === null };
+  }
+
+  if (force === undefined) {
+    return { value: null as boolean | null, invalid: false };
+  }
+
+  return { value: null as boolean | null, invalid: true };
+}
+
 function isGpt5Model(model: string) {
   return model.startsWith("gpt-5");
 }
@@ -129,7 +188,7 @@ async function requestRefereeOutput(params: {
   return (response.output_text ?? "").trim();
 }
 
-export async function POST(_request: NextRequest, context: RouteContext) {
+export async function POST(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
 
   if (!id) {
@@ -146,15 +205,36 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ ok: false, error: "OPENAI_API_KEY not set" }, { status: 500 });
+  const forceQuery = request.nextUrl.searchParams.get("force");
+  const forceFromQuery = parseForceValue(forceQuery);
+
+  if (forceQuery && forceFromQuery === null) {
+    return NextResponse.json({ ok: false, error: "Invalid force query value." }, { status: 400 });
   }
+
+  const { value: forceFromBody, invalid: forceBodyInvalid } = await readForceFromBody(request);
+
+  if (forceBodyInvalid) {
+    return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const force = forceFromQuery ?? forceFromBody ?? false;
 
   try {
     const thread = await getThread(id);
     if (!thread) {
       return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
+    }
+
+    const existingReport = (thread.referee_report as RefereeReport | null) ?? null;
+
+    if (!force && existingReport) {
+      return NextResponse.json({ ok: true, report: existingReport, reused: true });
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ ok: false, error: "OPENAI_API_KEY not set" }, { status: 500 });
     }
 
     const voteSummary = await getVoteSummary(id);
@@ -231,14 +311,14 @@ export async function POST(_request: NextRequest, context: RouteContext) {
 
     const { error: updateError } = await supabase
       .from("arena_threads")
-      .update({ referee_report: report })
+      .update({ referee_report: report, referee_report_updated_at: new Date().toISOString() })
       .eq("id", id);
 
     if (updateError) {
       return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, report });
+    return NextResponse.json({ ok: true, report, reused: false });
   } catch (error) {
     return NextResponse.json({ ok: false, error: asErrorMessage(error) }, { status: 500 });
   }

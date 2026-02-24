@@ -1895,3 +1895,78 @@ After:
 - [ ] Retest Members section loads without errors
 #### Commit Link
 - TODO
+
+### Prompt ID: Hotfix-07c-2026-02-24 (commit: TODO)
+#### Prompt
+```text
+[Hotfix 07c] Refresh semantics 확정 + Referee report 재사용/재판정(force) 분리
+
+컨텍스트
+- Repo root: ~/code/statrumble/
+- Next app:   ~/code/statrumble/statrumble/
+- 스택: Next(App Router) + Supabase(RLS/RPC) + OpenAI Responses API
+- 현재 목표(문서 기반):
+  - Refresh는 비용 0원 “DB 최신 동기화”
+  - snapshot/start/end는 고정
+  - Run Referee(기본)는 report 있으면 재사용(reused=true)
+  - 강제 재판정은 별도 버튼(force=true)
+  - UI에서 Run Referee / Re-run(costs) 분리
+  (문서 5.2 Hotfix 07c):contentReference[oaicite:1]{index=1}
+
+해야 할 일(구현)
+1) Thread 페이지/컴포넌트에서 Refresh 의미를 “DB 재조회만”으로 고정
+   - 대상: messages / votes / referee report
+   - snapshot(start/end 포함)은 절대 다시 계산하거나 바꾸지 말 것
+   - Refresh 클릭 시 네트워크 폭주 없이(POST 1 + GET 1 수준) 안정적으로 수렴
+   - 관련 파일 후보:
+     - statrumble/app/threads/[id]/page.tsx
+     - statrumble/app/components/ThreadArena.tsx (있으면)
+     - statrumble/lib/db/messages.ts, votes.ts 등
+
+2) /judge route 동작을 확정
+   - 파일 후보: statrumble/app/api/threads/[id]/judge/route.ts
+   - Query 또는 Body로 force 플래그 지원(권장: query ?force=1 또는 body { force: true })
+   - force=false(기본):
+     - 기존 report가 DB에 있으면 OpenAI 호출 없이 즉시 반환
+     - 응답에 reused=true 포함
+   - force=true:
+     - OpenAI Responses API 호출 → 결과 저장 → 반환
+     - 응답에 reused=false 포함
+   - 저장 방식:
+     - 현재 스키마를 확인해서 “thread_id 당 report 1개 upsert”로 최소 구현(히스토리 테이블 새로 만들지 않아도 됨)
+     - 단, overwritten 방식이면 updated_at 등으로 최신 여부가 명확히 남게
+   - 워크스페이스 권한/스코프는 기존 active workspace/RLS 규칙 그대로 준수
+
+3) UI: Run Referee / Re-run(costs) 버튼 분리
+   - Run Referee: 기본(force=false) 호출 → 재사용이면 “Reused” 배지/텍스트로 표시
+   - Re-run(costs): force=true 호출 → 가벼운 confirm(예: “비용이 발생할 수 있음”) 후 실행
+   - Refresh 버튼은 judge를 자동 호출하지 말 것(오직 조회만)
+
+4) 회귀/테스트 체크
+   - 기존 스레드에 report가 있는 상태에서 Run Referee → OpenAI 호출 없이 즉시 반환(reused=true)
+   - force=true 클릭 시에만 OpenAI 호출(로그/응답으로 확인)
+   - Refresh는 report/messages/votes만 재조회(스냅샷 범위 변동 없음)
+   - lint/typecheck/verify.sh 통과 유지
+
+커밋 전략
+- 커밋 메시지: fix: refresh semantics and reuse referee report
+- docs/CODEX_LOG.md에 변경 요약 5~10줄 추가
+
+완료 후 실행(로컬)
+- pnpm -C statrumble run lint
+- pnpm -C statrumble run typecheck
+- ./scripts/verify.sh
+```
+#### Result
+- Added a thread refresh API that returns messages, votes, and referee report in a single GET without touching snapshot math.
+- Updated `ThreadArena` to use the refresh endpoint for initial load and all refresh actions, keeping refresh to one GET.
+- Reworked `/judge` to support `force` via query/body, reuse existing reports when present, and return `reused` flags.
+- Added a migration and model updates for `referee_report_updated_at` to record overwrite timestamps.
+- Split Run Referee vs Re-run (costs) in the UI with a confirm step for forced reruns.
+- Displayed a Reused badge when the referee report is reused.
+#### Manual Checklist
+- [x] `pnpm -C statrumble run lint`
+- [x] `pnpm -C statrumble run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

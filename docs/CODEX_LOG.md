@@ -2121,3 +2121,115 @@ Task:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt-C-2026-02-24 (commit: TODO)
+#### Prompt
+```text
+[Prompt C] Public Portal Skeleton (read-only) for Decision Cards
+
+컨텍스트
+- Repo root: ~/code/statrumble/
+- Next app:   ~/code/statrumble/statrumble/
+- 이미 완료:
+  - /workspaces 허브 + active workspace 스코프
+  - threads/judge/refresh semantics(재사용+force)
+  - decisions ledger(/decisions, promote thread -> decision)
+
+목표
+1) Decision Card를 “공개(Publish)”하면, 로그인 없이 볼 수 있는 공개 URL이 생긴다.
+2) 공개 페이지는 read-only. (댓글/투표/스레드 내용 노출 X)
+3) 공개/비공개 토글은 워크스페이스 권한(최소 owner)으로만 가능.
+4) RLS로 안전하게: 공개된 decision만 anon이 읽을 수 있다.
+
+구현 요구사항
+
+A) DB 마이그레이션 (새 파일, 다음 번호로 추가: 현재 014까지 있으니 015_... 권장)
+- 파일: statrumble/supabase/migrations/015_public_decisions_portal.sql
+- decision_cards에 아래 컬럼 추가(없으면):
+  - is_public boolean not null default false
+  - public_id uuid unique (nullable)  -- 공개 URL 식별자
+  - public_at timestamptz nullable
+- public_id 생성 규칙:
+  - publish 시 public_id가 null이면 gen_random_uuid()로 생성
+  - unpublish 시 is_public=false (public_id는 유지해도 되고 null로 지워도 됨; MVP에서는 “유지” 추천)
+- 인덱스:
+  - index on (is_public, public_at desc) 또는 (public_id)만 있어도 됨(unique면 충분)
+- RLS:
+  1) 기존 멤버 select policy는 유지
+  2) anon/public 읽기 정책 추가:
+     - decision_cards: SELECT 허용 조건 using (is_public = true and public_id is not null)
+  3) UPDATE 정책:
+     - publish/unpublish는 owner만 가능(최소 MVP). member는 불가.
+     - 구현은 policy + RPC 둘 중 하나 선택(권장: RPC로 중앙집권)
+
+B) RPC(권장) 또는 API-only
+- RPC 권장: set_decision_public(p_decision_id uuid, p_public boolean) returns table(public_id uuid, is_public boolean)
+  - auth.uid() null이면 Unauthorized
+  - decision이 속한 workspace에서 caller가 owner인지 검증
+  - p_public=true:
+    - is_public=true, public_at=now()
+    - public_id가 null이면 gen_random_uuid()로 채움
+  - p_public=false:
+    - is_public=false
+  - 결과로 public_id/is_public 반환
+- security definer + 내부에서 auth.uid()/멤버십 검증(지금까지 패턴 유지)
+
+C) API 라우트
+- POST statrumble/app/api/decisions/[id]/publish/route.ts
+  - body: { public: true|false } (또는 query ?public=1)
+  - 내부에서 위 RPC 호출
+  - 응답: { publicId, isPublic, publicUrl }
+  - publicUrl 포맷: /p/decisions/<publicId>
+- 이 API는 workspace scope가 아니라 “decision_id -> workspace 검증”으로 권한 체크
+
+D) UI (Decision detail 페이지에 Publish 컨트롤 추가)
+- 파일 후보: statrumble/app/decisions/[id]/page.tsx
+- owner일 때만 노출:
+  - Publish toggle 버튼(또는 Publish/Unpublish)
+  - Publish 후 public URL 표시 + Copy 버튼
+- owner가 아니면:
+  - 공개 상태는 보여줘도 되지만(선택), 토글은 숨김
+
+E) Public 페이지 라우트(로그인 없이 접근)
+- 새 페이지:
+  - statrumble/app/p/decisions/[publicId]/page.tsx
+  - (선택) statrumble/app/p/layout.tsx 로 공개페이지 레이아웃 분리(상단 nav 최소화)
+- 동작:
+  - cookies/auth 없이 supabase anon client로 decision_cards를 public_id로 조회
+  - is_public=false/null이면 404
+  - 보여줄 내용(MVP):
+    - title, summary, snapshot_start/end, created_at, (선택) referee report 요약/일부
+  - 절대 노출하지 말 것:
+    - workspace 내부 멤버 목록/유저 이메일/스레드 메시지/투표 상세 등
+
+F) QA 체크리스트
+1) decision detail에서 Publish -> publicId 생성 -> /p/decisions/<id> 접속 시 로그인 없이 보임
+2) Unpublish 후 same URL 접속 -> 404
+3) 다른 workspace의 decision은 owner 아닌 계정이 publish 불가
+4) 공개 decision이더라도 /decisions 목록은 기존처럼 로그인/멤버십 필요(변화 없음)
+5) lint/typecheck/verify.sh 통과 + supabase db push 적용
+
+커밋
+- feat(public): add public decisions portal (publish + /p/decisions/[publicId])
+- docs/CODEX_LOG.md에 변경 요약 5~10줄
+- 마이그레이션 추가 시: pnpm exec supabase db push (dry-run 후)
+
+실행
+- pnpm -C statrumble run lint
+- pnpm -C statrumble run typecheck
+- ./scripts/verify.sh
+```
+#### Result
+- Added `015_public_decisions_portal.sql` with public columns, public select policy, owner-only update/delete policy, and the `set_decision_public` RPC.
+- Added publish API at `POST /api/decisions/[id]/publish` returning `publicUrl` and enforcing owner authorization via RPC.
+- Added `DecisionPublishControls` client component and wired it into decision detail for owners only.
+- Added public decision page at `/p/decisions/[publicId]` with read-only summary view and referee TL;DR.
+- Extended decision DB helpers to include public fields and public-id lookup.
+#### Manual Checklist
+- [x] `pnpm -C statrumble run lint`
+- [x] `pnpm -C statrumble run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] `pnpm exec supabase db push --dry-run` (failed: supabase CLI not found)
+- [ ] `pnpm exec supabase db push` (failed: supabase CLI not found)
+#### Commit Link
+- TODO

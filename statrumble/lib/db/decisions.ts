@@ -20,6 +20,19 @@ export type DecisionCardDetail = DecisionCardListItem & {
   snapshot_end: string | null;
   referee_report: unknown | null;
   updated_at: string | null;
+  is_public: boolean;
+  public_id: string | null;
+  public_at: string | null;
+};
+
+export type PublicDecisionCard = {
+  id: string;
+  title: string;
+  summary: string | null;
+  created_at: string;
+  snapshot_start: string | null;
+  snapshot_end: string | null;
+  referee_report: unknown | null;
 };
 
 export async function listDecisions(limit = 20): Promise<DecisionCardListItem[]> {
@@ -45,7 +58,7 @@ export async function getDecision(decisionId: string): Promise<DecisionCardDetai
   const { data, error } = await supabase
     .from("decision_cards")
     .select(
-      "id, title, summary, decision, context, snapshot, snapshot_start, snapshot_end, referee_report, created_at, updated_at, created_by, thread_id",
+      "id, title, summary, decision, context, snapshot, snapshot_start, snapshot_end, referee_report, created_at, updated_at, created_by, thread_id, is_public, public_id, public_at",
     )
     .eq("id", decisionId)
     .eq("workspace_id", workspaceId)
@@ -56,6 +69,22 @@ export async function getDecision(decisionId: string): Promise<DecisionCardDetai
   }
 
   return (data as DecisionCardDetail | null) ?? null;
+}
+
+export async function getPublicDecisionByPublicId(publicId: string): Promise<PublicDecisionCard | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("decision_cards")
+    .select("id, title, summary, created_at, snapshot_start, snapshot_end, referee_report")
+    .eq("public_id", publicId)
+    .eq("is_public", true)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load public decision: ${error.message}`);
+  }
+
+  return (data as PublicDecisionCard | null) ?? null;
 }
 
 export async function getDecisionForThread(threadId: string): Promise<DecisionCardListItem | null> {

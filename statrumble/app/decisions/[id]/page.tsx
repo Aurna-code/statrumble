@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import DecisionPublishControls from "@/app/components/DecisionPublishControls";
 import OnboardingCard from "@/app/components/OnboardingCard";
 import RefereeReportView from "@/app/components/RefereeReportView";
 import { getDecision, type DecisionCardDetail } from "@/lib/db/decisions";
-import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
+import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import type { RefereeReport } from "@/lib/referee/schema";
 
 export const dynamic = "force-dynamic";
@@ -72,16 +73,21 @@ function renderSummary(decision: DecisionCardDetail) {
 
 export default async function DecisionDetailPage({ params }: DecisionDetailPageProps) {
   const { id } = await params;
-  let hasMembership = false;
+  let workspaceSelection = {
+    workspaces: [],
+    activeWorkspaceId: null,
+  } as Awaited<ReturnType<typeof getActiveWorkspaceSelection>>;
 
   try {
-    const memberships = await listMemberWorkspaceSummaries();
-    hasMembership = memberships.length > 0;
+    workspaceSelection = await getActiveWorkspaceSelection();
   } catch {
-    hasMembership = false;
+    workspaceSelection = {
+      workspaces: [],
+      activeWorkspaceId: null,
+    };
   }
 
-  if (!hasMembership) {
+  if (workspaceSelection.workspaces.length === 0) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">Decision</h1>
@@ -91,6 +97,9 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
     );
   }
 
+  const activeWorkspace =
+    workspaceSelection.workspaces.find((workspace) => workspace.id === workspaceSelection.activeWorkspaceId) ?? null;
+  const isOwner = activeWorkspace?.role === "owner";
   let decision: DecisionCardDetail | null = null;
   let loadError: string | null = null;
 
@@ -127,6 +136,9 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
           <div className="rounded-lg border border-zinc-200 bg-white p-5">
             <h2 className="text-lg font-semibold">{decision.title}</h2>
             <p className="mt-2 text-sm text-zinc-700">{renderSummary(decision)}</p>
+            <p className="mt-2 text-xs text-zinc-500">
+              공개 상태: {decision.is_public ? "Public" : "Private"}
+            </p>
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
               <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
                 Snapshot Start: <span className="font-medium">{formatDateLabel(decision.snapshot_start)}</span>
@@ -151,7 +163,25 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
                 </Link>
               </div>
             ) : null}
+            {decision.is_public && decision.public_id ? (
+              <div className="mt-3">
+                <Link
+                  href={`/p/decisions/${decision.public_id}`}
+                  className="text-sm text-zinc-600 hover:text-zinc-900"
+                >
+                  Public URL 확인
+                </Link>
+              </div>
+            ) : null}
           </div>
+
+          {isOwner ? (
+            <DecisionPublishControls
+              decisionId={decision.id}
+              initialIsPublic={decision.is_public}
+              initialPublicId={decision.public_id}
+            />
+          ) : null}
 
           {report ? (
             <RefereeReportView report={report} />

@@ -52,7 +52,7 @@ type WorkspaceOwnerCountRow = {
 };
 
 type WorkspaceMemberQueryRow = {
-  user_id: string;
+  member_user_id: string;
   role: string;
   joined_at: string;
 };
@@ -166,7 +166,7 @@ export async function listWorkspaceMembers(workspaceId: string): Promise<Workspa
   const rows = (data as WorkspaceMemberQueryRow[] | null) ?? [];
 
   return rows.map((row) => ({
-    user_id: row.user_id,
+    user_id: row.member_user_id,
     role: row.role,
     joined_at: row.joined_at,
   }));

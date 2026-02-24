@@ -1858,3 +1858,40 @@ UI:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Fix-Workspace-Members-Ambiguous-User-Id-2026-02-24 (commit: TODO)
+#### Prompt
+```text
+[Codex Prompt] Fix "column reference user_id is ambiguous" in workspace members listing
+
+Symptom:
+- Workspaces page Members section fails: "column reference 'user_id' is ambiguous"
+
+Goal:
+- Make the members list query/RPC unambiguous and return members correctly.
+
+Tasks:
+1) Find the RPC/view used to load workspace members (search migrations + API routes).
+2) In the SQL, qualify every user_id reference with table aliases (e.g., wm.user_id, p.user_id).
+   - Avoid unqualified `user_id` in SELECT/JOIN/WHERE.
+3) If the function is PL/pgSQL with RETURNS TABLE(user_id ...), either:
+   - rename output column to member_user_id, OR
+   - add `#variable_conflict use_column`, BUT still prefer explicit aliases.
+4) Add a new migration to apply the fix (do not edit already-applied migrations).
+5) Ensure UI shows at least the current owner as a member after fix.
+
+After:
+- pnpm exec supabase db push
+- Retest Members section loads without errors.
+```
+#### Result
+- Replaced the members RPC with a drop + recreate migration that aliases all `user_id` references and renames the output column to `member_user_id`.
+- Updated workspace member query mapping to read `member_user_id` and keep the UI contract intact.
+#### Manual Checklist
+- [x] `pnpm -C statrumble exec supabase db push`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Retest Members section loads without errors
+#### Commit Link
+- TODO

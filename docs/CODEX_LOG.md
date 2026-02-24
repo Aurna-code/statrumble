@@ -2092,3 +2092,32 @@ E) 코드 구조(권장)
 - [ ] `pnpm exec supabase db push` (failed: supabase CLI not found)
 #### Commit Link
 - TODO
+
+### Prompt ID: UI-Nav-Active-2026-02-24 (commit: TODO)
+#### Prompt
+```text
+[UI polish] Header nav active link highlight
+
+Goal:
+- Top nav (StatRumble / Decisions / Workspaces / Join) should highlight the current page, not always StatRumble.
+
+Task:
+1) Find the header/nav code (likely statrumble/app/layout.tsx or a Header component).
+2) Implement active styling using next/navigation usePathname().
+3) Rules:
+   - StatRumble is active only when pathname === '/'
+   - Decisions active when pathname startsWith('/decisions')
+   - Workspaces active when pathname startsWith('/workspaces') or pathname startsWith('/workspace')
+   - Join active when pathname startsWith('/join')
+4) Keep styling consistent with existing UI (use same bold/underline style currently applied to StatRumble).
+5) Ensure lint/typecheck passes.
+```
+#### Result
+- Added a client-side `HeaderNavLinks` component that derives active state from `usePathname()` and applies bold styling to the active link.
+- Replaced static header links in `statrumble/app/layout.tsx` with the new active-aware nav links.
+#### Manual Checklist
+- [x] `pnpm -C statrumble run lint`
+- [x] `pnpm -C statrumble run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

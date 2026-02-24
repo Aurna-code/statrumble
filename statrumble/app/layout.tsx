@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import HeaderNavLinks from "@/app/components/HeaderNavLinks";
 import WorkspaceSwitcher from "@/app/components/WorkspaceSwitcher";
 import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
@@ -52,18 +53,7 @@ export default async function RootLayout({
         <div className="min-h-screen bg-zinc-50 text-zinc-900">
           <header className="border-b border-zinc-200 bg-white">
             <nav className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3 text-sm md:px-8">
-              <Link href="/" className="font-semibold">
-                StatRumble
-              </Link>
-              <Link href="/decisions" className="text-zinc-600 hover:text-zinc-900">
-                Decisions
-              </Link>
-              <Link href="/workspaces" className="text-zinc-600 hover:text-zinc-900">
-                Workspaces
-              </Link>
-              <Link href="/join" className="text-zinc-600 hover:text-zinc-900">
-                Join
-              </Link>
+              <HeaderNavLinks />
               <div className="ml-auto flex items-center gap-3">
                 {workspaceSelection.activeWorkspaceId ? (
                   <WorkspaceSwitcher

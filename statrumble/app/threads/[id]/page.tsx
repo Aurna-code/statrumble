@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import ThreadArena from "@/app/components/ThreadArena";
+import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
 
@@ -69,6 +70,7 @@ function formatCount(value: number | null | undefined) {
 export default async function ThreadDetailPage({ params }: ThreadPageProps) {
   const { id } = await params;
   let thread = null;
+  let initialDecisionId: string | null = null;
 
   try {
     thread = await getThread(id);
@@ -85,6 +87,13 @@ export default async function ThreadDetailPage({ params }: ThreadPageProps) {
 
   if (thread === null) {
     notFound();
+  }
+
+  try {
+    const decision = await getDecisionForThread(id);
+    initialDecisionId = decision?.id ?? null;
+  } catch {
+    initialDecisionId = null;
   }
 
   const snapshot = (thread.snapshot ?? {}) as ThreadSnapshot;
@@ -154,6 +163,7 @@ export default async function ThreadDetailPage({ params }: ThreadPageProps) {
         threadId={thread.id}
         snapshot={thread.snapshot}
         initialRefereeReport={(thread.referee_report as RefereeReport | null) ?? null}
+        initialDecisionId={initialDecisionId}
       />
     </main>
   );

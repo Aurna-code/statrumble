@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefereeReportView from "@/app/components/RefereeReportView";
 import type { RefereeReport } from "@/lib/referee/schema";
@@ -37,6 +39,13 @@ type JudgeApiResponse = {
   error?: string;
 };
 
+type PromoteApiResponse = {
+  ok: boolean;
+  decisionId?: string;
+  created?: boolean;
+  error?: string;
+};
+
 type SnapshotSummary = {
   selectedAvg: number | null;
   selectedN: number | null;
@@ -50,6 +59,7 @@ type ThreadArenaProps = {
   threadId: string;
   snapshot: unknown;
   initialRefereeReport?: RefereeReport | null;
+  initialDecisionId?: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -151,7 +161,13 @@ function buildVoteSignature(counts: VoteCounts, myStance: VoteStance | null) {
   return `${counts.A}:${counts.B}:${counts.C}:${myStance ?? "-"}`;
 }
 
-export default function ThreadArena({ threadId, snapshot, initialRefereeReport = null }: ThreadArenaProps) {
+export default function ThreadArena({
+  threadId,
+  snapshot,
+  initialRefereeReport = null,
+  initialDecisionId = null,
+}: ThreadArenaProps) {
+  const router = useRouter();
   const renderWindowRef = useRef({
     windowStart: Date.now(),
     renderCount: 0,
@@ -168,6 +184,9 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
   const [refereeReused, setRefereeReused] = useState<boolean | null>(null);
   const [judging, setJudging] = useState(false);
   const [judgeError, setJudgeError] = useState<string | null>(null);
+  const [decisionId, setDecisionId] = useState<string | null>(initialDecisionId);
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const refreshInFlightRef = useRef(false);
@@ -352,6 +371,34 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
     }
   }
 
+  async function onPromoteDecision() {
+    if (promoting) {
+      return;
+    }
+
+    setPromoting(true);
+    setPromoteError(null);
+
+    try {
+      const response = await fetch(`/api/threads/${threadId}/promote`, {
+        method: "POST",
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as PromoteApiResponse;
+
+      if (!response.ok || !payload.ok || !payload.decisionId) {
+        throw new Error(payload.error ?? "Failed to promote decision.");
+      }
+
+      setDecisionId(payload.decisionId);
+      router.push(`/decisions/${payload.decisionId}`);
+    } catch (error) {
+      setPromoteError(error instanceof Error ? error.message : "Unknown promote error");
+    } finally {
+      setPromoting(false);
+    }
+  }
+
   return (
     <div className="mt-6 space-y-6">
       <section className="grid gap-6 lg:grid-cols-2">
@@ -496,6 +543,27 @@ export default function ThreadArena({ threadId, snapshot, initialRefereeReport =
               ) : null}
             </div>
             {judgeError ? <p className="mt-2 text-sm text-red-600">{judgeError}</p> : null}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {decisionId ? (
+              <Link
+                href={`/decisions/${decisionId}`}
+                className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 transition hover:bg-zinc-100"
+              >
+                View Decision
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void onPromoteDecision()}
+                disabled={promoting}
+                className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {promoting ? "승격 중..." : "Promote to Decision"}
+              </button>
+            )}
+            {promoteError ? <p className="text-sm text-red-600">{promoteError}</p> : null}
           </div>
         </div>
       </section>

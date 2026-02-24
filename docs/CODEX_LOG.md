@@ -1970,3 +1970,125 @@ After:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt-B-2026-02-24 (commit: TODO)
+#### Prompt
+```text
+[Prompt B] Promote to Decision + /decisions Ledger (MVP)
+
+컨텍스트
+- Repo root: ~/code/statrumble/
+- Next app:   ~/code/statrumble/statrumble/
+- 스택: Next(App Router) + Supabase(RLS/RPC) + workspace/active 스코프
+- 이미 완료된 것:
+  - /workspaces 허브 + active workspace 스코프
+  - threads / messages / votes / judge / refresh(=DB requery only) 동작
+  - Referee reuse/force 분리
+
+목표
+1) Thread를 “Decision Card”로 승격(Promote)
+2) /decisions 페이지(목록) + /decisions/[id] 상세(읽기 전용) 제공
+3) workspace 스코프/권한(RLS, active workspace) 준수
+4) idempotent: 한 thread는 decision 1개(중복 생성 방지)
+
+구현 요구사항
+
+A) DB (필요 시 마이그레이션 추가)
+- 현재 supabase/migrations에서 마지막 번호 확인 후 다음 번호로 새 migration 생성(예: 014_...).
+- decision_cards 테이블이 이미 있으면 스키마를 확인하고 “MVP에 필요한 컬럼”이 없을 때만 추가.
+- 최소 요구 컬럼(없으면 추가):
+  - id uuid pk (있을 가능성 큼)
+  - workspace_id uuid (thread의 workspace)
+  - thread_id uuid (unique)
+  - title text
+  - summary text (nullable)
+  - created_by uuid (auth.uid)
+  - created_at timestamptz default now()
+  - updated_at timestamptz default now()
+  - snapshot_start timestamptz (thread의 start)
+  - snapshot_end timestamptz (thread의 end)
+  - referee_report jsonb or text (이미 thread에 저장된 report를 그대로 복사하거나 요약 텍스트 저장) — 선택
+- 제약:
+  - unique(thread_id)
+  - index(workspace_id, created_at desc)
+- RLS:
+  - 읽기: workspace 멤버만 select 가능
+  - 쓰기(생성): workspace owner/member 중 “thread에 접근 가능한 사람”만 insert 가능 (최소는 workspace member)
+  - 업데이트/삭제는 MVP에서는 막거나 owner만 허용
+
+B) API: Promote endpoint
+- 새 API route 추가:
+  - POST statrumble/app/api/threads/[id]/promote/route.ts
+- 동작:
+  1) active workspace를 서버에서 해석(기존 유틸 재사용)
+  2) thread 조회(해당 workspace에 속하는지 검증)
+  3) 이미 decision_cards에 thread_id 존재하면 기존 decision 반환 (idempotent)
+  4) 없으면 decision_cards 생성:
+     - title: 기본값 생성(예: `${metricName} (${start}~${end})` 또는 thread.title/없으면 "Decision")
+     - summary: referee report가 있으면 거기서 1~2줄 요약(없으면 null)
+     - snapshot_start/end: thread의 start/end
+     - created_by: auth.uid()
+     - workspace_id/thread_id: thread에서
+  5) 응답: { decisionId, created: boolean }
+- 에러:
+  - 권한 없음: 401/403
+  - thread not found or 다른 workspace: 404
+
+C) UI: Thread → Promote 버튼
+- thread 상세 페이지(또는 ThreadArena UI)에 버튼 추가:
+  - "Promote to Decision"
+- 클릭 시:
+  - POST /api/threads/[id]/promote
+  - 성공 시 /decisions/[decisionId]로 이동 또는 링크 표시
+- 이미 promote된 thread면 버튼 대신:
+  - "View Decision" 링크 표시
+
+D) UI: Decisions 목록/상세
+- 목록: statrumble/app/decisions/page.tsx
+  - active workspace 기준 decision_cards list
+  - 카드/테이블: title, created_at, created_by(가능하면), thread 링크
+- 상세: statrumble/app/decisions/[id]/page.tsx
+  - decision 카드 내용 표시(title, summary, 기간, 생성자)
+  - 관련 thread로 이동 링크
+  - (선택) referee report 원문/요약 표시
+- 네비게이션:
+  - layout/header에 Decisions 링크가 이미 있으면 그대로, 없으면 추가
+  - /decisions는 멤버십 없으면 온보딩(기존 정책과 동일한 UX)
+
+E) 코드 구조(권장)
+- DB 접근 유틸: statrumble/lib/db/decisions.ts (또는 workspaces/threads.ts에 최소 추가)
+- 기존 active workspace 유틸/권한 체크 재사용
+
+검증 체크리스트
+1) thread 생성/조회 가능 상태에서 Promote 클릭 → decision 생성되고 /decisions에 나타남
+2) 같은 thread에서 Promote 2번 → 새로 생성되지 않고 기존 decision으로 이동(created=false)
+3) workspace 전환 후 /decisions가 workspace별로 분리되어 보임
+4) 권한 없는 workspace/thread 접근 시 404/403
+5) lint/typecheck/verify.sh 통과
+
+커밋
+- 커밋 1~2개로 정리(가능하면 1개):
+  - feat(decisions): promote thread to decision and add decisions pages
+- docs/CODEX_LOG.md에 변경 요약 5~10줄 추가
+- DB migration 추가 시: pnpm exec supabase db push (dry-run 후)
+
+실행
+- pnpm -C statrumble run lint
+- pnpm -C statrumble run typecheck
+- ./scripts/verify.sh
+```
+#### Result
+- Added `014_decision_cards_mvp.sql` to extend `decision_cards` with summary/created_by/updated_at/snapshot range/referee report plus unique thread constraint and workspace index.
+- Introduced `statrumble/lib/db/decisions.ts` and exports for decision list/detail lookups scoped to the active workspace.
+- Added `POST /api/threads/[id]/promote` with idempotent promotion, summary extraction from referee reports, and active-workspace validation.
+- Wired Thread UI to show Promote/View Decision and redirect to the decision detail on success.
+- Replaced the Decisions placeholder with a workspace-scoped list page and added a read-only detail page with optional referee report view.
+- Maintained onboarding UX when no workspace membership is present.
+#### Manual Checklist
+- [x] `pnpm -C statrumble run lint`
+- [x] `pnpm -C statrumble run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] `pnpm exec supabase db push --dry-run` (failed: supabase CLI not found)
+- [ ] `pnpm exec supabase db push` (failed: supabase CLI not found)
+#### Commit Link
+- TODO

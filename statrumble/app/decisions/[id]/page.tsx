@@ -1,0 +1,168 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import OnboardingCard from "@/app/components/OnboardingCard";
+import RefereeReportView from "@/app/components/RefereeReportView";
+import { getDecision, type DecisionCardDetail } from "@/lib/db/decisions";
+import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
+import type { RefereeReport } from "@/lib/referee/schema";
+
+export const dynamic = "force-dynamic";
+
+interface DecisionDetailPageProps {
+  params: Promise<{ id: string }>;
+}
+
+function formatDateLabel(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString();
+}
+
+function isRefereeReport(value: unknown): value is RefereeReport {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.tldr !== "string") {
+    return false;
+  }
+
+  if (!Array.isArray(record.data_facts) || !Array.isArray(record.confounders) || !Array.isArray(record.next_checks)) {
+    return false;
+  }
+
+  if (!record.stances || typeof record.stances !== "object") {
+    return false;
+  }
+
+  if (!record.verdict || typeof record.verdict !== "object") {
+    return false;
+  }
+
+  const verdict = record.verdict as Record<string, unknown>;
+
+  return (
+    typeof verdict.leading === "string" &&
+    typeof verdict.confidence_0_100 === "number" &&
+    typeof verdict.reason === "string"
+  );
+}
+
+function renderSummary(decision: DecisionCardDetail) {
+  if (decision.summary && decision.summary.trim().length > 0) {
+    return decision.summary;
+  }
+
+  if (decision.decision && decision.decision.trim().length > 0) {
+    return decision.decision;
+  }
+
+  return "요약 없음";
+}
+
+export default async function DecisionDetailPage({ params }: DecisionDetailPageProps) {
+  const { id } = await params;
+  let hasMembership = false;
+
+  try {
+    const memberships = await listMemberWorkspaceSummaries();
+    hasMembership = memberships.length > 0;
+  } catch {
+    hasMembership = false;
+  }
+
+  if (!hasMembership) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Decision</h1>
+        <p className="mt-2 text-sm text-zinc-600">워크스페이스에 참여해야 Decision을 확인할 수 있습니다.</p>
+        <OnboardingCard />
+      </main>
+    );
+  }
+
+  let decision: DecisionCardDetail | null = null;
+  let loadError: string | null = null;
+
+  try {
+    decision = await getDecision(id);
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : "Unknown error";
+  }
+
+  if (!loadError && !decision) {
+    notFound();
+  }
+
+  const report = decision && isRefereeReport(decision.referee_report) ? decision.referee_report : null;
+
+  return (
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Decision</h1>
+          <p className="mt-2 text-sm text-zinc-600">Decision 카드 상세 보기</p>
+        </div>
+        <Link href="/decisions" className="text-sm text-zinc-600 hover:text-zinc-900">
+          목록으로 돌아가기
+        </Link>
+      </div>
+
+      {loadError ? (
+        <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
+          <p className="text-sm text-red-600">조회 실패: {loadError}</p>
+        </section>
+      ) : decision ? (
+        <section className="mt-6 space-y-6">
+          <div className="rounded-lg border border-zinc-200 bg-white p-5">
+            <h2 className="text-lg font-semibold">{decision.title}</h2>
+            <p className="mt-2 text-sm text-zinc-700">{renderSummary(decision)}</p>
+            <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+              <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                Snapshot Start: <span className="font-medium">{formatDateLabel(decision.snapshot_start)}</span>
+              </p>
+              <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                Snapshot End: <span className="font-medium">{formatDateLabel(decision.snapshot_end)}</span>
+              </p>
+              <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                Created: <span className="font-medium">{formatDateLabel(decision.created_at)}</span>
+              </p>
+              <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
+                Created by: <span className="font-medium">{decision.created_by ?? "-"}</span>
+              </p>
+            </div>
+            {decision.thread_id ? (
+              <div className="mt-4">
+                <Link
+                  href={`/threads/${decision.thread_id}`}
+                  className="text-sm text-zinc-600 hover:text-zinc-900"
+                >
+                  Thread로 이동
+                </Link>
+              </div>
+            ) : null}
+          </div>
+
+          {report ? (
+            <RefereeReportView report={report} />
+          ) : (
+            <section className="rounded-lg border border-zinc-200 bg-white p-5">
+              <h2 className="text-base font-semibold">Referee Report</h2>
+              <p className="mt-2 text-sm text-zinc-600">연결된 Referee report가 없습니다.</p>
+            </section>
+          )}
+        </section>
+      ) : null}
+    </main>
+  );
+}

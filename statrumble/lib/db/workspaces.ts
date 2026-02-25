@@ -27,6 +27,16 @@ export type WorkspaceMemberRow = {
   joined_at: string;
 };
 
+export type WorkspacePublicProfile = {
+  workspace_id: string;
+  slug: string;
+  display_name: string;
+  description: string | null;
+  is_public: boolean;
+  public_at: string | null;
+  updated_at: string;
+};
+
 type MemberWorkspaceQueryRow = {
   role: string;
   created_at: string;
@@ -241,4 +251,23 @@ export async function ensurePersonalWorkspaceMembership(): Promise<string> {
   }
 
   return data as string;
+}
+
+export async function getWorkspacePublicProfile(workspaceId: string): Promise<WorkspacePublicProfile | null> {
+  if (!workspaceId) {
+    throw new Error("workspace_id is required.");
+  }
+
+  const { supabase } = await getAuthenticatedUserId();
+  const { data, error } = await supabase
+    .from("workspace_public_profiles")
+    .select("workspace_id, slug, display_name, description, is_public, public_at, updated_at")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load workspace public profile: ${error.message}`);
+  }
+
+  return (data as WorkspacePublicProfile | null) ?? null;
 }

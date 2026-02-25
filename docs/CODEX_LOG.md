@@ -2408,3 +2408,207 @@ F) QA 체크리스트
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Prompt D (commit: TODO)
+#### Prompt
+```text
+[Prompt D] Public Workspace Portal (workspace publish + /portal + /p/w/[slug])
+
+컨텍스트
+- Repo root: ~/code/statrumble/
+- Next app:   ~/code/statrumble/statrumble/
+- 완료된 것:
+  - Decision publish/unpublish + /p/decisions/[publicId]
+  - workspace membership/RLS + /workspaces hub
+- 목표: 공개 워크스페이스를 “포털 형태”로 묶어서 탐색/공유 가능하게 만들기
+- 주의: workspaces 테이블에는 invite_code 같은 민감정보가 있을 수 있으니, anon에 workspaces row를 직접 열지 말 것.
+
+목표
+1) 워크스페이스를 Publish 하면 public slug가 생기고, 로그인 없이 볼 수 있는 공개 페이지가 생긴다.
+2) /portal 에서 공개 워크스페이스 목록을 보여준다.
+3) /p/w/[slug] 에서 해당 워크스페이스의 공개 decision 목록을 보여준다.
+4) 공개 페이지는 read-only. (멤버/이메일/초대코드/내부 스레드 메시지/투표 등은 절대 노출 X)
+5) Publish/Unpublish는 workspace owner만 가능.
+
+구현 요구사항
+
+A) DB (새 migration, 번호 충돌 방지: migrations 폴더 스캔해서 max+1로 생성)
+- 파일 예: statrumble/supabase/migrations/0XX_public_workspaces_portal.sql
+
+A1) 새 테이블 추가: public.workspace_public_profiles
+- workspace_id uuid primary key references public.workspaces(id) on delete cascade
+- slug text unique not null
+- display_name text not null
+- description text null
+- is_public boolean not null default false
+- public_at timestamptz null
+- updated_at timestamptz not null default now()
+
+A2) RLS
+- enable rls on workspace_public_profiles
+- SELECT:
+  - anon/public 읽기 허용: using (is_public = true)
+  - authenticated 멤버 읽기 허용은 굳이 안 넣어도 되지만, owner/member가 관리 UI에서 읽을 수 있게 하려면 “workspace member면 select 허용” 정책 추가 가능
+- UPDATE/INSERT:
+  - owner만 허용 (RPC로만 처리할 거면 policy는 막아도 됨)
+- workspaces 테이블에는 “anon select” 정책을 추가하지 말 것(초대코드 누출 방지)
+
+A3) slug 생성 규칙 (MVP)
+- publish 시 slug가 없으면 생성:
+  - base := lower(regexp_replace(display_name, '[^a-zA-Z0-9]+', '-', 'g'))
+  - slug := base || '-' || substr(gen_random_uuid()::text, 1, 8)
+- 충돌 가능성 낮게 만들고, conflict 나면 suffix 재생성(또는 그냥 unique 위반 에러로 돌려도 MVP는 OK)
+
+B) RPC: set_workspace_public
+- create or replace function public.set_workspace_public(
+    p_workspace_id uuid,
+    p_public boolean,
+    p_display_name text default null,
+    p_description text default null
+  )
+  returns table(slug text, is_public boolean, public_at timestamptz)
+- security definer + auth.uid() 검증
+- owner 검증:
+  - public.workspace_members wm where wm.workspace_id=p_workspace_id and wm.user_id=auth.uid() and wm.role='owner'
+- 동작:
+  - ensure row exists in workspace_public_profiles (upsert)
+  - p_public=true:
+     - is_public=true, public_at=now()
+     - display_name := coalesce(p_display_name, workspaces.name)
+     - description := p_description
+     - slug가 비었으면 규칙에 따라 생성
+  - p_public=false:
+     - is_public=false, public_at=null (slug 유지)
+- returning slug, is_public, public_at
+
+C) API
+C1) POST /api/workspaces/[id]/publish
+- 파일: statrumble/app/api/workspaces/[id]/publish/route.ts
+- body: { public: boolean, displayName?: string, description?: string }
+- 내부에서 set_workspace_public RPC 호출
+- 응답: { slug, isPublic, publicAt, publicUrl: `/p/w/${slug}` }
+
+D) UI (authenticated, owner만)
+D1) /workspaces 허브 또는 workspace settings 영역에 “Workspace Public Portal” 섹션 추가
+- owner일 때만 Publish/Unpublish 토글 표시
+- Publish 후 public URL 표시 + copy 버튼
+- Unpublish 후 안내(공개 URL은 404)
+
+E) Public pages (anon 접근)
+E1) /portal
+- 파일: statrumble/app/portal/page.tsx
+- anon client로 workspace_public_profiles where is_public=true order by public_at desc
+- 목록 카드: display_name, description(있으면), “View” 링크 -> /p/w/[slug]
+- Pagination/검색은 MVP에서 생략 가능
+
+E2) /p/w/[slug]
+- 파일: statrumble/app/p/w/[slug]/page.tsx
+- 1) workspace_public_profiles에서 slug로 조회 (is_public=true 아니면 404)
+- 2) 해당 workspace_id의 “공개 decision 목록” 조회:
+     - decision_cards where is_public=true and workspace_id=<workspace_id> order by public_at/updated_at desc
+     - 각 항목은 /p/decisions/[publicId] 링크 제공
+- 노출 제한:
+  - created_by email, 멤버 목록, invite_code 등 금지
+  - 보여줄 것: title, summary, snapshot_start/end, created_at 정도
+
+F) lib/db 정리
+- statrumble/lib/db/publicPortal.ts (또는 workspaces.ts/decisions.ts 확장)
+- public용 조회 함수는 “anon client”를 쓰는 경로로 분리(쿠키/세션 없이)
+
+G) QA 체크
+1) owner가 workspace publish -> /portal에 노출
+2) /p/w/[slug]가 로그인 없이 열림
+3) /p/w/[slug]에서 공개 decision들만 보임 (비공개 decision은 안 보임)
+4) unpublish 후 /portal에서 사라지고 /p/w/[slug]는 404
+5) owner 아닌 계정이 publish API 호출 -> 403/Forbidden
+
+커밋
+- feat(portal): add public workspace portal (/portal + /p/w/[slug])
+- docs/CODEX_LOG.md 요약 추가
+- migration 추가 시: pnpm exec supabase db push (dry-run 후)
+
+실행
+- pnpm -C statrumble run lint
+- pnpm -C statrumble run typecheck
+- ./scripts/verify.sh
+```
+#### Result
+- `statrumble/supabase/migrations/017_public_workspaces_portal.sql`로 공개 워크스페이스 프로필 테이블/정책/RPC를 추가했다.
+- anon 전용 조회 경로(`createAnonClient`, `lib/db/publicPortal.ts`)와 `/portal`, `/p/w/[slug]` 공개 페이지를 구현했다.
+- `/api/workspaces/[id]/publish`와 워크스페이스 허브의 공개 포털 토글 UI를 추가했다.
+#### Manual Checklist
+- [ ] `pnpm exec supabase db push --dry-run` (failed: `supabase` not found)
+- [ ] `pnpm exec supabase db push` (failed: `supabase` not found)
+- [x] `pnpm -C statrumble run lint`
+- [x] `pnpm -C statrumble run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Hotfix Public Portal Redirect (commit: TODO)
+#### Prompt
+```text
+[Hotfix] Public portal routes redirect to /login — find root cause and fix
+
+Symptom
+- Publishing workspace produces slug/public URL OK.
+- But opening public URLs in a fresh/incognito browser redirects to /login instead of showing the public page.
+- Affected routes should include:
+  - /portal
+  - /p/w/[slug]
+  - /p/decisions/[publicId]
+- These routes must be accessible without authentication.
+
+Goal
+- Make public pages truly public (no auth redirect).
+- Keep all private app routes protected as before.
+- Keep publish/unpublish APIs protected (owner-only). Only public READ pages bypass auth.
+
+Task (investigate first, then fix)
+1) Reproduce and capture redirect chain:
+   - Open incognito and visit /portal and /p/w/<valid-slug>.
+   - Use server console logs + browser network to confirm if redirect is 307/303 to /login.
+2) Identify where the redirect happens:
+   - Check statrumble/middleware.ts (or proxy.ts if migrated) for auth gating logic.
+   - Check statrumble/app/layout.tsx (and any nested layouts) for redirect(/login) behavior.
+   - Check any shared server utilities that enforce auth (e.g., createServerClient wrappers).
+3) Apply the minimal fix:
+   - Add an explicit allowlist bypass for public paths:
+     - /portal and any /p/* should NEVER trigger auth redirect.
+   - Ensure this bypass works both for server-side navigation and direct URL entry.
+4) Confirm:
+   - Incognito visiting /portal, /p/w/[slug], /p/decisions/[publicId] loads without redirect.
+   - Private routes (/, /workspaces, /decisions, /threads/...) still redirect to login if unauthenticated.
+   - Publish API remains protected:
+     - POST /api/workspaces/[id]/publish requires owner.
+     - POST /api/decisions/[id]/publish requires owner.
+5) Add lightweight regression notes to docs/CODEX_LOG.md.
+
+Implementation hints (do not blindly apply; confirm root cause)
+- If middleware/proxy is redirecting unauthenticated users:
+  - Add a public-path early return:
+    - pathname === '/portal' or pathname startsWith('/portal/')
+    - pathname === '/p' or pathname startsWith('/p/')
+  - Return NextResponse.next() for those.
+- If layout is redirecting:
+  - Skip session check/redirect when pathname matches /portal or /p/*
+  - You can use headers() / request URL parsing in server components if needed.
+- Keep changes minimal; do not refactor auth system.
+
+Deliverables
+- Diff + files changed
+- Short explanation: where redirect was enforced and how bypass works
+- Ensure lint/typecheck/verify.sh still pass
+
+Suggested commit message
+- fix(public): allow /portal and /p/* routes without auth redirect
+```
+#### Result
+- Root cause: `statrumble/middleware.ts` enforced auth for all non-excluded paths, redirecting unauthenticated users to `/login`.
+- Added explicit public-path allowlist for `/portal` and `/p/*` so these routes bypass auth gating while keeping all other routes protected.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

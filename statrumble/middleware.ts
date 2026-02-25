@@ -4,6 +4,9 @@ import { NextResponse, type NextRequest } from "next/server";
 const EXCLUDED_PREFIXES = ["/_next", "/favicon.ico"];
 const EXCLUDED_PATHS = new Set(["/auth/callback"]);
 
+const PUBLIC_PATHS = new Set(["/portal", "/p"]);
+const PUBLIC_PREFIXES = ["/portal/", "/p/"];
+
 function getSupabaseEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -25,10 +28,18 @@ function isExcludedPath(pathname: string) {
   );
 }
 
+function isPublicPath(pathname: string) {
+  if (PUBLIC_PATHS.has(pathname)) {
+    return true;
+  }
+
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  if (isExcludedPath(pathname)) {
+  if (isExcludedPath(pathname) || isPublicPath(pathname)) {
     return NextResponse.next();
   }
 

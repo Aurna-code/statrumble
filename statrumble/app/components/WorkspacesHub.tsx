@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import InviteCodeCopyButton from "@/app/components/InviteCodeCopyButton";
+import WorkspacePublicPortalControls from "@/app/components/WorkspacePublicPortalControls";
 import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
-import type { MemberWorkspaceRow, WorkspaceMemberRow } from "@/lib/db/workspaces";
+import type { MemberWorkspaceRow, WorkspaceMemberRow, WorkspacePublicProfile } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatJoinedAt } from "@/lib/formatDate";
 
 type WorkspacesHubProps = {
@@ -14,6 +15,7 @@ type WorkspacesHubProps = {
   workspaceMembers: WorkspaceMemberRow[];
   membersWorkspaceId: string | null;
   membersError: string | null;
+  workspacePublicProfile: WorkspacePublicProfile | null;
 };
 
 type SetActiveWorkspaceResponse = {
@@ -40,6 +42,7 @@ export default function WorkspacesHub({
   workspaceMembers,
   membersWorkspaceId,
   membersError,
+  workspacePublicProfile,
 }: WorkspacesHubProps) {
   const router = useRouter();
   const [memberships, setMemberships] = useState(workspaces);
@@ -233,6 +236,24 @@ export default function WorkspacesHub({
       {errorMessage ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {errorMessage}
+        </div>
+      ) : null}
+
+      {activeWorkspace && isActiveOwner ? (
+        <div className="rounded-lg border border-zinc-200 bg-white p-5">
+          <div className="flex items-baseline justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-semibold">Workspace Public Portal</h2>
+              <p className="mt-1 text-sm text-zinc-600">공개 워크스페이스 포털을 설정합니다.</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <WorkspacePublicPortalControls
+              workspaceId={activeWorkspace.id}
+              workspaceName={activeWorkspace.name}
+              initialProfile={workspacePublicProfile}
+            />
+          </div>
         </div>
       ) : null}
 

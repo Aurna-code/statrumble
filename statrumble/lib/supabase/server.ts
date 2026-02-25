@@ -33,3 +33,18 @@ export async function createClient() {
     },
   });
 }
+
+export async function createAnonClient() {
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+
+  return createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return [];
+      },
+      setAll() {
+        // No-op: anon client should not persist session cookies.
+      },
+    },
+  });
+}

@@ -5,8 +5,10 @@ import WorkspacesHub from "@/app/components/WorkspacesHub";
 import {
   listMemberWorkspaces,
   listWorkspaceMembers,
+  getWorkspacePublicProfile,
   type MemberWorkspaceRow,
   type WorkspaceMemberRow,
+  type WorkspacePublicProfile,
 } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
@@ -26,6 +28,7 @@ export default async function WorkspacesPage() {
   let workspaceMembers: WorkspaceMemberRow[] = [];
   let membersWorkspaceId: string | null = null;
   let membersError: string | null = null;
+  let workspacePublicProfile: WorkspacePublicProfile | null = null;
 
   if (authError || !user) {
     loadError = "로그인이 필요합니다.";
@@ -53,6 +56,12 @@ export default async function WorkspacesPage() {
         membersWorkspaceId = activeWorkspaceId;
       } catch (error) {
         membersError = error instanceof Error ? error.message : "Unknown error";
+      }
+
+      try {
+        workspacePublicProfile = await getWorkspacePublicProfile(activeWorkspaceId);
+      } catch {
+        workspacePublicProfile = null;
       }
     }
   }
@@ -87,6 +96,7 @@ export default async function WorkspacesPage() {
           workspaceMembers={workspaceMembers}
           membersWorkspaceId={membersWorkspaceId}
           membersError={membersError}
+          workspacePublicProfile={workspacePublicProfile}
         />
       ) : null}
     </main>

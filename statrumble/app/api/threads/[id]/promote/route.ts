@@ -2,20 +2,11 @@ import { NextResponse } from "next/server";
 import { getThread } from "@/lib/db/threads";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
+import { formatDateLabel } from "@/lib/formatDate";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
-
-function formatDateLabel(value: string) {
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleDateString("ko-KR");
-}
 
 function buildDecisionTitle(metricName: string | null | undefined, startTs: string, endTs: string) {
   const safeMetric = metricName?.trim() ? metricName.trim() : "Decision";

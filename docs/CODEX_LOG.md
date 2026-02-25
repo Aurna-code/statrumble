@@ -2233,3 +2233,178 @@ F) QA 체크리스트
 - [ ] `pnpm exec supabase db push` (failed: supabase CLI not found)
 #### Commit Link
 - TODO
+
+### Prompt ID: 2026-02-25-Hydration-01 (commit: TODO)
+#### Prompt
+```text
+너는 statrumble(Next.js App Router) 레포에서 Hydration mismatch를 없애는 패치를 만든다.
+
+문제:
+- pnpm dev 실행 후 / 페이지에서 "Hydration failed because the server rendered text didn't match the client" 발생.
+- diff를 보면 <option> 텍스트의 날짜 포맷이 서버는 "2/25/2026, 1:02:35 AM", 클라는 "2026. 2. 25. 오전 1:02:35" 처럼 locale/timeZone 기본값 차이로 달라진다.
+- 에러 스택: app/components/ImportChart.tsx around line ~293의 <option> 라벨에서 formatDateLabel(item.created_at) 출력.
+
+목표(필수):
+1) 서버(SSR)와 클라이언트(초기 hydration)에서 "동일한 created_at 입력"에 대해 완전히 동일한 문자열이 렌더되게 만든다.
+2) suppressHydrationWarning 같은 “숨기기”는 사용하지 말고, 포맷을 결정적으로(deterministic) 만드는 방식으로 해결한다.
+3) 성능/안정성: formatter는 렌더마다 새로 만들지 말고 모듈 스코프 상수 또는 useMemo로 재사용한다.
+4) created_at이 string(ISO)일 수 있으니 파싱 방어(Invalid Date 처리)도 넣는다.
+
+구현 지시:
+- app/components/ImportChart.tsx를 열고 formatDateLabel(또는 날짜 포맷 코드)을 찾아, toLocaleString()/toLocaleDateString()를 “기본값으로” 호출하는 부분이 있으면 전부 제거한다.
+- Intl.DateTimeFormat를 사용해 locale과 timeZone을 명시적으로 고정한다.
+  예: locale "ko-KR", timeZone "Asia/Seoul", year/month/day/hour/minute/second, hour12 등 명시.
+- <option> 라벨은 기존처럼 "파일명 - 날짜" 구조를 유지하되 날짜 부분이 위 formatter를 사용하도록 수정한다.
+
+추가 점검(가능하면):
+- 레포 전체에서 toLocaleString / toLocaleDateString / toLocaleTimeString 사용처를 검색해서,
+  SSR 경로(서버 렌더링 중 실행될 수 있는 컴포넌트/유틸)에서 기본값 호출이 있으면 동일하게 locale/timeZone 명시로 고친다.
+
+검증:
+- pnpm dev 후 동일 페이지를 새로고침해도 hydration 에러가 더 이상 뜨지 않아야 한다.
+- 변경 파일/코드 diff를 깔끔하게 제시하고, 왜 이게 SSR/클라 동일성을 보장하는지 한 문단으로 설명한다.
+```
+#### Result
+- Added a shared deterministic date formatter in `lib/formatDate.ts` with fixed `ko-KR` locale and `Asia/Seoul` timeZone, plus invalid-date fallback.
+- Updated ImportChart option labels and chart labels to use the deterministic formatter.
+- Replaced default locale date formatting in server/client-rendered pages and components with the shared formatter.
+- Updated decision title formatting in the promote route to use the deterministic date-only formatter.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: 2026-02-25-Date-Format-02 (commit: TODO)
+#### Prompt
+```text
+너는 statrumble(Next.js App Router) 레포에서 “날짜 포맷 결정화(deteministic) + 의도 복원” follow-up 패치를 만든다.
+
+배경:
+- Hydration mismatch의 원인은 SSR(서버)과 CSR(브라우저)에서 날짜 문자열이 locale/timeZone 기본값 차이로 달라졌기 때문.
+- 이미 lib/formatDate.ts를 추가해 Intl.DateTimeFormat("ko-KR", { timeZone:"Asia/Seoul", ... }) 기반으로 고정했지만,
+  (A) 자정(00시) 근처 hourCycle(h23/h24) 차이로 “00 vs 24” 같은 초희귀 mismatch 가능성이 남아있고,
+  (B) UI 표시 포맷이 기존 ko-KR 브라우저 스타일(예: "2026. 2. 25. 오전 1:02:35")에서
+      새 포맷("2026.02.25 01:02:35")로 바뀌어 UX 의도가 흔들릴 수 있다.
+- 또한 timestamp 문자열이 timezone 없는 ISO일 경우 new Date(value) 해석이 SSR/CSR에서 달라질 수 있다.
+- app/api/threads/[id]/promote/route.ts의 날짜 포맷 변경은 “유저 표시용 vs 머신용” 의도에 따라 다시 점검해야 한다.
+
+목표(필수):
+1) SSR과 초기 hydration에서 동일 timestamp 입력 → 동일 문자열 출력(100%).
+2) suppressHydrationWarning 같은 숨기기 금지. 진짜로 deterministic 하게 고칠 것.
+3) hourCycle을 명시해서 자정 엣지케이스(00 vs 24)를 원천 차단.
+4) UI 날짜 표기 “의도”를 코드 근거로 확인하고, 의도에 맞게 포맷을 조정(기존 스타일 유지가 기본 가정).
+5) timezone 없는 ISO 입력은 정규화해서 SSR/CSR 파싱 차이를 없앤다.
+6) API route의 날짜 포맷은 소비처를 추적해 “유저 표시용이면 UI 포맷”, “머신/로그/키면 ISO(YYYY-MM-DD 등)”로 분리.
+
+작업 지시:
+
+[1] statrumble/lib/formatDate.ts 개선
+- DateInput은 string | null | undefined 유지 가능.
+- parseDate(value: string): Date | null 유틸을 추가:
+  - value가 ISO-like인데 끝에 'Z' 또는 '+09:00' 같은 TZ 정보가 없으면 'Z'를 붙여 UTC로 정규화한다.
+    예: /^\d{4}-\d{2}-\d{2}T/ && !/(Z|[+\-]\d{2}:\d{2})$/ -> `${value}Z`
+  - Date가 Invalid면 null 반환.
+
+- “UI용 datetime 포맷”을 기존 브라우저 ko-KR 표시와 최대한 유사하게 만든다(의도 복원):
+  - 목표 예시: "2026. 2. 25. 오전 1:02:35"
+  - 구현은 Intl.DateTimeFormat + formatToParts로 숫자/오전오후 파트를 뽑아 직접 조립.
+  - ko-KR, Asia/Seoul 고정.
+  - hourCycle은 12시간 표시 의도면 hourCycle: "h12" + hour12: true,
+    24시간 표시 의도면 hourCycle: "h23" + hour12: false 로 명시.
+  - month/day/hour은 numeric(leading zero 제거), minute/second는 2-digit 유지.
+  - dayPeriod(오전/오후)가 필요하니 DatePartKey에 "dayPeriod" 추가하고 parts에서 추출.
+
+- “로그/정렬/기계친화” 포맷이 필요하면 별도 함수로 유지:
+  - 예: formatDateTimeLabel24 -> "YYYY.MM.DD HH:mm:ss" (hourCycle: "h23" 명시)
+  - 단, UI에서 어디에 쓰는지 명확히 구분.
+
+- 기존 export 함수명(formatDateLabel, formatDateTimeLabel)이 이미 여러 군데에서 쓰이면
+  - UI용이 기본이면 formatDateTimeLabel은 UI 스타일로,
+  - 24h 버전은 formatDateTimeLabel24 같은 이름으로 추가하는 쪽을 우선.
+
+[2] “의도 확인” (코드 기반 판단)
+- 레포 전체에서 toLocaleString/toLocaleDateString 사용 이력/현존 사용처를 검색.
+- 사용자에게 직접 보여주는 라벨(옵션 텍스트, 리스트, 카드)은 “ko-KR 로컬 스타일(오전/오후)”로 보여주려 했던 흔적이 강하면
+  -> UI 기본 포맷을 그 스타일로 복원한다.
+- 그래프 축/툴팁 등은 24h가 더 명확할 수 있으나, 화면 일관성을 최우선으로 결정하고 이유를 CODEX_LOG.md에 남긴다.
+
+[3] 변경 파일 반영
+- ImportChart.tsx의 <option> 라벨과 차트 라벨은 “의도에 맞게” UI용 formatter를 사용.
+- 이번 패치에서 함께 바뀐 컴포넌트들(ThreadArena.tsx, WorkspacesHub.tsx, app/page.tsx, threads/decisions 관련 page들)도
+  동일 원칙으로 정리(무조건 한 가지 기준으로).
+
+[4] app/api/threads/[id]/promote/route.ts 재점검
+- 이 route가 반환/생성하는 날짜 문자열의 소비처(call-site)를 찾아서 목적을 판단:
+  - 유저에게 보여지는 문장/라벨이면 UI formatter 사용(ko-KR 스타일).
+  - 머신/로그/키/슬러그/프롬프트 파이프라인이면 locale 비의존 ISO 포맷(YYYY-MM-DD 또는 RFC3339)으로 변경.
+- “왜 그렇게 결정했는지”를 CODEX_LOG.md에 2~5줄로 기록.
+
+[5] 회귀 방지(필수)
+- 테스트 러너가 있으면 유닛 테스트 추가, 없으면 node 스크립트라도 추가:
+  - scripts/verify-date-format.mjs (또는 .ts)
+  - 케이스 최소 2개:
+    1) 자정 경계: "2026-02-25T15:00:00Z" (KST 2026-02-26 00:00:00) 같은 케이스 포함
+    2) 일반 시간: "2026-02-25T00:02:35Z"
+  - 출력 문자열이 기대값과 정확히 일치하는지 assert.
+  - verify.sh(또는 기존 검증 스크립트)에 이 스크립트를 연결 가능하면 연결.
+
+검증:
+- pnpm dev에서 해당 페이지 강력 새로고침 여러 번 → hydration error 재현 안 됨.
+- pnpm build && pnpm start에서도 동일.
+- 변경 diff + CODEX_LOG.md에 “의도 판단 근거/결정”이 남아 있어야 함.
+
+커밋 메시지 예:
+- fix(hydration): stabilize hourCycle and restore intended ko-KR datetime labels
+```
+#### Result
+- Added ISO-without-timezone normalization (`parseDate`) and dayPeriod-aware UI formatting that matches ko-KR browser style while locking locale/timeZone/hourCycle.
+- Introduced a 24h formatter with explicit hourCycle and normalization for rare “24:00:00” outputs at midnight.
+- Added a date-format verification script wired into `scripts/verify.sh` using a local TS loader.
+- Kept chart and list labels on the same ko-KR UI datetime style for consistency with prior `toLocaleString` intent.
+- Confirmed promote route uses date-only labels for user-visible decision titles (UI intent), not machine keys.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: 2026-02-25-Date-Format-03 (commit: TODO)
+#### Prompt
+```text
+너는 statrumble(Next.js App Router) 레포에서 “날짜 포맷 결정화(deterministic) + 의미 보존” 최종 봉합 패치를 만든다.
+이번 패치 목적은 (A) hydration mismatch 재발 가능성을 더 낮추고, (B) timezone 없는 문자열 처리에서 “의미(시간대 가정)”를 임의로 바꾸지 않게 하는 것이다.
+
+현재 상태 요약(전제):
+- lib/formatDate.ts에서 Intl.DateTimeFormat("ko-KR",{ timeZone:"Asia/Seoul", ... })로 SSR/CSR 일치를 해결하려 했음.
+- 다만 두 리스크가 남아있음:
+  1) TZ 없는 ISO-like 문자열을 parseDate에서 `${value}Z`로 강제 정규화하면, 원래 로컬(KST) 의미였을 때 시간이 9시간 이동할 수 있음(의미 훼손).
+  2) UI용 “오전/오후(dayPeriod)”를 Intl 결과에 의존하면(드물지만) Node ICU/로케일 차이로 서버가 AM/PM, 브라우저가 오전/오후를 뱉어 hydration mismatch가 재발할 수 있음.
+
+필수 목표:
+1) SSR/CSR 초기 hydration에서 동일 입력 -> 동일 출력 문자열(결정적).
+2) timezone 없는 ISO 입력에 대해 “UTC 가정(Z 붙이기)” 같은 의미 변경을 기본값으로 하지 않는다.
+3) UI용 날짜 표기는 기존 의도(ko-KR 스타일 “YYYY. M. D. 오전/오후 h:mm:ss”)를 유지하되,
+   “오전/오후”는 Intl에서 가져오지 말고 코드로 직접 계산한다(AM/PM/오전/오후 불일치 원천봉쇄).
+4) suppressHydrationWarning 같은 숨기기 금지.
+
+구현 지시:
+[1] parseDate 정책 변경 (TZ 없는 ISO는 파싱 거부)
+[2] UI dayPeriod 계산을 코드로 직접 처리
+[3] TZ 없는 입력은 원문 반환
+[4] verify-date-format.mjs 갱신
+```
+#### Result
+- TZ 없는 ISO-like 문자열은 파싱을 거부하고 원문 그대로 반환하도록 변경해 시간대 의미를 임의로 바꾸지 않게 했습니다.
+- UI용 “오전/오후”는 Intl 결과가 아니라 24h 숫자(hour24)에서 직접 계산해 ICU/로케일 차이로 인한 mismatch 가능성을 차단했습니다.
+- UI 포맷은 기존 ko-KR 스타일(“YYYY. M. D. 오전/오후 h:mm:ss”)을 유지하면서도 hourCycle을 명시해 자정 엣지를 안정화했습니다.
+- 24h 포맷은 hourCycle h23 + 24→00 보정으로 결정적이고 기계 친화적인 표기를 유지했습니다.
+- TZ 없는 입력에 대한 정책(원문 유지)과 dayPeriod 계산 원칙을 verify-date-format 스크립트로 고정해 회귀를 방지했습니다.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

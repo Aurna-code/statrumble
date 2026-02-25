@@ -4,6 +4,7 @@ import { listImports, listMetrics, listThreads, type MetricImportRow } from "@/l
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import UploadCsvForm from "@/app/components/UploadCsvForm";
 import ImportChart from "@/app/components/ImportChart";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +16,6 @@ function formatMetricLabel(row: MetricImportRow) {
   }
 
   return metric.unit ? `${metric.name} (${metric.unit})` : metric.name;
-}
-
-function formatDateLabel(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
 }
 
 export default async function Home() {

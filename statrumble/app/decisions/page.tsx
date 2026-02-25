@@ -2,18 +2,9 @@ import Link from "next/link";
 import OnboardingCard from "@/app/components/OnboardingCard";
 import { listDecisions, type DecisionCardListItem } from "@/lib/db/decisions";
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 export const dynamic = "force-dynamic";
-
-function formatDateLabel(value: string) {
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString();
-}
 
 export default async function DecisionsPage() {
   let hasMembership = false;

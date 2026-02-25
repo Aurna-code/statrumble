@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import InviteCodeCopyButton from "@/app/components/InviteCodeCopyButton";
 import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
 import type { MemberWorkspaceRow, WorkspaceMemberRow } from "@/lib/db/workspaces";
+import { formatDateTimeLabel as formatJoinedAt } from "@/lib/formatDate";
 
 type WorkspacesHubProps = {
   workspaces: MemberWorkspaceRow[];
@@ -32,16 +33,6 @@ type PromoteWorkspaceMemberResponse = {
   ok: boolean;
   error?: string;
 };
-
-function formatJoinedAt(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
 
 export default function WorkspacesHub({
   workspaces,

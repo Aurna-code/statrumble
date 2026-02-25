@@ -3,6 +3,7 @@ import ThreadArena from "@/app/components/ThreadArena";
 import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 export const dynamic = "force-dynamic";
 
@@ -37,16 +38,6 @@ type ThreadSnapshot = {
   before?: SnapshotStats | null;
   delta?: SnapshotDelta | null;
 };
-
-function formatDateLabel(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
 
 function formatNumber(value: number | null | undefined, digits = 2) {
   if (value === null || value === undefined) {

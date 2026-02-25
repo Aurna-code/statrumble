@@ -23,3 +23,6 @@ else
   echo "==> npm --prefix statrumble run test --if-present"
   npm --prefix "${APP_DIR}" run test --if-present
 fi
+
+echo "==> node --loader scripts/ts-strip-loader.mjs scripts/verify-date-format.mjs"
+node --loader "${ROOT_DIR}/scripts/ts-strip-loader.mjs" "${ROOT_DIR}/scripts/verify-date-format.mjs"

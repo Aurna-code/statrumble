@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 type ImportOption = {
   id: string;
@@ -46,16 +47,6 @@ type BrushRange = {
   startIndex: number;
   endIndex: number;
 };
-
-function formatDateLabel(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
-}
 
 function arePointsEqual(left: PointItem[], right: PointItem[]) {
   if (left.length !== right.length) {

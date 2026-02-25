@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefereeReportView from "@/app/components/RefereeReportView";
 import type { RefereeReport } from "@/lib/referee/schema";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 type VoteStance = "A" | "B" | "C";
 
@@ -93,15 +94,6 @@ function getSnapshotSummary(snapshot: unknown): SnapshotSummary {
     deltaAbs: asFiniteNumber(delta?.abs),
     deltaRel: asFiniteNumber(delta?.rel),
   };
-}
-
-function formatDateLabel(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString();
 }
 
 function formatDecimal(value: number | null, digits = 2) {

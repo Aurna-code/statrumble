@@ -1,24 +1,11 @@
 import { notFound } from "next/navigation";
 import { getPublicDecisionByPublicId } from "@/lib/db/decisions";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 export const dynamic = "force-dynamic";
 
 interface PublicDecisionPageProps {
   params: Promise<{ publicId: string }>;
-}
-
-function formatDateLabel(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString();
 }
 
 function extractRefereeSummary(report: unknown) {

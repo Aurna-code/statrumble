@@ -6,25 +6,12 @@ import RefereeReportView from "@/app/components/RefereeReportView";
 import { getDecision, type DecisionCardDetail } from "@/lib/db/decisions";
 import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import type { RefereeReport } from "@/lib/referee/schema";
+import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 export const dynamic = "force-dynamic";
 
 interface DecisionDetailPageProps {
   params: Promise<{ id: string }>;
-}
-
-function formatDateLabel(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleString();
 }
 
 function isRefereeReport(value: unknown): value is RefereeReport {

@@ -2612,3 +2612,44 @@ Suggested commit message
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Next 16 cleanup - proxy migration (commit: TODO)
+#### Prompt
+```text
+[Next 16 cleanup] Migrate middleware.ts -> proxy.ts (keep auth + public allowlist)
+
+Goal:
+- Remove Next.js warning: "middleware file convention is deprecated"
+- Keep existing behavior:
+  - Private routes still require auth redirect
+  - Public routes (/portal, /p/*) bypass auth redirect (allowlist)
+  - Existing excluded prefixes (/_next, favicon 등) 유지
+
+Tasks:
+1) Migrate file convention:
+   - Rename statrumble/middleware.ts -> statrumble/proxy.ts
+   - Rename exported function if needed per Next conventions (proxy)
+   - Preserve matcher/config
+   (You may use codemod: npx @next/codemod@latest middleware-to-proxy .)
+2) Ensure the public allowlist logic is preserved exactly.
+3) Run:
+   - pnpm -C statrumble run lint
+   - pnpm -C statrumble run typecheck
+   - ./scripts/verify.sh
+4) Verify manually:
+   - Incognito: /portal and /p/* open without redirect
+   - Incognito: /workspaces redirects to /login
+   - No warning about middleware->proxy in dev logs
+
+Commit:
+- chore(next): migrate middleware to proxy
+```
+#### Result
+- Migrated `statrumble/middleware.ts` to `statrumble/proxy.ts` and renamed the handler to `proxy`, preserving the auth gating and public allowlist behavior.
+- Matcher/config and excluded prefixes remain unchanged.
+#### Manual Checklist
+- [x] `pnpm -C statrumble run lint`
+- [x] `pnpm -C statrumble run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

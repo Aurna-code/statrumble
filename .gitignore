@@ -11,6 +11,8 @@ coverage/
 # env (ignore all, keep example)
 .env*
 !.env.example
+!.env.smoke.example
+.env.smoke
 
 # logs
 **/*.log

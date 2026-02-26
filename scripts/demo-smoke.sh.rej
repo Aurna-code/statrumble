@@ -1,0 +1,344 @@
+diff a/scripts/demo-smoke.sh b/scripts/demo-smoke.sh	(rejected hunks)
+@@ -7,7 +7,6 @@ set -euo pipefail
+ # Usage:
+ #   SUPABASE_URL="<supabase_url>" \
+ #   SUPABASE_ANON_KEY="<anon_key>" \
+-#   SUPABASE_SERVICE_ROLE_KEY="<service_role_key>" \
+ #   TEST_EMAIL="<user_email>" \
+ #   TEST_PASSWORD="<user_password>" \
+ #   IMPORT_ID="<metric_import_uuid>" \
+@@ -17,18 +16,18 @@ set -euo pipefail
+ # Optional:
+ #   COOKIE="sb-<project>-auth-token=..."
+ #   PARENT_THREAD_ID="<existing_transform_proposal_thread_uuid>"
++#   SMOKE_API_ONLY=1
+ #
+ # Notes:
+-# - Required env: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
+-#   TEST_EMAIL, TEST_PASSWORD, IMPORT_ID
++# - Full mode (default): requires SUPABASE_SERVICE_ROLE_KEY and runs membership seeding + DB assertions.
++# - API-only mode (SMOKE_API_ONLY=1): does not require service role and skips DB assertions + membership seeding.
+ # - If COOKIE is empty, script logs in with password grant and generates app cookie.
+-# - Before propose-transform, membership is auto-seeded via service role:
+-#   metric_imports.workspace_id -> workspace_members upsert(user_id from JWT sub).
+ 
+ BASE_URL="${BASE_URL:-http://localhost:3000}"
+ COOKIE="${COOKIE:-}"
+ IMPORT_ID="${IMPORT_ID:-}"
+ PARENT_THREAD_ID="${PARENT_THREAD_ID:-}"
++SMOKE_API_ONLY="${SMOKE_API_ONLY:-0}"
+ SUPABASE_URL="${SUPABASE_URL:-}"
+ SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+ SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-}"
+@@ -45,6 +44,8 @@ NEGATIVE_PROMPT="Smoke test invalid parent proposal ($(date -u +%Y-%m-%dT%H:%M:%
+ 
+ RESP_STATUS=""
+ RESP_BODY=""
++API_ONLY_MODE=0
++NEEDS_PASSWORD_LOGIN=1
+ 
+ mask_sensitive() {
+   local input="${1:-}"
+@@ -98,6 +99,12 @@ require_env() {
+   fi
+ }
+ 
++is_truthy() {
++  local value="${1:-}"
++  local normalized="${value,,}"
++  [[ "$normalized" == "1" || "$normalized" == "true" || "$normalized" == "yes" || "$normalized" == "y" ]]
++}
++
+ derive_supabase_project_ref() {
+   local url="$1"
+   local host
+@@ -441,129 +448,149 @@ build_range_payload_from_points() {
+ 
+ require_env "SUPABASE_URL" "$SUPABASE_URL"
+ require_env "SUPABASE_ANON_KEY" "$SUPABASE_ANON_KEY"
+-require_env "SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_SERVICE_ROLE_KEY"
+-require_env "TEST_EMAIL" "$TEST_EMAIL"
+-require_env "TEST_PASSWORD" "$TEST_PASSWORD"
+ require_env "IMPORT_ID" "$IMPORT_ID"
+ 
+-if ! command -v jq >/dev/null 2>&1; then
+-  fail "jq is required for password grant login."
++if is_truthy "$SMOKE_API_ONLY"; then
++  API_ONLY_MODE=1
++  NEEDS_PASSWORD_LOGIN=0
+ fi
+ 
+-echo "==> Step 0: password grant login"
+-LOGIN_BODY_FILE="$(mktemp)"
+-LOGIN_PAYLOAD="$(jq -n --arg email "$TEST_EMAIL" --arg password "$TEST_PASSWORD" '{email:$email, password:$password}')"
+-LOGIN_STATUS="$(
+-  curl -sS -o "$LOGIN_BODY_FILE" -w "%{http_code}" \
+-    -X POST \
+-    -H "apikey: $SUPABASE_ANON_KEY" \
+-    -H "Content-Type: application/json" \
+-    --data "$LOGIN_PAYLOAD" \
+-    "${SUPABASE_URL%/}/auth/v1/token?grant_type=password"
+-)"
+-LOGIN_BODY="$(cat "$LOGIN_BODY_FILE")"
+-rm -f "$LOGIN_BODY_FILE"
+-
+-if [[ "$LOGIN_STATUS" != "200" ]]; then
+-  fail "Supabase login failed (HTTP $LOGIN_STATUS): $LOGIN_BODY"
++if [[ "$API_ONLY_MODE" != "1" ]]; then
++  require_env "SUPABASE_SERVICE_ROLE_KEY" "$SUPABASE_SERVICE_ROLE_KEY"
+ fi
+ 
+-TOKENS="$(extract_access_tokens "$LOGIN_BODY")"
+-ACCESS_TOKEN="$(echo "$TOKENS" | sed -n '1p')"
+-REFRESH_TOKEN="$(echo "$TOKENS" | sed -n '2p')"
+-if [[ -z "$ACCESS_TOKEN" || -z "$REFRESH_TOKEN" ]]; then
+-  fail "Supabase login response missing access_token/refresh_token."
++if [[ "$API_ONLY_MODE" != "1" || -z "$COOKIE" ]]; then
++  NEEDS_PASSWORD_LOGIN=1
++  require_env "TEST_EMAIL" "$TEST_EMAIL"
++  require_env "TEST_PASSWORD" "$TEST_PASSWORD"
+ fi
+ 
+-TEST_USER_ID="$(decode_jwt_sub "$ACCESS_TOKEN")"
+-if [[ -z "$TEST_USER_ID" ]]; then
+-  fail "Unable to decode user id from access token."
++if [[ "$NEEDS_PASSWORD_LOGIN" == "1" ]] && ! command -v jq >/dev/null 2>&1; then
++  fail "jq is required for password grant login."
+ fi
+-pass "Resolved test user id from access_token JWT sub."
+ 
+-if [[ -z "$COOKIE" ]]; then
+-  PROJECT_REF="$(derive_supabase_project_ref "$SUPABASE_URL")"
+-  if [[ -z "$PROJECT_REF" ]]; then
+-    fail "Unable to derive Supabase project ref from SUPABASE_URL."
++if [[ "$NEEDS_PASSWORD_LOGIN" == "1" ]]; then
++  echo "==> Step 0: password grant login"
++  LOGIN_BODY_FILE="$(mktemp)"
++  LOGIN_PAYLOAD="$(jq -n --arg email "$TEST_EMAIL" --arg password "$TEST_PASSWORD" '{email:$email, password:$password}')"
++  LOGIN_STATUS="$(
++    curl -sS -o "$LOGIN_BODY_FILE" -w "%{http_code}" \
++      -X POST \
++      -H "apikey: $SUPABASE_ANON_KEY" \
++      -H "Content-Type: application/json" \
++      --data "$LOGIN_PAYLOAD" \
++      "${SUPABASE_URL%/}/auth/v1/token?grant_type=password"
++  )"
++  LOGIN_BODY="$(cat "$LOGIN_BODY_FILE")"
++  rm -f "$LOGIN_BODY_FILE"
++
++  if [[ "$LOGIN_STATUS" != "200" ]]; then
++    fail "Supabase login failed (HTTP $LOGIN_STATUS): $LOGIN_BODY"
+   fi
+ 
+-  COOKIE_NAME="sb-${PROJECT_REF}-auth-token"
+-  SESSION_JSON="$(echo "$LOGIN_BODY" | jq -c '.')"
+-  COOKIE="$(
+-    SESSION_JSON="$SESSION_JSON" COOKIE_NAME="$COOKIE_NAME" node -e '
+-      const sessionJson = process.env.SESSION_JSON;
+-      const cookieName = process.env.COOKIE_NAME;
+-      if (!sessionJson || !cookieName) {
+-        console.error("Missing session or cookie name.");
+-        process.exit(1);
+-      }
+-
+-      let session;
+-      try {
+-        session = JSON.parse(sessionJson);
+-      } catch (error) {
+-        console.error("Invalid session JSON.");
+-        process.exit(1);
+-      }
+-
+-      const raw = JSON.stringify(session);
+-      const base64url = Buffer.from(raw, "utf8")
+-        .toString("base64")
+-        .replace(/\+/g, "-")
+-        .replace(/\//g, "_")
+-        .replace(/=+$/g, "");
+-      const encoded = `base64-${base64url}`;
+-      const max = 3180;
+-      const parts = [];
+-
+-      if (encoded.length <= max) {
+-        parts.push({ name: cookieName, value: encoded });
+-      } else {
+-        for (let i = 0; i < encoded.length; i += max) {
+-          parts.push({
+-            name: `${cookieName}.${Math.floor(i / max)}`,
+-            value: encoded.slice(i, i + max),
+-          });
+-        }
+-      }
++  TOKENS="$(extract_access_tokens "$LOGIN_BODY")"
++  ACCESS_TOKEN="$(echo "$TOKENS" | sed -n '1p')"
++  REFRESH_TOKEN="$(echo "$TOKENS" | sed -n '2p')"
++  if [[ -z "$ACCESS_TOKEN" || -z "$REFRESH_TOKEN" ]]; then
++    fail "Supabase login response missing access_token/refresh_token."
++  fi
+ 
+-      process.stdout.write(parts.map(({ name, value }) => `${name}=${value}`).join("; "));
+-    '
+-  )"
++  TEST_USER_ID="$(decode_jwt_sub "$ACCESS_TOKEN")"
++  if [[ -z "$TEST_USER_ID" ]]; then
++    fail "Unable to decode user id from access token."
++  fi
++  pass "Resolved test user id from access_token JWT sub."
+ 
+   if [[ -z "$COOKIE" ]]; then
+-    fail "Failed to generate auth cookie."
++    PROJECT_REF="$(derive_supabase_project_ref "$SUPABASE_URL")"
++    if [[ -z "$PROJECT_REF" ]]; then
++      fail "Unable to derive Supabase project ref from SUPABASE_URL."
++    fi
++
++    COOKIE_NAME="sb-${PROJECT_REF}-auth-token"
++    SESSION_JSON="$(echo "$LOGIN_BODY" | jq -c '.')"
++    COOKIE="$(
++      SESSION_JSON="$SESSION_JSON" COOKIE_NAME="$COOKIE_NAME" node -e '
++        const sessionJson = process.env.SESSION_JSON;
++        const cookieName = process.env.COOKIE_NAME;
++        if (!sessionJson || !cookieName) {
++          console.error("Missing session or cookie name.");
++          process.exit(1);
++        }
++
++        let session;
++        try {
++          session = JSON.parse(sessionJson);
++        } catch (error) {
++          console.error("Invalid session JSON.");
++          process.exit(1);
++        }
++
++        const raw = JSON.stringify(session);
++        const base64url = Buffer.from(raw, "utf8")
++          .toString("base64")
++          .replace(/\+/g, "-")
++          .replace(/\//g, "_")
++          .replace(/=+$/g, "");
++        const encoded = `base64-${base64url}`;
++        const max = 3180;
++        const parts = [];
++
++        if (encoded.length <= max) {
++          parts.push({ name: cookieName, value: encoded });
++        } else {
++          for (let i = 0; i < encoded.length; i += max) {
++            parts.push({
++              name: `${cookieName}.${Math.floor(i / max)}`,
++              value: encoded.slice(i, i + max),
++            });
++          }
++        }
++
++        process.stdout.write(parts.map(({ name, value }) => `${name}=${value}`).join("; "));
++      '
++    )"
++
++    if [[ -z "$COOKIE" ]]; then
++      fail "Failed to generate auth cookie."
++    fi
++    pass "Generated COOKIE via Supabase login."
++  else
++    pass "Using provided COOKIE for app requests."
+   fi
+-  pass "Generated COOKIE via Supabase login."
+ else
+   pass "Using provided COOKIE for app requests."
+ fi
+ 
+-echo "==> Step 0.5: seed workspace membership via service role"
+-WORKSPACE_LOOKUP_JSON="$(supabase_rest_get "/rest/v1/metric_imports?id=eq.${IMPORT_ID}&select=workspace_id" "1")"
+-WORKSPACE_ID="$(extract_workspace_id "$WORKSPACE_LOOKUP_JSON")"
+-if [[ -z "$WORKSPACE_ID" ]]; then
+-  fail "Failed to resolve workspace_id from metric_imports."
+-fi
+-pass "Resolved workspace_id from metric_imports."
+-
+-MEMBERSHIP_UPSERT_PAYLOAD="$(
+-  WORKSPACE_ID="$WORKSPACE_ID" TEST_USER_ID="$TEST_USER_ID" node -e '
+-    const payload = [
+-      {
+-        workspace_id: process.env.WORKSPACE_ID,
+-        user_id: process.env.TEST_USER_ID,
+-        role: "member",
+-      },
+-    ];
+-    process.stdout.write(JSON.stringify(payload));
+-  '
+-)"
+-supabase_rest_post "/rest/v1/workspace_members?on_conflict=workspace_id,user_id" "$MEMBERSHIP_UPSERT_PAYLOAD" "1" >/dev/null
++if [[ "$API_ONLY_MODE" == "1" ]]; then
++  echo "API-only mode: skipping DB asserts and membership seeding."
++else
++  echo "==> Step 0.5: seed workspace membership via service role"
++  WORKSPACE_LOOKUP_JSON="$(supabase_rest_get "/rest/v1/metric_imports?id=eq.${IMPORT_ID}&select=workspace_id" "1")"
++  WORKSPACE_ID="$(extract_workspace_id "$WORKSPACE_LOOKUP_JSON")"
++  if [[ -z "$WORKSPACE_ID" ]]; then
++    fail "Failed to resolve workspace_id from metric_imports."
++  fi
++  pass "Resolved workspace_id from metric_imports."
++
++  MEMBERSHIP_UPSERT_PAYLOAD="$(
++    WORKSPACE_ID="$WORKSPACE_ID" TEST_USER_ID="$TEST_USER_ID" node -e '
++      const payload = [
++        {
++          workspace_id: process.env.WORKSPACE_ID,
++          user_id: process.env.TEST_USER_ID,
++          role: "member",
++        },
++      ];
++      process.stdout.write(JSON.stringify(payload));
++    '
++  )"
++  supabase_rest_post "/rest/v1/workspace_members?on_conflict=workspace_id,user_id" "$MEMBERSHIP_UPSERT_PAYLOAD" "1" >/dev/null
+ 
+-MEMBERSHIP_ASSERT_JSON="$(supabase_rest_get "/rest/v1/workspace_members?workspace_id=eq.${WORKSPACE_ID}&user_id=eq.${TEST_USER_ID}&select=id" "1")"
+-assert_workspace_membership_exists "$MEMBERSHIP_ASSERT_JSON"
+-pass "workspace_members row exists before propose-transform."
++  MEMBERSHIP_ASSERT_JSON="$(supabase_rest_get "/rest/v1/workspace_members?workspace_id=eq.${WORKSPACE_ID}&user_id=eq.${TEST_USER_ID}&select=id" "1")"
++  assert_workspace_membership_exists "$MEMBERSHIP_ASSERT_JSON"
++  pass "workspace_members row exists before propose-transform."
++fi
+ 
+ echo "==> Step 1: create transform proposal"
+ ROOT_PAYLOAD="$(
+@@ -584,10 +611,14 @@ fi
+ ROOT_THREAD_ID="$(extract_thread_id "$RESP_BODY")"
+ pass "Root proposal created: $ROOT_THREAD_ID"
+ 
+-echo "==> Step 2: verify root thread persisted fields"
+-ROOT_THREAD_ROW_JSON="$(query_thread_row "$ROOT_THREAD_ID")"
+-assert_root_transform_thread "$ROOT_THREAD_ROW_JSON" "$ROOT_THREAD_ID"
+-pass "Root thread has kind=transform_proposal and transform fields persisted."
++if [[ "$API_ONLY_MODE" == "1" ]]; then
++  echo "==> Step 2: API-only mode, skipping root DB assertions"
++else
++  echo "==> Step 2: verify root thread persisted fields"
++  ROOT_THREAD_ROW_JSON="$(query_thread_row "$ROOT_THREAD_ID")"
++  assert_root_transform_thread "$ROOT_THREAD_ROW_JSON" "$ROOT_THREAD_ID"
++  pass "Root thread has kind=transform_proposal and transform fields persisted."
++fi
+ 
+ echo "==> Step 3: create fork proposal"
+ FORK_PAYLOAD="$(
+@@ -607,10 +638,14 @@ fi
+ CHILD_THREAD_ID="$(extract_thread_id "$RESP_BODY")"
+ pass "Fork proposal created: $CHILD_THREAD_ID"
+ 
+-echo "==> Step 4: verify child diff report"
+-CHILD_THREAD_ROW_JSON="$(query_thread_row "$CHILD_THREAD_ID")"
+-assert_child_transform_thread "$CHILD_THREAD_ROW_JSON" "$CHILD_THREAD_ID" "$ROOT_THREAD_ID"
+-pass "Child thread has transform_diff_report with deltas/error."
++if [[ "$API_ONLY_MODE" == "1" ]]; then
++  echo "==> Step 4: API-only mode, skipping child DB assertions"
++else
++  echo "==> Step 4: verify child diff report"
++  CHILD_THREAD_ROW_JSON="$(query_thread_row "$CHILD_THREAD_ID")"
++  assert_child_transform_thread "$CHILD_THREAD_ROW_JSON" "$CHILD_THREAD_ID" "$ROOT_THREAD_ID"
++  pass "Child thread has transform_diff_report with deltas/error."
++fi
+ 
+ echo "==> Step 5: negative test (non-transform parent must fail with HTTP 400)"
+ api_call "GET" "/api/imports/${IMPORT_ID}/points"

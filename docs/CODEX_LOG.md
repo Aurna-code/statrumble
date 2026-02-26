@@ -12,6 +12,7 @@
 #### Commit Link
 - TODO
 
+
 ### Prompt ID: English-only UI + deterministic datetime formatting (commit: TODO)
 #### Prompt
 ```text
@@ -2833,5 +2834,159 @@ Also detect any filenames containing Hangul and handle them safely.
 - [x] `./scripts/verify.sh`
 - [x] `rg "\p{Hangul}" .` returns no matches
 - [x] `python filename scan (\uAC00-\uD7A3)` returns no matches
+#### Commit Link
+- TODO
+
+### Prompt ID: Hackathon polish ROI (codex summary + compare readability + smoke API-only) (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble repo. We want to address remaining hackathon “polish” gaps with maximum ROI.
+
+High-level goals (all English-only):
+1) Make Codex visibly support collaboration beyond just generating a proposal:
+   - Add a “Summarize diff with Codex” button on child proposals.
+   - The summary should be saved and displayed (so collaboration is obvious to judges).
+2) Improve interpretability and visibility of Transform Proposal comparisons:
+   - Make deltas readable (+/- sign, more precision).
+   - Add a short interpretation hint for mean/std/slope/count.
+   - Make clip effects visible by tracking outliers_clipped.
+3) Make the smoke test more reviewer-friendly:
+   - Keep full mode (service_role) as default.
+   - Add an API-only mode that does not require service_role (skips DB asserts and membership seeding) for external reviewers.
+4) Add demo sample data and recommended prompts to README, and include a sample CSV in repo.
+5) Ensure the repository remains English-only:
+   - After changes, rg "\p{Hangul}" . must return no matches.
+
+A) “Summarize diff with Codex” (UI + API)
+1) Add a new API route: statrumble/app/api/threads/[id]/summarize-diff/route.ts (POST only)
+2) Validate transform_proposal + transform_diff_report, reject error reports, call OpenAI Responses Structured Outputs (strict schema, no text.verbosity), input parent_stats/child_stats/deltas/spec-presence flags
+3) Persist to transform_diff_report.codex_summary + codex_summary_updated_at
+4) Respond with { ok: true, codex_summary }
+5) UI in statrumble/app/threads/[id]/page.tsx with new client component statrumble/app/components/TransformDiffSummary.tsx
+
+B) Improve compare readability + add clip visibility
+6) Update transform engine stats for outliers_clipped and compareStats delta
+7) Update sanity assertions for clip/remove
+8) Update proposal panel + compare section text/formatting/hints + no-meaningful-change hint
+
+C) Smoke test API-only mode
+9) Update scripts/demo-smoke.sh with SMOKE_API_ONLY=1 branch (no service_role, no DB asserts/seeding, still root/fork/negative API tests)
+
+D) Sample data + docs
+10) Add samples/demo_spiky_step.csv (~240 rows)
+11) Update README.md with sample data, prompts, judge checklist, and both smoke modes
+
+E) English-only + verification
+12) Run npm run lint, npm run typecheck, ./scripts/verify.sh, bash -n scripts/demo-smoke.sh
+13) Confirm Hangul scan returns no matches
+
+Output:
+- Patch diff for all changes
+- Brief summary
+- Suggested commits:
+  - feat: add codex diff summarization
+  - feat(demo): improve compare readability + clipped outliers
+  - test(smoke): add API-only mode
+  - docs: add sample data and demo steps
+```
+#### Result
+- Added new route `statrumble/app/api/threads/[id]/summarize-diff/route.ts`:
+  - Session + active-workspace gating
+  - Validates thread kind and diff report state
+  - Uses OpenAI Responses API Structured Outputs (`json_schema`, strict, no `text.verbosity`)
+  - Persists `transform_diff_report.codex_summary` and `transform_diff_report.codex_summary_updated_at`
+  - Returns `{ ok: true, codex_summary }`
+- Added new client component `statrumble/app/components/TransformDiffSummary.tsx`:
+  - Renders existing saved summary if present
+  - Otherwise shows `Summarize this diff with Codex` button
+  - Handles loading/error states and updates UI in place after success
+- Updated `statrumble/app/threads/[id]/page.tsx`:
+  - Wired in `TransformDiffSummary`
+  - Added explicit SQL safety sentence near SQL preview
+  - Added interpretation hints for std/count/slope/mean deltas
+  - Updated subtle no-change hint copy
+  - Kept signed/precision delta formatting and clip visibility (`outliers_clipped`)
+- Updated `scripts/demo-smoke.sh`:
+  - Added `SMOKE_API_ONLY=1`
+  - Full mode remains default with service-role seeding and DB assertions
+  - API-only mode skips service-role requirement, membership seeding, and DB assertions
+  - API-only mode supports `COOKIE` or password-grant login for cookie creation
+  - Prints `API-only mode: skipping DB asserts and membership seeding.`
+- Added demo data file `samples/demo_spiky_step.csv` (240 minute rows + deterministic spikes + step change)
+- Updated root `README.md`:
+  - Added sample data section + recommended prompts
+  - Added judge checklist
+  - Documented full smoke mode and API-only smoke mode usage
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [x] `bash -n scripts/demo-smoke.sh`
+- [x] `rg -n --hidden --no-ignore-vcs "\p{Hangul}" . -g '!**/.git/**' -g '!**/node_modules/**' -g '!**/.next/**' -g '!**/dist/**' -g '!**/build/**' -g '!**/.turbo/**'`
+#### Commit Link
+- TODO
+
+### Prompt ID: Add convenient smoke runner scripts (commit: TODO)
+#### Prompt
+```text
+Add convenient runner scripts for smoke tests, without committing secrets.
+
+Goal:
+- Provide two wrapper scripts:
+  1) scripts/run-smoke-api-only.sh  (SMOKE_API_ONLY=1)
+  2) scripts/run-smoke-full.sh      (default full smoke with service-role DB asserts + membership seed)
+- Store secrets locally in .env.smoke (NOT committed).
+- Ensure .env.smoke is gitignored.
+
+Requirements:
+1) Create/ensure .gitignore contains:
+   - .env.smoke
+2) Provide a template file (NOT secrets) for users to copy:
+   - .env.smoke.example (commit OK)
+3) scripts/run-smoke-api-only.sh:
+   - Load .env.smoke if present
+   - Validate required env for api-only mode:
+     SUPABASE_URL, SUPABASE_ANON_KEY, TEST_EMAIL, TEST_PASSWORD, IMPORT_ID
+   - Set BASE_URL default if missing
+   - Run:
+     SMOKE_API_ONLY=1 bash scripts/demo-smoke.sh
+   - Print a helpful message if .env.smoke is missing (suggest copying from .env.smoke.example)
+4) scripts/run-smoke-full.sh:
+   - Load .env.smoke if present
+   - Validate required env for full mode:
+     SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, TEST_EMAIL, TEST_PASSWORD, IMPORT_ID
+   - Set BASE_URL default if missing
+   - Run:
+     bash scripts/demo-smoke.sh
+5) Make both scripts executable (chmod +x) and use:
+   set -euo pipefail
+   No secrets echoed.
+6) Update README.md briefly:
+   - Mention copying .env.smoke.example to .env.smoke (local only)
+   - Mention running:
+     ./scripts/run-smoke-api-only.sh
+     ./scripts/run-smoke-full.sh
+7) Verification:
+   - bash -n scripts/run-smoke-api-only.sh
+   - bash -n scripts/run-smoke-full.sh
+   - bash -n scripts/demo-smoke.sh
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+```
+#### Result
+- Added `.env.smoke.example` with smoke-only env placeholders and explicitly ignored `.env.smoke` in `.gitignore`.
+- Added executable wrappers:
+  - `scripts/run-smoke-api-only.sh` (loads `.env.smoke`, validates API-only env, defaults `BASE_URL`, runs `SMOKE_API_ONLY=1 bash scripts/demo-smoke.sh`)
+  - `scripts/run-smoke-full.sh` (loads `.env.smoke`, validates full-mode env including `SUPABASE_SERVICE_ROLE_KEY`, defaults `BASE_URL`, runs `bash scripts/demo-smoke.sh`)
+- Added missing-file guidance in both wrappers to copy `.env.smoke.example` to `.env.smoke`.
+- Updated `README.md` smoke test section with `.env.smoke` copy step and wrapper commands.
+#### Manual Checklist
+- [x] `bash -n scripts/run-smoke-api-only.sh`
+- [x] `bash -n scripts/run-smoke-full.sh`
+- [x] `bash -n scripts/demo-smoke.sh`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO

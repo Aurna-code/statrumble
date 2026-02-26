@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import ThreadArena from "@/app/components/ThreadArena";
+import TransformDiffSummary from "@/app/components/TransformDiffSummary";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
@@ -51,6 +52,13 @@ type ComparableStats = {
   warnings?: string[];
 };
 
+type CodexDiffSummary = {
+  summary: string;
+  key_diffs: string[];
+  risks: string[];
+  recommendation: string;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -78,6 +86,22 @@ function asNullableFiniteNumber(value: unknown): number | null | undefined {
   }
 
   return asFiniteNumber(value) ?? undefined;
+}
+
+function asStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const normalized = value
+    .map((item) => asNonEmptyString(item))
+    .filter((item): item is string => Boolean(item));
+
+  if (normalized.length !== value.length) {
+    return null;
+  }
+
+  return normalized;
 }
 
 function extractComparableStats(value: unknown): ComparableStats | null {
@@ -147,6 +171,30 @@ function extractComparableStatsFromRecord(record: Record<string, unknown> | null
     std,
     slope,
     ...(warnings ? { warnings } : {}),
+  };
+}
+
+function extractCodexDiffSummary(value: unknown): CodexDiffSummary | null {
+  const record = asRecord(value);
+
+  if (!record) {
+    return null;
+  }
+
+  const summary = asNonEmptyString(record.summary);
+  const keyDiffs = asStringArray(record.key_diffs);
+  const risks = asStringArray(record.risks);
+  const recommendation = asNonEmptyString(record.recommendation);
+
+  if (!summary || !keyDiffs || !risks || !recommendation) {
+    return null;
+  }
+
+  return {
+    summary,
+    key_diffs: keyDiffs,
+    risks,
+    recommendation,
   };
 }
 
@@ -268,6 +316,7 @@ export default async function Page({ params }: ThreadPageProps) {
   const diffReport = asRecord(thread.transform_diff_report);
   const diffError = asNonEmptyString(diffReport?.error);
   const deltas = asRecord(diffReport?.deltas);
+  const initialCodexSummary = extractCodexDiffSummary(diffReport?.codex_summary);
   const countBeforeDelta = readDeltaValue(deltas, "count_before");
   const countAfterDelta = readDeltaValue(deltas, "count_after");
   const outliersRemovedDelta = readDeltaValue(deltas, "outliers_removed");
@@ -328,7 +377,10 @@ export default async function Page({ params }: ThreadPageProps) {
             </div>
 
             <div>
-              <p className="text-xs font-medium text-zinc-500">SQL Preview (not executed)</p>
+              <p className="text-xs font-medium text-zinc-500">SQL Preview</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                SQL preview is for review only and is NOT executed. The server executes only a safe TransformSpec DSL.
+              </p>
               <pre className="mt-1 overflow-x-auto rounded-md border border-zinc-200 bg-white p-3 text-xs text-zinc-800">
                 <code>{sqlPreview ?? "No SQL preview."}</code>
               </pre>
@@ -393,11 +445,22 @@ export default async function Page({ params }: ThreadPageProps) {
                         </p>
                       ))}
                     </div>
+                    <div className="mt-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600">
+                      <p className="font-medium text-zinc-700">Interpretation hints</p>
+                      <ul className="mt-1 list-disc space-y-1 pl-4">
+                        <li>Std dev decrease means smoother / less volatility.</li>
+                        <li>Count decrease means points were removed (potential data loss).</li>
+                        <li>Slope change may indicate trend distortion.</li>
+                        <li>Mean shift indicates level offset vs parent.</li>
+                      </ul>
+                    </div>
                     {hasLittleToNoChange ? (
                       <p className="mt-2 text-xs text-zinc-500">
-                        This transformation shows little to no substantive change compared to the parent (the
-                        range/data may be benign or use an identical spec).
+                        No meaningful change vs parent (data may be stable or the spec may be identical).
                       </p>
+                    ) : null}
+                    {thread.parent_thread_id ? (
+                      <TransformDiffSummary threadId={thread.id} initialSummary={initialCodexSummary} />
                     ) : null}
                   </>
                 )}

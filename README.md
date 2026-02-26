@@ -7,6 +7,7 @@ StatRumble is a collaborative data debate app where teams upload metrics, create
 - Codex converts natural-language prompts into a Transform Proposal with a safe `TransformSpec` and SQL preview for review.
 - Any proposal can be Forked so multiple alternatives can be explored in parallel.
 - Child proposals surface Deltas in the `Compare to parent` panel for transparent change review.
+- Child proposals can generate and persist a `Summarize this diff with Codex` review for visible collaboration evidence.
 - Arena threads keep messages, votes, Referee output, and final Decision in one place.
 - The `Proposal` badge makes proposal threads obvious during a live demo.
 
@@ -19,6 +20,19 @@ StatRumble is a collaborative data debate app where teams upload metrics, create
 6. Review Deltas in the `Compare to parent` panel.
 7. Add discussion messages and votes in the thread.
 8. Run the Referee and review the final Decision.
+
+## Sample Data
+- Use [`samples/demo_spiky_step.csv`](samples/demo_spiky_step.csv) for a deterministic demo series (minute-level, spikes + step change, 240 rows).
+
+Recommended demo prompts:
+- Parent prompt: `Clip outliers using IQR (k=1.5).`
+- Child prompt: `Remove outliers using IQR (k=1.5) and apply moving average window=30.`
+
+What judges should look for:
+- Proposal badge appears on proposal threads.
+- Fork action creates a child proposal thread.
+- Compare deltas clearly show parent-vs-child differences.
+- `Summarize this diff with Codex` generates and displays a saved review.
 
 ## Local Setup
 1. Install dependencies.
@@ -39,11 +53,23 @@ pnpm dev
 ## Smoke Test
 Use `scripts/demo-smoke.sh` to verify Transform Proposal creation, Fork creation, Deltas generation, and invalid-parent rejection.
 
+Create a local smoke env file first (do not commit secrets):
+
+```bash
+cp .env.smoke.example .env.smoke
+```
+
+Then run one of the wrappers:
+
+```bash
+./scripts/run-smoke-api-only.sh
+./scripts/run-smoke-full.sh
+```
+
+### Full mode (default)
+Includes service-role membership seeding and DB assertions.
+
 Required env vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TEST_EMAIL`, `TEST_PASSWORD`, `IMPORT_ID`.
-
-Optional env vars: `BASE_URL` (default `http://localhost:3000`), `COOKIE`, `PARENT_THREAD_ID`.
-
-The script auto-seeds workspace membership before proposal requests.
 
 ```bash
 SUPABASE_URL=... \
@@ -52,6 +78,26 @@ SUPABASE_SERVICE_ROLE_KEY=... \
 TEST_EMAIL=... \
 TEST_PASSWORD=... \
 IMPORT_ID=... \
+BASE_URL=http://localhost:3000 \
+bash scripts/demo-smoke.sh
+```
+
+### API-only mode (`SMOKE_API_ONLY=1`)
+Skips service-role membership seeding and DB assertions. This is useful for external reviewers who can hit app APIs but do not have `SUPABASE_SERVICE_ROLE_KEY`.
+
+Required env vars:
+- Always: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `IMPORT_ID`
+- Auth: provide `COOKIE`, or provide `TEST_EMAIL` + `TEST_PASSWORD` for password-grant login
+
+Optional env vars: `BASE_URL` (default `http://localhost:3000`), `PARENT_THREAD_ID`.
+
+```bash
+SUPABASE_URL=... \
+SUPABASE_ANON_KEY=... \
+TEST_EMAIL=... \
+TEST_PASSWORD=... \
+IMPORT_ID=... \
+SMOKE_API_ONLY=1 \
 BASE_URL=http://localhost:3000 \
 bash scripts/demo-smoke.sh
 ```

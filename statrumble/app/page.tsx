@@ -96,6 +96,11 @@ export default async function Home() {
                   <Link href={`/threads/${thread.id}`} className="hover:underline">
                     Thread #{thread.id}
                   </Link>
+                  {thread.kind === "transform_proposal" ? (
+                    <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                      Proposal
+                    </span>
+                  ) : null}
                 </p>
                 <p className="mt-1 text-xs text-zinc-600">
                   metric: {thread.metric?.name ?? "-"} {thread.metric?.unit ? `(${thread.metric.unit})` : ""}

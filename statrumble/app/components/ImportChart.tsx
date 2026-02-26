@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import TransformProposalCreateForm from "@/app/components/TransformProposalCreateForm";
 
 type ImportOption = {
   id: string;
@@ -342,14 +343,17 @@ export default function ImportChart({ imports }: ImportChartProps) {
             </p>
           ) : null}
 
-          <button
-            type="button"
-            disabled={!canCreateThread}
-            onClick={onCreateThread}
-            className="inline-flex items-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isCreatingThread ? "Creating..." : "Create Thread"}
-          </button>
+          <div className="flex flex-wrap items-start gap-2">
+            <button
+              type="button"
+              disabled={!canCreateThread}
+              onClick={onCreateThread}
+              className="inline-flex items-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isCreatingThread ? "Creating..." : "Create Thread"}
+            </button>
+            <TransformProposalCreateForm importId={selectedImportId} disabled={!selectedImportId} />
+          </div>
 
           {threadError ? <p className="text-sm text-red-600">스레드 생성 실패: {threadError}</p> : null}
         </div>

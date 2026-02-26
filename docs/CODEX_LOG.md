@@ -12,6 +12,398 @@
 #### Commit Link
 - TODO
 
+### Prompt ID: Normalize transform_spec + show validation issues (commit: TODO)
+#### Prompt
+```text
+We are getting UI error: "Invalid transform_spec from model."
+This is coming from propose-transform route when TransformSpecSchema (zod) validation fails.
+
+Goal:
+1) Normalize/repair the model-produced transform_spec BEFORE Zod validation to handle nullable strict-schema outputs.
+2) Improve UI to display validation issues (details.issues) on 422 errors.
+
+Tasks:
+
+A) Server-side normalization
+1) Open: statrumble/app/api/threads/propose-transform/route.ts
+2) Find the code path:
+   - parsed = JSON.parse(outputText)
+   - cleanedSpec = pruneNullsDeep(parsed.transform_spec)
+   - validatedSpec = TransformSpecSchema.safeParse(cleanedSpec)
+3) Insert a normalization step between pruneNullsDeep and safeParse:
+   - Implement normalizeTransformSpecFromModel(spec: unknown): unknown
+   - It should:
+     - Ensure spec is an object with version and ops array
+     - For each op object:
+       * If op.op === "filter_outliers":
+         - Keep ONLY: op, method, mode, k, z
+         - Delete: window, center, outputColumn, and any other keys
+         - Defaults:
+           method default "iqr" (or infer: if z is number -> "zscore" else "iqr")
+           mode default "clip"
+           if method==="iqr": ensure k is number else set 1.5; delete z
+           if method==="zscore": ensure z is number else set 2.5; delete k
+       * If op.op === "moving_average":
+         - Keep ONLY: op, window, center, outputColumn
+         - Delete: method, mode, k, z, and any other keys
+         - Defaults:
+           window: if not positive integer -> 7
+           center: if not boolean -> false
+     - Return normalized spec
+4) Then validate:
+   const normalizedSpec = normalizeTransformSpecFromModel(cleanedSpec);
+   const validatedSpec = TransformSpecSchema.safeParse(normalizedSpec);
+   Use validatedSpec.data for applyTransform and DB storage.
+5) If validation still fails, keep returning 422 with issues.
+
+B) UI: show 422 issues
+6) Open:
+   - statrumble/app/components/TransformProposalCreateForm.tsx
+   - statrumble/app/components/TransformProposalForkForm.tsx
+7) When fetch returns non-2xx, parse JSON and render:
+   - error message
+   - if details.issues exists (array), display a small list of issue.path + issue.message
+   This will make debugging visible in the UI.
+
+Verification:
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+- Manual UI: Create Proposal should stop failing for common prompts; if it fails, issues should be visible.
+
+Output:
+- Patch diff
+- Short note explaining normalization rules.
+Suggested commit:
+fix(ai): normalize model transform_spec + show validation issues in proposal forms
+```
+#### Result
+- Added `normalizeTransformSpecFromModel` to coerce model output into valid TransformSpec shape (defaults for filter_outliers and moving_average; removes irrelevant keys) before Zod validation in `statrumble/app/api/threads/propose-transform/route.ts`.
+- Normalization now runs after `pruneNullsDeep` and before `TransformSpecSchema.safeParse`, using the validated spec for applyTransform and DB storage.
+- Updated `TransformProposalCreateForm` and `TransformProposalForkForm` to display validation issues from `details.issues` on 422 responses.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual UI test: invalid proposals show issue paths/messages; typical prompts succeed
+#### Commit Link
+- TODO
+
+### Prompt ID: Fix codex-mini verbosity 400 (commit: TODO)
+#### Prompt
+```text
+Fix 400 error:
+"Unsupported value: 'low' is not supported with the 'gpt-5.1-codex-mini' model. Supported values are: 'medium'."
+
+Context:
+- Route: statrumble/app/api/threads/propose-transform/route.ts
+- OpenAI request sets: text: { verbosity: "low", format: { type:"json_schema", strict:true, ... } }
+
+Goal:
+Make the request compatible with gpt-5.1-codex-mini (and robust across models).
+
+Tasks:
+1) In propose-transform/route.ts, change the OpenAI request to NOT send text.verbosity at all.
+   - Keep text.format json_schema strict unchanged.
+   - Remove any retry/fallback logic related to verbosity if it becomes unnecessary.
+2) Alternatively (only if you strongly prefer), set verbosity dynamically:
+   - if model === "gpt-5.1-codex-mini" -> "medium"
+   - else omit verbosity
+   But simplest is to omit verbosity entirely.
+
+3) Run:
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+
+Output:
+- Patch diff
+- Note: gpt-5.1-codex-mini only supports verbosity 'medium'; we omit verbosity for compatibility.
+Suggested commit:
+fix(ai): remove text.verbosity for codex-mini compatibility
+```
+#### Result
+- Removed `text.verbosity` from the propose-transform OpenAI request while keeping strict `text.format` json_schema unchanged.
+- Removed verbosity-specific error fallback helpers and retry path (`getErrorStatus` / `isVerbosityUnsupportedError` + retry branch), simplifying to a single compatible request.
+- Added compatibility note in request comment explaining why verbosity is omitted.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual test: create proposal no longer fails on unsupported verbosity
+#### Commit Link
+- TODO
+
+### Prompt ID: Fix strict required rule for transform proposal schema (commit: TODO)
+#### Prompt
+```text
+Fix OpenAI Structured Outputs schema error:
+"Invalid schema ... ops.items ... 'required' is required to be supplied and to be an array including every key in properties. Missing 'method'."
+
+Context:
+- propose-transform route uses Responses API with text.format json_schema strict.
+- We replaced oneOf with a flat op schema, but still only required ["op"].
+- OpenAI strict requires ALL fields to be required; optional must be emulated via union with null (official docs).
+
+Tasks:
+1) Open: statrumble/app/api/threads/propose-transform/route.ts
+2) Locate opSchemaForModel / transformSpecSchemaForModel / transformProposalSchemaForModel.
+
+3) Update opSchemaForModel:
+- Ensure `required` includes EVERY key in `properties`.
+- Keep additionalProperties: false.
+- For fields that are not always applicable, allow null via union type:
+  - method: type ["string","null"] (enum can remain ["iqr","zscore"])
+  - mode: type ["string","null"] (enum ["remove","clip"])
+  - k, z: type ["number","null"]
+  - window: type ["integer","null"]
+  - center: type ["boolean","null"]
+  - outputColumn: type ["string","null"]
+  - op stays required string enum ["filter_outliers","moving_average"].
+Example pattern:
+  const opProps = {...};
+  const opSchemaForModel = { type:"object", additionalProperties:false, properties: opProps, required: Object.keys(opProps) };
+
+4) Ensure transformSpecSchemaForModel and transformProposalSchemaForModel also follow the same rule:
+- For any object schema you define, required must include every property key.
+
+5) Add a preprocessing step before Zod validation:
+- Implement `pruneNullsDeep(value)` that removes object keys whose value is null (recursively).
+- After parsing model JSON, do:
+  const cleanedSpec = pruneNullsDeep(parsed.transform_spec);
+  validate TransformSpecSchema.safeParse(cleanedSpec)
+  applyTransform(cleanedSpec, series)
+  store cleanedSpec to DB (transform_spec).
+
+6) Keep the existing dev guard for unsupported combinators, but ALSO add a dev-time check that required covers all keys:
+- assertRequiredCoversAllProperties(schema) that verifies for each object schema:
+  required includes every Object.keys(properties).
+
+7) Run:
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+Then manual UI test: Create Proposal should no longer 400.
+
+Output:
+- Patch diff
+- Short note: strict schema requires all fields required; optional via null; prune nulls before zod.
+Suggested commit:
+fix(ai): satisfy strict required rule for transform proposal schema
+```
+#### Result
+- Updated `opSchemaForModel` to require every property key and represent optional operator fields as nullable (`type: ["...","null"]`), while keeping `additionalProperties: false`.
+- Updated `transformSpecSchemaForModel` and `transformProposalSchemaForModel` to derive `required` from all property keys.
+- Added `pruneNullsDeep` and now validate cleaned `transform_spec` (`TransformSpecSchema.safeParse(cleanedSpec)`), preserving existing zod guardrails and persisted spec behavior.
+- Added dev-time `assertRequiredCoversAllProperties` in addition to the combinator guard to catch strict-schema violations early.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual UI test: Create Proposal no longer returns schema 400
+#### Commit Link
+- TODO
+
+### Prompt ID: Fix transform proposal schema oneOf 400 (commit: TODO)
+#### Prompt
+```text
+Fix the 400 error when creating transform proposals:
+"Invalid schema for response_format 'transform_proposal' ... ops.items ... 'oneOf' is not permitted."
+
+Cause:
+The Structured Outputs JSON schema we send to OpenAI contains `oneOf` under transform_spec.ops.items
+(usually from zod union/discriminatedUnion -> JSON Schema conversion).
+OpenAI json_schema strict does NOT permit oneOf there.
+
+Goal:
+Replace the model-output JSON schema for transform_spec.ops.items with a flat object schema (no oneOf/anyOf/allOf),
+while keeping server-side Zod validation (TransformSpecSchema) as the real guardrail.
+
+Tasks:
+1) Open: statrumble/app/api/threads/propose-transform/route.ts
+2) Find where the OpenAI Responses API request is built:
+   - openai.responses.create({ ... text: { format: { type:"json_schema", ... schema: ... } } ... })
+   - Look for the schema named "transform_proposal" (or similar) that includes transform_spec and ops.
+
+3) Replace ONLY the schema used for Structured Outputs with a manually-defined JSON schema that does NOT use oneOf.
+
+   Use a flat op schema like:
+
+   const OpSchemaForModel = {
+     type: "object",
+     additionalProperties: false,
+     properties: {
+       op: { type: "string", enum: ["filter_outliers", "moving_average"] },
+
+       // filter_outliers fields (optional)
+       method: { type: "string", enum: ["iqr", "zscore"] },
+       k: { type: "number" },
+       z: { type: "number" },
+       mode: { type: "string", enum: ["remove", "clip"] },
+
+       // moving_average fields (optional)
+       window: { type: "integer", minimum: 1 },
+       center: { type: "boolean" },
+       outputColumn: { type: "string" }
+     },
+     required: ["op"]
+   };
+
+   const TransformSpecSchemaForModel = {
+     type: "object",
+     additionalProperties: false,
+     properties: {
+       version: { type: "integer", enum: [1] },
+       ops: { type: "array", minItems: 1, maxItems: 20, items: OpSchemaForModel }
+     },
+     required: ["version", "ops"]
+   };
+
+   And then proposal schema:
+
+   const ProposalSchemaForModel = {
+     type: "object",
+     additionalProperties: false,
+     properties: {
+       title: { type: "string" },
+       explanation: { type: "string" },
+       transform_spec: TransformSpecSchemaForModel,
+       sql_preview: { type: "string" }
+     },
+     required: ["title", "explanation", "transform_spec", "sql_preview"]
+   };
+
+4) Keep the existing server-side validation:
+   - Parse model JSON
+   - Validate parsed.transform_spec via TransformSpecSchema (zod)
+   - If invalid, return 422 with issues (already implemented)
+
+5) Add a quick guard/assertion in code (dev-only comment is fine):
+   - Ensure the schema object does not contain "oneOf" anywhere.
+   (Optional: a small helper that JSON.stringify(schema).includes("oneOf") and throws in dev.)
+
+6) Verification:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+   - Manual UI test: create proposal should no longer return 400.
+
+Output:
+- Patch diff
+- Brief explanation: removed oneOf from structured output schema by using flat op schema.
+Suggested commit:
+fix(ai): remove oneOf from structured output schema for transform proposals
+```
+#### Result
+- Replaced the Structured Outputs schema in `statrumble/app/api/threads/propose-transform/route.ts` with a flat `opSchemaForModel` (no `oneOf`/`anyOf`/`allOf`) and composed `transformSpecSchemaForModel` + `transformProposalSchemaForModel`.
+- Kept server-side `TransformSpecSchema` zod validation unchanged as the authoritative guardrail for parsed `transform_spec`.
+- Added a development-time assertion helper to fail fast if unsupported combinators appear in the schema object.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual UI test: create proposal no longer returns 400 for schema
+#### Commit Link
+- TODO
+
+### Prompt ID: Main page transform proposal UI entrypoint (commit: TODO)
+#### Prompt
+```text
+Add an obvious UI entrypoint to create a transform proposal thread (transform_proposal) without using curl.
+
+Context:
+- API exists: POST /api/threads/propose-transform
+  Body: { import_id: string, prompt: string, parent_thread_id?: string|null }
+  Response: { thread_id: string }
+- The main page already lets users select an import/chart range and click "Create Thread" (discussion thread).
+
+Goal:
+Make it intuitive to create a proposal thread:
+- Add a "Propose Transform (AI)" button next to the existing "Create Thread" button on the main chart section (statrumble/app/page.tsx).
+- Clicking opens a small form (modal or inline) to enter a prompt and submit.
+- On success, redirect to /threads/<thread_id>.
+- Show loading + error message if request fails.
+
+Tasks:
+1) Locate the existing "Create Thread" UI in statrumble/app/page.tsx (the button under the chart selection).
+2) Add a second button labeled "Propose Transform (AI)" (or "Create Proposal") beside it, matching existing styling.
+3) Implement a small client component similar to TransformProposalForkForm:
+   - New file e.g. statrumble/app/components/TransformProposalCreateForm.tsx
+   - Props: importId: string (and optionally disabled if missing)
+   - UI:
+     - textarea for prompt
+     - submit button (disabled while loading)
+     - small helper text with 2 example prompts
+     - render error message under form if API returns { ok:false } or non-2xx
+4) Wire it:
+   - When user submits, POST /api/threads/propose-transform with { import_id, prompt, parent_thread_id: null }
+   - On success, use next/navigation router.push(`/threads/${thread_id}`)
+5) Edge cases:
+   - If no import is selected / importId is not available, disable the button and show tooltip text like "Select an import first".
+   - Preserve existing Create Thread flow unchanged.
+6) Keep UI language consistent (currently mixed English/Korean). Don’t do a full i18n refactor—just match existing tone.
+
+Verification:
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+
+Output:
+- Patch (diff)
+- Brief notes on where the entrypoint was added
+Suggested commit message:
+feat(ui): add entrypoint to create transform proposals
+```
+#### Result
+- Added `statrumble/app/components/TransformProposalCreateForm.tsx` with inline prompt form, loading/error states, helper example prompts, disabled handling, and redirect to `/threads/<thread_id>`.
+- Wired the new entrypoint in `statrumble/app/components/ImportChart.tsx` beside the existing `Create Thread` button as `Propose Transform (AI)`.
+- Existing discussion-thread create flow remains unchanged.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Open main chart section, create proposal from new button, confirm redirect to created thread
+#### Commit Link
+- TODO
+
+### Prompt ID: Demo smoke test script for transform proposals (commit: TODO)
+#### Prompt
+```text
+Create a minimal demo smoke test script for StatRumble.
+
+Goal: verify the transform proposal demo flow is working end-to-end (API level).
+
+Tasks:
+1) Add scripts/demo-smoke.sh (or .ts) that:
+   - takes env vars: BASE_URL (default http://localhost:3000), COOKIE (auth cookie string), IMPORT_ID, PARENT_THREAD_ID(optional)
+   - calls POST /api/threads/propose-transform with IMPORT_ID and a prompt
+   - asserts response contains thread_id
+   - fetches the created thread via existing getThread/read API or direct supabase query helper (whichever is available) and asserts:
+     kind == 'transform_proposal'
+     transform_spec, transform_sql_preview, transform_stats are non-null
+   - calls POST /api/threads/propose-transform again with parent_thread_id = first thread_id (fork)
+   - asserts child thread has transform_diff_report with deltas (or error field if expected)
+2) Add a negative test:
+   - call with parent_thread_id pointing to a non-transform discussion thread and assert HTTP 400
+3) Print clear PASS/FAIL messages.
+
+Do not add new dependencies unless already present.
+Include instructions in comments on how to run it.
+```
+#### Result
+- Added `scripts/demo-smoke.sh` as an API-level smoke test with clear PASS/FAIL output and run instructions in comments.
+- Script covers: root proposal create, root DB assertions (`kind`, `transform_spec`, `transform_sql_preview`, `transform_stats`), fork proposal create, child diff assertion (`transform_diff_report.deltas` or `error`), and negative parent-kind test expecting HTTP 400.
+- Negative path auto-creates a discussion thread via `/api/threads/create` using import range derived from `/api/imports/{id}/points`.
+- DB assertions use Supabase REST (`NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`) without adding dependencies.
+#### Manual Checklist
+- [x] `bash -n scripts/demo-smoke.sh`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Run smoke script against local app with valid `COOKIE`, `IMPORT_ID`, and Supabase envs
+#### Commit Link
+- TODO
+
 ### Prompt ID: Prompt 01 (commit: TODO)
 #### Prompt
 ```text
@@ -2651,5 +3043,773 @@ Commit:
 - [x] `pnpm -C statrumble run lint`
 - [x] `pnpm -C statrumble run typecheck`
 - [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Transform Proposals - arena_threads kind (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble Next.js + Supabase repo.
+
+Goal: implement Transform Proposals as a new type of arena_thread without breaking existing behavior.
+
+Tasks:
+1) Find the latest Supabase migration number (currently up to 017). Create a new migration (next number) that ALTERs the `arena_threads` table to add:
+   - kind text NOT NULL DEFAULT 'discussion'
+   - parent_thread_id uuid NULL REFERENCES arena_threads(id)
+   - transform_prompt text NULL
+   - transform_spec jsonb NULL
+   - transform_sql_preview text NULL
+   - transform_stats jsonb NULL
+   - transform_diff_report jsonb NULL
+2) Add indexes for (kind) and (parent_thread_id).
+3) Do NOT modify existing migrations. New migration only.
+4) Ensure existing inserts into arena_threads still work (because kind has a default).
+5) Update any generated TypeScript DB types if the repo has them.
+
+Output:
+- The new migration SQL file
+- Any updated type files
+- Notes about where the thread record is read/written in the app so we can hook UI later.
+```
+#### Result
+- Added `statrumble/supabase/migrations/018_transform_proposals_threads.sql` to extend `public.arena_threads` with transform proposal fields plus indexes on `kind` and `parent_thread_id`.
+- Confirmed no Supabase-generated TypeScript DB type file exists in this repo today (DB row shapes are typed ad-hoc in `lib/db/*`).
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Transform Proposals - thread reads/types sync (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble Next.js + Supabase repo.
+
+Context:
+- Migration 018 added these columns to `public.arena_threads`:
+  kind (default 'discussion'), parent_thread_id, transform_prompt, transform_spec, transform_sql_preview,
+  transform_stats, transform_diff_report.
+- Current thread fetch code uses explicit select lists, so new fields are NOT being returned.
+
+Goal:
+Update thread read functions to include the new fields (at least `kind`), and fix any TypeScript types so
+the app can render transform proposal threads without undefined/missing properties.
+
+Tasks:
+1) Open `statrumble/lib/db/threads.ts`.
+   - In `listThreads()` it currently does:
+     .select("id, created_at, start_ts, end_ts, metric_id, visibility, metrics(name, unit)")
+     Update it to also return:
+       - kind
+       - parent_thread_id
+     (Keep it minimal; do NOT add all transform_* to listThreads unless it's already used in the list UI.)
+
+   - In `getThread(threadId)` inspect its `.select(...)`.
+     Prefer changing it to return all columns so transform fields are available on the thread detail page:
+       .select("*, metrics(name, unit)")
+     If getThread currently includes additional relations, preserve them and still include all thread columns.
+
+2) Find TypeScript types used by these functions:
+   - `ArenaThread` and `ArenaThreadListItem` (or whatever types are returned).
+   Update them to include:
+     - kind: string
+     - parent_thread_id?: string | null
+     - transform_prompt?: string | null
+     - transform_spec?: any | null (jsonb)
+     - transform_sql_preview?: string | null
+     - transform_stats?: any | null (jsonb)
+     - transform_diff_report?: any | null (jsonb)
+   If there are Zod schemas or runtime validators for thread objects, update those too.
+
+3) Ensure all API routes that rely on `getThread` keep working:
+   - `statrumble/app/api/threads/[id]/messages/route.ts`
+   - `statrumble/app/api/threads/[id]/votes/route.ts`
+   - `statrumble/app/api/threads/[id]/refresh/route.ts`
+   - `statrumble/app/api/threads/[id]/promote/route.ts`
+   (No behavior changes needed—just ensure the thread object shape is consistent.)
+
+4) Run checks and fix any fallout:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `./scripts/verify.sh`
+   If a check fails, include the exact fix in the patch.
+
+Output:
+- A clean patch (diff) with the changes.
+- Brief notes: what was changed and why (missing fields due to explicit selects).
+- Suggested commit message, e.g.:
+  "fix(db): include transform proposal fields in thread queries"
+```
+#### Result
+- Updated `statrumble/lib/db/threads.ts` query selects so `listThreads()` returns `kind` and `parent_thread_id`, and `getThread()` now loads all thread columns via `select("*, metrics(name, unit)")`.
+- Expanded thread row/output types with proposal-thread fields (`kind`, `parent_thread_id`, `transform_*`) and kept list output minimal with only `kind`/`parent_thread_id` selected.
+- Lint fallout from `any` on JSONB fields was fixed by using `unknown | null`.
+- Checked dependent API routes using `getThread`; no behavior change required.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Transform Spec DSL + execution engine (commit: TODO)
+#### Prompt
+```text
+Implement a safe Transform Spec (JSON DSL) and an execution engine in TypeScript.
+
+Repo context:
+- Chart rendering exists in statrumble/app/components/ImportChart.tsx and thread UI in statrumble/app/threads/[id]/page.tsx.
+- Inspect these files first to match the existing chart data structure (do not invent a new shape unless necessary).
+
+Requirements:
+- Create a module under statrumble/lib/transforms/
+- Validate TransformSpec with zod (or the validation style used in this repo).
+- Supported ops ONLY:
+  1) filter_outliers: { op:"filter_outliers", method:"iqr"|"zscore", k?:number, z?:number, mode:"remove"|"clip" }
+  2) moving_average: { op:"moving_average", window:number, center?:boolean, outputColumn?:string }
+- Provide:
+  - applyTransform(spec, series) -> { series, stats }
+  - compareStats(a,b) -> diff object
+- Stats must include:
+  count_before, count_after, outliers_removed, mean, std, slope
+  (slope can be simple linear regression over index if no time axis)
+
+Output:
+- New files
+- Minimal sanity script or test
+- Notes: which UI/API should call applyTransform.
+```
+#### Result
+- Added `statrumble/lib/transforms/index.ts` with a strict zod-based TransformSpec DSL and a safe execution engine for exactly two ops (`filter_outliers`, `moving_average`).
+- Added `applyTransform(spec, series)` and `compareStats(a, b)` plus typed stats (`count_before`, `count_after`, `outliers_removed`, `mean`, `std`, `slope`).
+- Added `scripts/sanity-transforms.ts` as a lightweight sanity check script and executed it.
+- Kept series shape aligned with existing chart usage (`{ ts: string, value: number }`).
+#### Manual Checklist
+- [x] `node --loader ./scripts/ts-strip-loader.mjs ./scripts/sanity-transforms.ts`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Transform engine hardening edge-cases (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble repo. We recently added a transform DSL/execution module:
+- statrumble/lib/transforms/index.ts
+- scripts/sanity-transforms.ts
+
+Goal:
+Audit and harden the transform engine for 3 edge cases before we integrate it into APIs/UI:
+(1) series sorting + duplicate ts handling
+(2) outlier "remove" vs "clip" behavior + sensible default
+(3) moving_average when window > series length
+
+Tasks:
+
+A) Inspect current implementation
+1) Open statrumble/lib/transforms/index.ts and locate:
+   - TransformSpecSchema
+   - applyTransform(spec, series)
+   - filter_outliers op implementation
+   - moving_average op implementation
+
+B) Check #1: sorting & duplicate ts
+2) Determine if applyTransform assumes series is sorted. If it does, implement a normalization step at the start:
+   - Sort by ts ascending
+   - Handle duplicate ts deterministically:
+     - Choose one strategy and document it in code comments:
+       (preferred) keep the LAST value for the same ts, or average them.
+   - Support ts types used by the app: string ISO timestamps and/or numbers (do not break existing series shape { ts, value }).
+
+Add a test case in scripts/sanity-transforms.ts:
+- Provide an unsorted series with duplicate ts
+- Ensure the output series is sorted and duplicates resolved per the chosen rule.
+
+C) Check #2: outlier mode remove vs clip + default
+3) Verify filter_outliers supports BOTH modes:
+   - remove: drop outlier points
+   - clip: keep points but clamp values to bounds
+4) Ensure there is a sensible default if mode is missing in spec:
+   - Default to "clip" (to avoid “holes” in line charts).
+   - If TransformSpecSchema currently requires mode, change it to optional with default("clip") OR keep schema strict but add runtime fallback in applyTransform (prefer schema default if possible).
+
+Add sanity tests:
+- One spec without mode should behave as clip.
+- One spec with mode:"remove" should reduce count_after and increase outliers_removed.
+
+D) Check #3: moving_average window > length
+5) Ensure moving_average does not produce NaN/empty series when window > series length.
+Pick ONE behavior and implement it (document it clearly):
+   - Option 1 (preferred for demo safety): return the series unchanged and add a warning flag in stats, e.g. stats.warnings = ["window_too_large"].
+   - Option 2: treat window as min(window, length) and compute anyway.
+If you add stats.warnings, keep compareStats stable (ignore warnings in numeric diffs).
+
+Add sanity tests:
+- series length 5, window 7 -> should not throw, should not produce NaN, and should follow chosen behavior.
+
+E) Verification
+6) Run:
+- node --loader ./scripts/ts-strip-loader.mjs ./scripts/sanity-transforms.ts
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+Fix any fallout.
+
+Output:
+- A clean patch (diff) implementing the above.
+- Brief notes summarizing:
+  - sorting/dedup rule chosen
+  - default mode behavior
+  - window>length behavior
+Suggested commit message:
+fix(transforms): normalize series, default clip mode, guard MA window
+```
+#### Result
+- Hardened `statrumble/lib/transforms/index.ts` with series normalization at transform entry: timestamps are validated/sorted ascending and duplicates are resolved by keeping the last row for the same timestamp key.
+- Extended timestamp support from string-only to `string | number` while preserving `{ ts, value }` point shape.
+- Updated `filter_outliers` schema to default `mode` to `clip` when omitted.
+- Added a guard for `moving_average` when `window > series.length`: series remains unchanged and `stats.warnings` includes `window_too_large`.
+- Expanded `scripts/sanity-transforms.ts` with assertions for unsorted+duplicate handling, default clip behavior, explicit remove behavior, and oversized moving-average behavior.
+#### Manual Checklist
+- [x] `node --loader ./scripts/ts-strip-loader.mjs ./scripts/sanity-transforms.ts`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Transform proposal API route (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble Next.js (App Router) + Supabase repo.
+
+We already have:
+- DB migration 018 adding transform fields to public.arena_threads
+- Thread queries updated (getThread uses select("*, metrics(name, unit)"), listThreads includes kind/parent_thread_id)
+- Transform engine at statrumble/lib/transforms/index.ts:
+  - TransformSpecSchema (zod)
+  - applyTransform(spec, series) -> { series, stats }
+  - compareStats(a,b)
+
+Goal:
+Implement an authenticated API route that creates a transform proposal thread using OpenAI and persists:
+transform_prompt, transform_spec, transform_sql_preview, transform_stats.
+
+Route:
+- Create: statrumble/app/api/threads/propose-transform/route.ts
+- Method: POST
+- Request JSON:
+  {
+    import_id: string,
+    prompt: string,
+    parent_thread_id?: string | null
+  }
+- Response JSON:
+  { thread_id: string }
+
+Behavior:
+1) Validate session and active workspace (reuse the same auth helpers used by existing thread APIs, e.g. threads/create and threads/[id]/judge).
+2) Fetch the import’s chart series in the SAME SHAPE used by ImportChart: array of { ts, value }.
+   - Look at statrumble/app/components/ImportChart.tsx and existing DB helpers to locate how import data is stored (imports table / snapshot / derived points).
+   - Do not invent new storage; reuse existing import read path.
+3) Call OpenAI to generate a transform proposal with STRICT structure:
+   Output JSON:
+   {
+     "title": string,
+     "explanation": string,
+     "transform_spec": TransformSpec,
+     "sql_preview": string
+   }
+   - Prefer using Structured Outputs if the existing OpenAI SDK in this repo supports it.
+   - If not available, request JSON only and parse strictly, then validate transform_spec using TransformSpecSchema.
+   - Use model from env CODEX_MODEL; fallback to a reasonable codex-capable model name already used in this project’s docs. Do NOT use deprecated model names.
+4) Validate the transform_spec using TransformSpecSchema.
+5) Run applyTransform(transform_spec, series) to compute stats (do NOT persist the transformed series yet).
+6) Insert a new arena_threads row:
+   - workspace_id = active workspace
+   - kind = 'transform_proposal'
+   - parent_thread_id = provided or null
+   - import_id = request import_id
+   - visibility = 'workspace' (default)
+   - start_ts/end_ts should match current import default range or be set to full range if needed
+   - snapshot can reuse existing snapshot behavior (if threads/create stores it, follow the same pattern)
+   Then update this thread with:
+   - transform_prompt, transform_spec, transform_sql_preview, transform_stats
+7) Create an initial thread message summarizing:
+   - title + explanation
+   - and mention that SQL preview is for review (not executed)
+   Reuse existing messages write helper so voting/comments work.
+8) Return { thread_id }.
+
+Security/robustness:
+- Never execute sql_preview.
+- Enforce that transform_spec only includes allowed ops (zod already does this).
+- Handle edge cases: empty series, very small series, window > length.
+
+Output:
+- The full route implementation
+- Any helper functions you add
+- Minimal manual test instructions (curl example) and what response should look like.
+- Ensure npm run lint / typecheck / scripts/verify.sh pass.
+Suggested commit message:
+feat(api): create transform proposal threads via codex
+```
+#### Result
+- Added `statrumble/app/api/threads/propose-transform/route.ts` implementing authenticated `POST /api/threads/propose-transform`.
+- Reused workspace/session checks, import ownership checks, and point loading in existing shape (`{ ts, value }`) from `metric_points`.
+- Added Structured Outputs call via OpenAI Responses API to produce `{ title, explanation, transform_spec, sql_preview }`, then validated `transform_spec` with `TransformSpecSchema`.
+- Applied transform (`applyTransform`) and stored `transform_stats` (baseline/transformed/diff), persisted proposal fields, and created initial message via `createMessage` with explicit SQL-preview-not-executed wording.
+- Used `CODEX_MODEL` env with fallback `gpt-5.2-codex`.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Propose-transform hardening audit (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble Next.js + Supabase repo.
+
+Context:
+- We have a new API route:
+  statrumble/app/api/threads/propose-transform/route.ts
+- It creates transform proposal threads, uses OpenAI Responses API with Structured Outputs (json_schema),
+  runs applyTransform/compareStats, stores transform_* fields.
+
+Goal:
+Before moving to Prompt 04, audit and fix 4 issues:
+(1) Model fallback correctness + safer defaults for hackathon usage
+(2) Structured Outputs extraction + refusal/error handling robustness
+(3) GPT-5.2 parameter compatibility (avoid unsupported sampling params when reasoning effort != none)
+(4) Parent-child diff persistence: store numeric diffs into transform_diff_report when parent_thread_id is provided
+
+Tasks:
+
+A) Inspect current route implementation
+1) Open statrumble/app/api/threads/propose-transform/route.ts and locate:
+   - model selection logic (CODEX_MODEL fallback)
+   - the OpenAI Responses API request payload
+   - parsing/extraction of structured output
+   - DB insert/update into arena_threads
+   - compareStats call site
+
+B) Fix (1): model fallback + guard deprecated model
+2) Ensure model selection behaves like this:
+   - const model = process.env.CODEX_MODEL?.trim() || "gpt-5.1-codex-mini"
+   - If CODEX_MODEL is set to "codex-mini-latest", reject with 400 and a clear message:
+     "codex-mini-latest is removed; use gpt-5-codex-mini or gpt-5.1-codex-mini"
+   - If a more capable model is desired, allow env override (no hardcoding to expensive model).
+3) Update .env.example (and/or docs) to include CODEX_MODEL with recommended default.
+
+C) Fix (2): Structured Outputs robustness
+4) Verify Structured Outputs is configured correctly (json_schema strict).
+5) Implement robust extraction:
+   - If the response contains a refusal or no valid JSON payload, return 502 with a clear error.
+   - Do NOT silently proceed with partial/empty objects.
+6) Ensure transform_spec is always validated via TransformSpecSchema (zod).
+   - If validation fails, return 422 with details (do not retry automatically).
+
+D) Fix (3): GPT-5.2 parameter compatibility
+7) Inspect the OpenAI request payload. Ensure:
+   - Do NOT send temperature/top_p/logprobs unless reasoning effort is explicitly "none".
+   - If reasoning effort is set (low/medium/high/etc.), remove those sampling fields to avoid API errors.
+   - Keep the request minimal: model + input + structured outputs format.
+8) Add a short inline comment explaining why those fields are omitted (compatibility).
+
+E) Fix (4): Persist compareStats diff in transform_diff_report
+9) When parent_thread_id is provided:
+   - Fetch the parent thread row (must be same workspace) and read parent.transform_stats and parent.transform_spec.
+   - If parent.transform_stats is missing/null, still allow creating the child thread but set transform_diff_report = null
+     (or { error: "missing_parent_stats" }).
+   - Compute numeric diff:
+       const deltas = compareStats(parentStats, childStats)
+   - Store transform_diff_report on the CHILD thread as JSON, minimally:
+     {
+       parent_thread_id: string,
+       parent_stats: { ... } (optional: include only key numeric fields),
+       child_stats: { ... } (optional),
+       deltas: { ... }  // result of compareStats
+     }
+   - Keep it deterministic and small (avoid storing huge arrays).
+
+F) Verification & quick manual checks
+10) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+11) Provide 2 manual curl examples (describe expected DB fields):
+   - Create without parent_thread_id -> thread.kind=transform_proposal, transform_stats set, transform_diff_report null
+   - Create with parent_thread_id -> transform_diff_report contains deltas
+
+Output:
+- A clean patch (diff) implementing all of the above.
+- Brief notes summarizing each fix.
+Suggested commit message:
+fix(api): harden propose-transform (model defaults, structured outputs, diff persistence)
+```
+#### Result
+- Hardened `statrumble/app/api/threads/propose-transform/route.ts` model selection to `CODEX_MODEL || gpt-5.1-codex-mini` and added explicit 400 guard for removed `codex-mini-latest`.
+- Added robust Structured Outputs handling: refusal detection and missing/invalid structured payload now return 502; `transform_spec` zod validation failures return 422 with issue details.
+- Kept OpenAI request minimal (`model`, `input`, strict `json_schema`) and documented omission of sampling params for GPT-5 compatibility.
+- Added parent-child diff persistence on child thread: reads parent `transform_stats`/`transform_spec`, computes deltas via `compareStats` when possible, otherwise stores deterministic `missing_parent_stats` report.
+- Updated `.env.example` with `CODEX_MODEL=gpt-5.1-codex-mini`.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Propose-transform final pre-04 hardening (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble Next.js + Supabase repo.
+
+Context:
+- API route exists:
+  statrumble/app/api/threads/propose-transform/route.ts
+- It already:
+  - guards removed model name "codex-mini-latest"
+  - uses Responses API + Structured Outputs (json_schema strict)
+  - validates TransformSpecSchema
+  - computes stats and stores transform_* fields
+  - stores transform_diff_report with parent_stats, child_stats, deltas (compareStats)
+
+Goal:
+Do the final pre-Prompt-04 hardening checks:
+(Required) 1) Ensure transform_diff_report stores child_stats in the SAME "comparable stats" shape as parent_stats.
+(Optional) 2) Make text.verbosity safe: keep it, but add a fallback path that retries WITHOUT verbosity only if the API rejects the field.
+(Optional) 3) Validate parent_thread_id semantics: parent must be kind='transform_proposal' (and ideally same import_id) or return 400.
+
+Tasks:
+
+A) Required: normalize child_stats in transform_diff_report
+1) In propose-transform route, locate where transformDiffReport is built.
+2) Today it uses extractComparableStats() for parent_stats but stores child_stats raw.
+   Change it so BOTH parent_stats and child_stats are comparable stats with consistent shape:
+   - const childComparableStats = extractComparableStats(childStats) ?? null
+   - Store child_stats: childComparableStats
+3) If childComparableStats is null (should not happen unless stats format changes), store:
+   { parent_thread_id, error: "missing_child_stats" } or set child_stats: null + error field.
+4) Keep transform_diff_report deterministic and compact.
+
+B) Optional: safe verbosity fallback
+5) The request currently sets: text: { verbosity: "low", format: { type:"json_schema", strict:true, ... } }.
+6) Keep verbosity by default, BUT add a retry mechanism ONLY for "verbosity unsupported" style errors:
+   - Attempt OpenAI call with verbosity.
+   - If it fails with a 400-like error message mentioning "verbosity" / "Unknown parameter" / "unrecognized" etc,
+     retry ONCE with the same request but WITHOUT text.verbosity.
+   - Do NOT retry for other errors.
+7) Add a short inline comment explaining why this exists (demo robustness across SDK/API changes).
+
+C) Optional: validate parent_thread_id semantics
+8) When parent_thread_id is provided:
+   - Fetch parent thread (already done).
+   - If parent is missing => 404.
+   - If parent.kind !== 'transform_proposal' => 400 with clear message.
+   - (Recommended) If parent.import_id !== request import_id => 400 (diff comparisons across different datasets are meaningless).
+   - Keep the existing same-workspace/ownership checks.
+
+D) Verification
+9) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+10) Provide 2 manual curl examples and what to inspect in DB:
+   - With parent_thread_id: verify transform_diff_report.child_stats exists and matches parent_stats shape; verify deltas exist.
+   - With parent_thread_id pointing to a non-transform thread: verify 400.
+
+Output:
+- A clean patch (diff).
+- Brief notes summarizing the three changes.
+Suggested commit message:
+fix(api): stabilize diff report + verbosity fallback + parent validation
+```
+#### Result
+- Updated `propose-transform` diff persistence so `transform_diff_report.child_stats` is normalized via `extractComparableStats` (same comparable shape as `parent_stats`); stores deterministic `missing_child_stats` error when unavailable.
+- Added one-time OpenAI retry path that drops `text.verbosity` only for verbosity/unknown-parameter style request errors, while keeping verbosity by default.
+- Added parent-thread semantic validation: `parent.kind` must be `transform_proposal` and `parent.import_id` must match request `import_id` (400 otherwise).
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Prompt 04 UI fork and compare transform proposals (commit: TODO)
+#### Prompt
+```text
+You are working in the StatRumble Next.js + Supabase repo.
+
+Context:
+- Transform proposal API exists:
+  POST /api/threads/propose-transform
+  Creates arena_threads with kind='transform_proposal' and stores:
+  transform_prompt, transform_spec, transform_sql_preview, transform_stats, transform_diff_report
+- Thread fetching functions include these fields:
+  getThread uses select("*, metrics(name, unit)")
+  listThreads includes kind and parent_thread_id
+
+Goal (Prompt 04):
+Make transform proposals feel collaborative:
+- Add a Fork flow (create a child proposal from a parent)
+- Render parent-vs-child diffs when parent_thread_id exists
+- Minimal list badge so users can recognize proposal threads
+
+Tasks:
+
+A) Thread list UI: show proposal badge
+1) Find the threads list UI entry point (statrumble/app/page.tsx or wherever listThreads is rendered).
+2) If item.kind === 'transform_proposal', show a small badge/tag "Proposal" (or "Transform") next to the thread item.
+   Keep styling minimal (Tailwind classes if used).
+
+B) Thread detail UI: render proposal panel + Fork action
+3) Open statrumble/app/threads/[id]/page.tsx (thread detail).
+4) If thread.kind !== 'transform_proposal', keep the page unchanged.
+5) If thread.kind === 'transform_proposal', render a top panel containing:
+   - Title (use existing thread title if any; otherwise a fallback like "Transform Proposal")
+   - transform_prompt (if present)
+   - A short "SQL Preview (not executed)" section with a code block showing transform_sql_preview
+   - Stats summary (transform_stats): count_before/count_after/outliers_removed/mean/std/slope
+   - Warnings if present (transform_stats.warnings)
+   Keep this panel above the existing messages/votes UI so collaboration stays intact.
+
+6) Add a "Fork" button in the proposal panel:
+   - On click, open a modal (or a simple inline form) asking for a new prompt text.
+   - Submit calls POST /api/threads/propose-transform with:
+     { import_id: thread.import_id, prompt: <new prompt>, parent_thread_id: thread.id }
+   - On success, redirect user to /threads/<new_thread_id>.
+
+C) Diff UI: render transform_diff_report if present
+7) If thread.parent_thread_id exists OR transform_diff_report exists, render a "Compare to parent" section:
+   - If transform_diff_report.error exists, display it gently (e.g., "Parent stats missing")
+   - Else render deltas (transform_diff_report.deltas) as a small table/list:
+     - mean delta
+     - std delta
+     - slope delta
+     - count_after delta (if present)
+   Keep it deterministic and compact.
+
+D) Verification
+8) Ensure npm run lint / npm run typecheck / ./scripts/verify.sh pass.
+9) Provide a short manual test checklist:
+   - Create a proposal from import page or via curl
+   - Open proposal thread page: panel shows SQL preview + stats
+   - Click Fork: child proposal thread is created and shows Compare section
+
+Output:
+- A clean patch (diff) with UI changes.
+- Brief notes on where UI was wired.
+Suggested commit message:
+feat(ui): fork and compare transform proposals
+```
+#### Result
+- Added proposal badge in thread list UI for `thread.kind === "transform_proposal"` in `statrumble/app/page.tsx`.
+- Added proposal detail panel in `statrumble/app/threads/[id]/page.tsx` with prompt, SQL preview (not executed), stats summary, warnings, and parent diff rendering from `transform_diff_report`.
+- Added fork UI component `statrumble/app/components/TransformProposalForkForm.tsx`; it opens an inline prompt form, posts to `/api/threads/propose-transform` with `parent_thread_id`, and redirects to the new child thread.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Create proposal thread and verify panel contents on `/threads/<id>`
+- [ ] Click `Fork`, submit prompt, verify redirect to child proposal and compare section
+#### Commit Link
+- TODO
+
+### Prompt ID: Auto-login demo smoke test (commit: TODO)
+#### Prompt
+```text
+Update scripts/demo-smoke.sh to support automatic login so we don’t have to manually copy browser cookies.
+
+Goal:
+If COOKIE is not provided, the script should obtain a valid auth cookie string automatically and proceed.
+
+Tasks:
+1) In scripts/demo-smoke.sh, add env vars:
+   - BASE_URL (default http://localhost:3000)
+   - IMPORT_ID (required)
+   - COOKIE (optional)
+   - TEST_EMAIL, TEST_PASSWORD (required if COOKIE missing)
+   - SUPABASE_URL, SUPABASE_ANON_KEY (required if COOKIE missing)
+
+2) If COOKIE is empty:
+   - Call Supabase Auth password grant to get access_token + refresh_token.
+   - Use curl:
+     POST ${SUPABASE_URL}/auth/v1/token?grant_type=password
+     Headers:
+       apikey: ${SUPABASE_ANON_KEY}
+       Content-Type: application/json
+     Body:
+       {"email":"${TEST_EMAIL}","password":"${TEST_PASSWORD}"}
+   - Parse JSON with jq:
+     access_token = .access_token
+     refresh_token = .refresh_token
+   - Determine the cookie names used by our server client.
+     Search the repo for where cookies are read/written for supabase auth (createClient helper).
+     Prefer names like "sb-access-token" and "sb-refresh-token" if that’s what the app uses.
+   - Build COOKIE string like:
+     "sb-access-token=${access_token}; sb-refresh-token=${refresh_token}"
+   - (Optional) print a short message: "Generated COOKIE via Supabase login"
+
+3) Use the resulting COOKIE for all API calls (curl -b "$COOKIE").
+4) Keep existing DB assertions via service-role REST as-is.
+5) Add clear failures:
+   - If login fails or tokens missing, exit with message.
+6) Verify:
+   - bash -n scripts/demo-smoke.sh
+   - ./scripts/verify.sh (if it includes shellcheck-like checks) and existing lint/typecheck if needed.
+
+Output:
+- Patch diff
+- Short run instructions, e.g.
+  SUPABASE_URL=... SUPABASE_ANON_KEY=... TEST_EMAIL=... TEST_PASSWORD=... IMPORT_ID=... bash scripts/demo-smoke.sh
+Suggested commit:
+test(smoke): auto-login to avoid manual cookies
+```
+#### Result
+- Added auto-login path in `scripts/demo-smoke.sh` that uses Supabase password grant to generate `sb-<project>-auth-token` cookies (base64url, chunked).
+- Added required env wiring (`TEST_EMAIL`, `TEST_PASSWORD`, `SUPABASE_ANON_KEY`) and jq/error checks for missing tokens.
+- Verification: `bash -n scripts/demo-smoke.sh`, `npm run lint`, `npm run typecheck`, `./scripts/verify.sh`.
+#### Manual Checklist
+- [x] `bash -n scripts/demo-smoke.sh`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Run `scripts/demo-smoke.sh` with auto-login env vars
+#### Commit Link
+- TODO
+
+### Prompt ID: Auto-seed workspace membership in smoke (commit: TODO)
+#### Prompt
+```text
+목표: 매뉴얼 테스트(워크스페이스 멤버십 추가/쿠키 복사/SQL Editor 작업) 전부 중지.
+Codex가 service_role 권한으로 “테스트 유저 멤버십 자동 주입 + propose-transform/fork 테스트”를 무조건 통과시키는 자동화만 만든다.
+
+현상:
+- scripts/demo-smoke.sh는 Supabase password grant로 COOKIE 생성까지는 성공하지만,
+  /api/threads/propose-transform 호출에서 {"ok":false,"error":"No workspace membership."}로 500이 난다.
+- 원인: smoke가 로그인한 TEST_EMAIL 유저가 import의 workspace에 멤버가 아니거나, active workspace 유도 이전에 멤버십이 없어 막힘.
+
+요구사항(강제):
+1) scripts/demo-smoke.sh에서 COOKIE가 없으면 자동 로그인(password grant) 후 access_token을 얻는다(이미 있음).
+2) access_token(JWT)에서 user_id를 자동 추출한다(수동으로 auth.users 조회 금지):
+   - JWT payload의 "sub"가 user UUID다.
+   - base64url 디코딩은 bash로 처리하거나 node/python one-liner 사용해도 됨.
+3) service_role 키로 DB를 직접 조작해서, 이 TEST 유저를 “import가 속한 workspace”의 멤버로 자동 등록한다.
+   - 테이블: public.workspace_members
+   - 유니크: (workspace_id, user_id)
+   - role은 'member'(기본값 있지만 명시해도 됨)
+   - 중복이어도 실패하지 않게 upsert 또는 on_conflict do nothing 동작으로.
+4) import의 workspace_id는 service_role로 public.metric_imports에서 가져온다:
+   - metric_imports.id == IMPORT_ID
+   - select workspace_id
+5) 위 멤버십 주입이 끝난 뒤에야 기존 propose-transform API 호출을 진행한다.
+6) 절대 매뉴얼(브라우저 쿠키 복사/SQL Editor insert)을 요구하지 않는다.
+7) 시크릿은 절대 echo로 출력하지 말고, 실패 시에도 키/토큰은 마스킹한다.
+
+구현 상세:
+A) demo-smoke.sh에 env 추가/정리:
+- 필수: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, TEST_EMAIL, TEST_PASSWORD, IMPORT_ID
+- 선택: BASE_URL (default http://localhost:3000)
+- COOKIE는 optional (없으면 자동 로그인)
+
+B) helper 함수 추가:
+- decode_jwt_sub(access_token) -> user_id
+- supabase_rest_get(path, use_service_role=1) / supabase_rest_post(...)
+
+C) workspace_id 조회(service role):
+GET ${SUPABASE_URL}/rest/v1/metric_imports?id=eq.${IMPORT_ID}&select=workspace_id
+
+D) workspace_members upsert(service role):
+POST ${SUPABASE_URL}/rest/v1/workspace_members?on_conflict=workspace_id,user_id
+
+E) propose-transform 호출은 기존대로(쿠키 기반)
+F) propose-transform 호출 전에 workspace_members row 존재 assert
+
+검증:
+- bash -n scripts/demo-smoke.sh
+- 실제 실행에서 PASS가 나와야 한다.
+
+실행 커맨드(문서에 적어줘):
+SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... TEST_EMAIL=... TEST_PASSWORD=... IMPORT_ID=... BASE_URL=http://localhost:3000 bash scripts/demo-smoke.sh
+
+Output:
+- demo-smoke.sh patch(diff)
+- 간단한 README 주석(필요 env와 실행법)
+- Suggested commit: test(smoke): auto-seed workspace membership with service role
+```
+#### Result
+- Reworked `scripts/demo-smoke.sh` to always run password grant login, decode `access_token` JWT `sub` into `user_id`, and auto-seed workspace membership with `service_role` before any propose-transform call.
+- Added helper functions `decode_jwt_sub`, `supabase_rest_get`, `supabase_rest_post`, plus service-role checks for:
+  - `metric_imports(id=IMPORT_ID) -> workspace_id`
+  - upsert into `workspace_members` (`on_conflict=workspace_id,user_id`, role=`member`)
+  - preflight assert that membership row exists.
+- Added secret masking helper so failure logs redact keys/tokens/JWT-like payloads.
+- Added README section for required env and exact smoke command.
+#### Manual Checklist
+- [x] `bash -n scripts/demo-smoke.sh`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Real smoke run with valid Supabase creds/import id (blocked: required env not present in current shell)
+#### Commit Link
+- TODO
+
+### Prompt ID: Fix ThreadDetailPage performance measure runtime error (commit: TODO)
+#### Prompt
+```text
+Fix runtime error on /threads/[id]:
+"Failed to execute 'measure' on 'Performance': 'ThreadDetailPage' cannot have a negative time stamp."
+
+Goal:
+Remove or harden any client-side Performance API instrumentation that measures "ThreadDetailPage" and causes negative timestamps.
+
+Tasks:
+1) Search the repo for any of:
+   - "ThreadDetailPage"
+   - performance.measure(
+   - performance.mark(
+   - "measure('ThreadDetailPage"
+   - "mark('ThreadDetailPage"
+   Use ripgrep and show the exact file+line you find.
+
+2) Fix:
+   - Prefer removing the measurement entirely (fastest, safest for hackathon).
+   - If you keep it, NEVER pass startTime/endTime as numbers derived from epoch timestamps.
+     Use marks without explicit startTime (performance.mark("...")) and measure via mark names:
+       performance.mark("ThreadDetailPage:start")
+       performance.mark("ThreadDetailPage:end")
+       performance.measure("ThreadDetailPage", "ThreadDetailPage:start", "ThreadDetailPage:end")
+     Wrap in try/catch so it can never crash the page.
+
+3) Ensure this fix applies to the thread detail page that currently crashes:
+   - statrumble/app/threads/[id]/page.tsx and any related client components.
+
+4) Verification:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+   - Manual quick: open /threads/<id> pages should render (no Runtime TypeError).
+
+Output:
+- Patch diff
+- Short explanation of the root cause and what was changed.
+Suggested commit:
+fix(ui): remove unsafe performance.measure instrumentation
+```
+#### Result
+- Searched all requested patterns with ripgrep; the only match was `ThreadDetailPage` function name at `statrumble/app/threads/[id]/page.tsx:215`.
+- No direct `performance.measure` / `performance.mark` calls were found in app code.
+- Renamed the page export from `ThreadDetailPage` to `Page` in `statrumble/app/threads/[id]/page.tsx` to remove the crashing measurement label from runtime instrumentation paths.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual quick check: open `/threads/<id>` and confirm no runtime TypeError
 #### Commit Link
 - TODO

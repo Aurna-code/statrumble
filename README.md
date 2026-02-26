@@ -66,3 +66,11 @@ npm run verify
 - No API keys in repository. Use local environment variables only.
 - `arena_threads.visibility` exists for future public/invite flows, but current RLS behavior remains workspace-private.
 - Public thread exposure will require separate public-data policies for imports/snapshots before enabling `visibility='public'`.
+
+## Demo Smoke (Auto Membership Seed)
+- Required env: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `TEST_EMAIL`, `TEST_PASSWORD`, `IMPORT_ID`
+- Optional env: `BASE_URL` (default `http://localhost:3000`), `COOKIE`
+- Run:
+```bash
+SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... TEST_EMAIL=... TEST_PASSWORD=... IMPORT_ID=... BASE_URL=http://localhost:3000 bash scripts/demo-smoke.sh
+```

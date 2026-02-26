@@ -8,10 +8,22 @@ export type ThreadMetricMeta = {
   unit: string | null;
 };
 
+type ThreadProposalFields = {
+  kind: string;
+  parent_thread_id?: string | null;
+  transform_prompt?: string | null;
+  transform_spec?: unknown | null;
+  transform_sql_preview?: string | null;
+  transform_stats?: unknown | null;
+  transform_diff_report?: unknown | null;
+};
+
 type ThreadRow = {
   id: string;
   workspace_id: string;
   visibility: "workspace" | "invite" | "public";
+  kind: string;
+  parent_thread_id: string | null;
   metric_id: string | null;
   import_id: string;
   start_ts: string;
@@ -19,11 +31,17 @@ type ThreadRow = {
   snapshot: unknown;
   referee_report: unknown;
   referee_report_updated_at: string | null;
+  transform_prompt: string | null;
+  transform_spec: unknown | null;
+  transform_sql_preview: string | null;
+  transform_stats: unknown | null;
+  transform_diff_report: unknown | null;
   created_at: string;
   metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
 };
 
-export type ArenaThread = Omit<ThreadRow, "metrics"> & {
+export type ArenaThread = Omit<ThreadRow, "metrics" | keyof ThreadProposalFields> &
+  ThreadProposalFields & {
   metric: ThreadMetricMeta | null;
 };
 
@@ -34,10 +52,13 @@ type ThreadListRow = {
   end_ts: string;
   metric_id: string | null;
   visibility: "workspace" | "invite" | "public";
+  kind: string;
+  parent_thread_id: string | null;
   metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
 };
 
-export type ArenaThreadListItem = Omit<ThreadListRow, "metrics"> & {
+export type ArenaThreadListItem = Omit<ThreadListRow, "metrics" | keyof ThreadProposalFields> &
+  ThreadProposalFields & {
   metric: ThreadMetricMeta | null;
 };
 
@@ -57,9 +78,7 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("arena_threads")
-    .select(
-      "id, workspace_id, visibility, metric_id, import_id, start_ts, end_ts, snapshot, referee_report, referee_report_updated_at, created_at, metrics(name, unit)",
-    )
+    .select("*, metrics(name, unit)")
     .eq("id", threadId)
     .maybeSingle();
 
@@ -72,20 +91,11 @@ export async function getThread(threadId: string): Promise<ArenaThread | null> {
   }
 
   const row = data as ThreadRow;
+  const { metrics, ...thread } = row;
 
   return {
-    id: row.id,
-    workspace_id: row.workspace_id,
-    visibility: row.visibility,
-    metric_id: row.metric_id,
-    import_id: row.import_id,
-    start_ts: row.start_ts,
-    end_ts: row.end_ts,
-    snapshot: row.snapshot,
-    referee_report: row.referee_report,
-    referee_report_updated_at: row.referee_report_updated_at,
-    created_at: row.created_at,
-    metric: pickMetric(row.metrics),
+    ...thread,
+    metric: pickMetric(metrics),
   };
 }
 
@@ -94,7 +104,7 @@ export async function listThreads(limit = 20): Promise<ArenaThreadListItem[]> {
   const workspaceId = await getRequiredActiveWorkspaceId();
   const { data, error } = await supabase
     .from("arena_threads")
-    .select("id, created_at, start_ts, end_ts, metric_id, visibility, metrics(name, unit)")
+    .select("id, created_at, start_ts, end_ts, metric_id, visibility, kind, parent_thread_id, metrics(name, unit)")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -103,13 +113,12 @@ export async function listThreads(limit = 20): Promise<ArenaThreadListItem[]> {
     throw new Error(`Failed to list threads: ${error.message}`);
   }
 
-  return ((data as ThreadListRow[] | null) ?? []).map((row) => ({
-    id: row.id,
-    created_at: row.created_at,
-    start_ts: row.start_ts,
-    end_ts: row.end_ts,
-    metric_id: row.metric_id,
-    visibility: row.visibility,
-    metric: pickMetric(row.metrics),
-  }));
+  return ((data as ThreadListRow[] | null) ?? []).map((row) => {
+    const { metrics, ...thread } = row;
+
+    return {
+      ...thread,
+      metric: pickMetric(metrics),
+    };
+  });
 }

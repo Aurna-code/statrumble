@@ -45,7 +45,7 @@ export default async function PublicDecisionPage({ params }: PublicDecisionPageP
       <div className="rounded-lg border border-zinc-200 bg-white p-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Public Decision</p>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-900">{decision.title}</h1>
-        <p className="mt-3 text-sm text-zinc-700">{decision.summary ?? "요약 없음"}</p>
+        <p className="mt-3 text-sm text-zinc-700">{decision.summary ?? "No summary"}</p>
         <div className="mt-4 grid gap-2 text-sm text-zinc-600 md:grid-cols-2">
           <p>
             Snapshot Start: <span className="font-medium">{formatDateLabel(decision.snapshot_start)}</span>

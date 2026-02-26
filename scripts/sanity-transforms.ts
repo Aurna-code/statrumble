@@ -59,6 +59,7 @@ const clippedByDefault = applyTransform(
 
 assert.equal(clippedByDefault.series.length, outlierSeries.length);
 assert.equal(clippedByDefault.stats.outliers_removed, 0);
+assert.equal(clippedByDefault.stats.outliers_clipped > 0, true);
 assert.equal(Math.max(...clippedByDefault.series.map((point) => point.value)) < 200, true);
 
 const removedOutliers = applyTransform(

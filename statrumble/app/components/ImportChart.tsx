@@ -266,7 +266,7 @@ export default function ImportChart({ imports }: ImportChartProps) {
   }
 
   if (imports.length === 0) {
-    return <p className="mt-2 text-sm text-zinc-600">아직 import가 없습니다. CSV를 먼저 업로드하세요.</p>;
+    return <p className="mt-2 text-sm text-zinc-600">No imports yet. Upload a CSV first.</p>;
   }
 
   return (
@@ -289,11 +289,11 @@ export default function ImportChart({ imports }: ImportChartProps) {
         </select>
       </div>
 
-      {isPointsLoading ? <p className="text-sm text-zinc-600">포인트 로딩 중...</p> : null}
-      {pointsError ? <p className="text-sm text-red-600">조회 실패: {pointsError}</p> : null}
+      {isPointsLoading ? <p className="text-sm text-zinc-600">Loading points...</p> : null}
+      {pointsError ? <p className="text-sm text-red-600">Load failed: {pointsError}</p> : null}
 
       {!isPointsLoading && !pointsError && points.length === 0 ? (
-        <p className="text-sm text-zinc-600">선택한 import에 표시할 포인트가 없습니다.</p>
+        <p className="text-sm text-zinc-600">No points to display for the selected import.</p>
       ) : null}
 
       {points.length > 0 ? (
@@ -332,14 +332,14 @@ export default function ImportChart({ imports }: ImportChartProps) {
           </div>
 
           <p className="text-xs text-zinc-600">
-            표시 포인트: {points.length}
-            {totalPoints !== null ? ` / 전체 ${totalPoints}` : ""}
+            Visible points: {points.length}
+            {totalPoints !== null ? ` / total ${totalPoints}` : ""}
             {sampled ? " (sampled)" : ""}
           </p>
 
           {selectedRange ? (
             <p className="text-sm text-zinc-700">
-              선택 구간: {formatDateLabel(selectedRange.startTs)} ~ {formatDateLabel(selectedRange.endTs)}
+              Selected range: {formatDateLabel(selectedRange.startTs)} ~ {formatDateLabel(selectedRange.endTs)}
             </p>
           ) : null}
 
@@ -355,7 +355,7 @@ export default function ImportChart({ imports }: ImportChartProps) {
             <TransformProposalCreateForm importId={selectedImportId} disabled={!selectedImportId} />
           </div>
 
-          {threadError ? <p className="text-sm text-red-600">스레드 생성 실패: {threadError}</p> : null}
+          {threadError ? <p className="text-sm text-red-600">Thread creation failed: {threadError}</p> : null}
         </div>
       ) : null}
     </div>

@@ -44,6 +44,7 @@ type ComparableStats = {
   count_before: number;
   count_after: number;
   outliers_removed: number;
+  outliers_clipped: number;
   mean: number | null;
   std: number | null;
   slope: number | null;
@@ -103,6 +104,9 @@ function extractComparableStatsFromRecord(record: Record<string, unknown> | null
   const countBefore = asFiniteNumber(record.count_before);
   const countAfter = asFiniteNumber(record.count_after);
   const outliersRemoved = asFiniteNumber(record.outliers_removed);
+  const outliersClippedRaw = record.outliers_clipped;
+  const outliersClipped =
+    outliersClippedRaw === undefined || outliersClippedRaw === null ? 0 : asFiniteNumber(outliersClippedRaw);
   const mean = asNullableFiniteNumber(record.mean);
   const std = asNullableFiniteNumber(record.std);
   const slope = asNullableFiniteNumber(record.slope);
@@ -111,6 +115,7 @@ function extractComparableStatsFromRecord(record: Record<string, unknown> | null
     countBefore === null ||
     countAfter === null ||
     outliersRemoved === null ||
+    outliersClipped === null ||
     mean === undefined ||
     std === undefined ||
     slope === undefined
@@ -137,6 +142,7 @@ function extractComparableStatsFromRecord(record: Record<string, unknown> | null
     count_before: countBefore,
     count_after: countAfter,
     outliers_removed: outliersRemoved,
+    outliers_clipped: outliersClipped,
     mean,
     std,
     slope,
@@ -164,28 +170,30 @@ function readDeltaValue(deltas: Record<string, unknown> | null, key: string): nu
   return asFiniteNumber(delta) ?? undefined;
 }
 
-function formatSignedNumber(value: number | null | undefined, digits = 2) {
+function formatSignedNumber(value: number | null | undefined, digits = 4) {
   if (value === null || value === undefined) {
-    return "-";
+    return "—";
   }
 
-  const formatted = value.toLocaleString("ko-KR", {
+  const sign = value < 0 ? "-" : "+";
+  const formatted = Math.abs(value).toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 
-  return value > 0 ? `+${formatted}` : formatted;
+  return `${sign}${formatted}`;
 }
 
 function formatSignedCount(value: number | null | undefined) {
   if (value === null || value === undefined) {
-    return "-";
+    return "—";
   }
 
   const rounded = Math.round(value);
-  const formatted = rounded.toLocaleString("ko-KR");
+  const sign = rounded < 0 ? "-" : "+";
+  const formatted = Math.abs(rounded).toLocaleString("en-US");
 
-  return rounded > 0 ? `+${formatted}` : formatted;
+  return `${sign}${formatted}`;
 }
 
 function resolveProposalTitle(thread: unknown) {
@@ -198,7 +206,7 @@ function formatNumber(value: number | null | undefined, digits = 2) {
     return "-";
   }
 
-  return value.toLocaleString("ko-KR", {
+  return value.toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -209,7 +217,7 @@ function formatCount(value: number | null | undefined) {
     return "-";
   }
 
-  return Math.round(value).toLocaleString("ko-KR");
+  return Math.round(value).toLocaleString("en-US");
 }
 
 export default async function Page({ params }: ThreadPageProps) {
@@ -224,7 +232,7 @@ export default async function Page({ params }: ThreadPageProps) {
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">Thread #{id}</h1>
         <p className="mt-2 text-sm text-red-600">
-          조회 실패: {error instanceof Error ? error.message : "Unknown error"}
+          Load failed: {error instanceof Error ? error.message : "Unknown error"}
         </p>
       </main>
     );
@@ -260,22 +268,46 @@ export default async function Page({ params }: ThreadPageProps) {
   const diffReport = asRecord(thread.transform_diff_report);
   const diffError = asNonEmptyString(diffReport?.error);
   const deltas = asRecord(diffReport?.deltas);
+  const countBeforeDelta = readDeltaValue(deltas, "count_before");
+  const countAfterDelta = readDeltaValue(deltas, "count_after");
+  const outliersRemovedDelta = readDeltaValue(deltas, "outliers_removed");
+  const outliersClippedDelta = readDeltaValue(deltas, "outliers_clipped");
   const meanDelta = readDeltaValue(deltas, "mean");
   const stdDelta = readDeltaValue(deltas, "std");
   const slopeDelta = readDeltaValue(deltas, "slope");
-  const countAfterDelta = readDeltaValue(deltas, "count_after");
   const hasCompareSection = isTransformProposal && (Boolean(thread.parent_thread_id) || diffReport !== null);
+  const explicitDeltaValues = [
+    countBeforeDelta,
+    countAfterDelta,
+    outliersRemovedDelta,
+    outliersClippedDelta,
+    meanDelta,
+    stdDelta,
+    slopeDelta,
+  ];
+  const hasExplicitDelta = explicitDeltaValues.some((value) => value !== null && value !== undefined);
+  const countDeltasForHint = [countBeforeDelta, countAfterDelta, outliersRemovedDelta, outliersClippedDelta].map((value) =>
+    value === null || value === undefined ? 0 : Math.round(value),
+  );
+  const floatDeltasForHint = [meanDelta, stdDelta, slopeDelta].map((value) => (value === null || value === undefined ? 0 : value));
+  const hasLittleToNoChange =
+    hasExplicitDelta &&
+    countDeltasForHint.every((value) => value === 0) &&
+    floatDeltasForHint.every((value) => Math.abs(value) < 0.0001);
   const compareItems = [
+    { label: "Count Before Δ", value: formatSignedCount(countBeforeDelta) },
+    { label: "Count After Δ", value: formatSignedCount(countAfterDelta) },
+    { label: "Outliers Removed Δ", value: formatSignedCount(outliersRemovedDelta) },
+    { label: "Outliers Clipped Δ", value: formatSignedCount(outliersClippedDelta) },
     { label: "Mean Δ", value: formatSignedNumber(meanDelta) },
     { label: "Std Δ", value: formatSignedNumber(stdDelta) },
     { label: "Slope Δ", value: formatSignedNumber(slopeDelta) },
-    { label: "Count After Δ", value: formatSignedCount(countAfterDelta) },
   ];
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-2xl font-semibold">Thread #{id}</h1>
-      <p className="mt-2 text-sm text-zinc-600">생성 시점 snapshot 기준으로 토론과 투표를 진행합니다.</p>
+      <p className="mt-2 text-sm text-zinc-600">Discussion and voting are based on the snapshot captured at creation time.</p>
 
       {isTransformProposal ? (
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50/50 p-5">
@@ -316,6 +348,9 @@ export default async function Page({ params }: ThreadPageProps) {
                     outliers_removed: <span className="font-medium">{formatCount(proposalStats.outliers_removed)}</span>
                   </p>
                   <p className="rounded-md border border-zinc-200 bg-white p-3">
+                    outliers_clipped: <span className="font-medium">{formatCount(proposalStats.outliers_clipped)}</span>
+                  </p>
+                  <p className="rounded-md border border-zinc-200 bg-white p-3">
                     mean: <span className="font-medium">{formatNumber(proposalStats.mean)}</span>
                   </p>
                   <p className="rounded-md border border-zinc-200 bg-white p-3">
@@ -346,16 +381,25 @@ export default async function Page({ params }: ThreadPageProps) {
             {hasCompareSection ? (
               <div>
                 <p className="text-xs font-medium text-zinc-500">Compare to parent</p>
+                <p className="mt-1 text-xs text-zinc-500">Deltas are shown as child - parent.</p>
                 {diffError ? (
-                  <p className="mt-1 rounded-md border border-zinc-200 bg-white p-3 text-zinc-600">{diffError}</p>
+                  <p className="mt-2 rounded-md border border-zinc-200 bg-white p-3 text-zinc-600">{diffError}</p>
                 ) : (
-                  <div className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                    {compareItems.map((item) => (
-                      <p key={item.label} className="rounded-md border border-zinc-200 bg-white p-3">
-                        {item.label}: <span className="font-medium">{item.value}</span>
+                  <>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      {compareItems.map((item) => (
+                        <p key={item.label} className="rounded-md border border-zinc-200 bg-white p-3">
+                          {item.label}: <span className="font-medium">{item.value}</span>
+                        </p>
+                      ))}
+                    </div>
+                    {hasLittleToNoChange ? (
+                      <p className="mt-2 text-xs text-zinc-500">
+                        This transformation shows little to no substantive change compared to the parent (the
+                        range/data may be benign or use an identical spec).
                       </p>
-                    ))}
-                  </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             ) : null}
@@ -364,7 +408,7 @@ export default async function Page({ params }: ThreadPageProps) {
       ) : null}
 
       <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">Snapshot 요약</h2>
+        <h2 className="text-base font-semibold">Snapshot Summary</h2>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
             <p className="text-xs text-zinc-500">Metric</p>
@@ -374,27 +418,27 @@ export default async function Page({ params }: ThreadPageProps) {
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">선택 구간 평균 / n</p>
+            <p className="text-xs text-zinc-500">Selected Range Avg / n</p>
             <p className="mt-1 font-medium">
               {formatNumber(selectedAvg)} / {formatCount(selectedN)}
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">직전 구간 평균 / n</p>
+            <p className="text-xs text-zinc-500">Previous Range Avg / n</p>
             <p className="mt-1 font-medium">
               {formatNumber(beforeAvg)} / {formatCount(beforeN)}
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">변화량 (abs)</p>
+            <p className="text-xs text-zinc-500">Delta (abs)</p>
             <p className="mt-1 font-medium">{formatNumber(deltaAbs)}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">변화율 (rel %)</p>
+            <p className="text-xs text-zinc-500">Delta (rel %)</p>
             <p className="mt-1 font-medium">{deltaRel === null ? "-" : `${formatNumber(deltaRel * 100)}%`}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">생성 시각</p>
+            <p className="text-xs text-zinc-500">Created At</p>
             <p className="mt-1 font-medium">{formatDateLabel(thread.created_at)}</p>
           </div>
         </div>

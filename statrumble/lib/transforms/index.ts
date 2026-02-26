@@ -88,6 +88,7 @@ export type TransformStats = {
   count_before: number;
   count_after: number;
   outliers_removed: number;
+  outliers_clipped: number;
   mean: number | null;
   std: number | null;
   slope: number | null;
@@ -98,6 +99,7 @@ export type TransformStatsDiff = {
   count_before: { before: number; after: number; delta: number };
   count_after: { before: number; after: number; delta: number };
   outliers_removed: { before: number; after: number; delta: number };
+  outliers_clipped: { before: number; after: number; delta: number };
   mean: { before: number | null; after: number | null; delta: number | null };
   std: { before: number | null; after: number | null; delta: number | null };
   slope: { before: number | null; after: number | null; delta: number | null };
@@ -106,6 +108,7 @@ export type TransformStatsDiff = {
 type FilterResult = {
   series: TransformSeriesPoint[];
   outliersRemoved: number;
+  outliersClipped: number;
 };
 
 type ValidatedSeriesPoint = {
@@ -354,11 +357,19 @@ function applyFilterOutliers(series: TransformSeriesPoint[], operation: FilterOu
     return {
       series: filtered,
       outliersRemoved: removed,
+      outliersClipped: 0,
     };
   }
 
+  let clippedCount = 0;
   const clipped = series.map((point) => {
+    const wasClipped = point.value < lower || point.value > upper;
     const nextValue = Math.min(upper, Math.max(lower, point.value));
+
+    if (wasClipped) {
+      clippedCount += 1;
+    }
+
     return {
       ...point,
       value: nextValue,
@@ -368,6 +379,7 @@ function applyFilterOutliers(series: TransformSeriesPoint[], operation: FilterOu
   return {
     series: clipped,
     outliersRemoved: 0,
+    outliersClipped: clippedCount,
   };
 }
 
@@ -432,6 +444,7 @@ function calculateSeriesStats(
   before: TransformSeriesPoint[],
   after: TransformSeriesPoint[],
   outliersRemoved: number,
+  outliersClipped: number,
   warnings: TransformWarning[],
 ): TransformStats {
   const values = after.map((point) => point.value);
@@ -443,6 +456,7 @@ function calculateSeriesStats(
     count_before: before.length,
     count_after: after.length,
     outliers_removed: outliersRemoved,
+    outliers_clipped: outliersClipped,
     mean,
     std,
     slope,
@@ -472,6 +486,7 @@ export function applyTransform(specInput: unknown, seriesInput: TransformSeriesP
   const before = normalizeSeries(seriesInput);
   let after = before;
   let outliersRemoved = 0;
+  let outliersClipped = 0;
   const warnings = new Set<TransformWarning>();
 
   for (const operation of spec.ops) {
@@ -479,6 +494,7 @@ export function applyTransform(specInput: unknown, seriesInput: TransformSeriesP
       const result = applyFilterOutliers(after, operation);
       after = result.series;
       outliersRemoved += result.outliersRemoved;
+      outliersClipped += result.outliersClipped;
       continue;
     }
 
@@ -492,7 +508,7 @@ export function applyTransform(specInput: unknown, seriesInput: TransformSeriesP
 
   return {
     series: after,
-    stats: calculateSeriesStats(before, after, outliersRemoved, [...warnings]),
+    stats: calculateSeriesStats(before, after, outliersRemoved, outliersClipped, [...warnings]),
   };
 }
 
@@ -512,6 +528,11 @@ export function compareStats(before: TransformStats, after: TransformStats): Tra
       before: before.outliers_removed,
       after: after.outliers_removed,
       delta: after.outliers_removed - before.outliers_removed,
+    },
+    outliers_clipped: {
+      before: before.outliers_clipped,
+      after: after.outliers_clipped,
+      delta: after.outliers_clipped - before.outliers_clipped,
     },
     mean: {
       before: before.mean,

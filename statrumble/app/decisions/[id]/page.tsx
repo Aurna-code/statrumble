@@ -55,7 +55,7 @@ function renderSummary(decision: DecisionCardDetail) {
     return decision.decision;
   }
 
-  return "요약 없음";
+  return "No summary";
 }
 
 export default async function DecisionDetailPage({ params }: DecisionDetailPageProps) {
@@ -78,7 +78,7 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">Decision</h1>
-        <p className="mt-2 text-sm text-zinc-600">워크스페이스에 참여해야 Decision을 확인할 수 있습니다.</p>
+        <p className="mt-2 text-sm text-zinc-600">Join a workspace to view decisions.</p>
         <OnboardingCard />
       </main>
     );
@@ -107,16 +107,16 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Decision</h1>
-          <p className="mt-2 text-sm text-zinc-600">Decision 카드 상세 보기</p>
+          <p className="mt-2 text-sm text-zinc-600">Decision detail view</p>
         </div>
         <Link href="/decisions" className="text-sm text-zinc-600 hover:text-zinc-900">
-          목록으로 돌아가기
+          Back to list
         </Link>
       </div>
 
       {loadError ? (
         <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-          <p className="text-sm text-red-600">조회 실패: {loadError}</p>
+          <p className="text-sm text-red-600">Load failed: {loadError}</p>
         </section>
       ) : decision ? (
         <section className="mt-6 space-y-6">
@@ -124,7 +124,7 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
             <h2 className="text-lg font-semibold">{decision.title}</h2>
             <p className="mt-2 text-sm text-zinc-700">{renderSummary(decision)}</p>
             <p className="mt-2 text-xs text-zinc-500">
-              공개 상태: {decision.is_public ? "Public" : "Private"}
+              Visibility: {decision.is_public ? "Public" : "Private"}
             </p>
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
               <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
@@ -146,7 +146,7 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
                   href={`/threads/${decision.thread_id}`}
                   className="text-sm text-zinc-600 hover:text-zinc-900"
                 >
-                  Thread로 이동
+                  Go to thread
                 </Link>
               </div>
             ) : null}
@@ -156,7 +156,7 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
                   href={`/p/decisions/${decision.public_id}`}
                   className="text-sm text-zinc-600 hover:text-zinc-900"
                 >
-                  Public URL 확인
+                  Open public URL
                 </Link>
               </div>
             ) : null}
@@ -175,7 +175,7 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
           ) : (
             <section className="rounded-lg border border-zinc-200 bg-white p-5">
               <h2 className="text-base font-semibold">Referee Report</h2>
-              <p className="mt-2 text-sm text-zinc-600">연결된 Referee report가 없습니다.</p>
+              <p className="mt-2 text-sm text-zinc-600">No linked referee report yet.</p>
             </section>
           )}
         </section>

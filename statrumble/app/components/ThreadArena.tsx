@@ -101,7 +101,7 @@ function formatDecimal(value: number | null, digits = 2) {
     return "-";
   }
 
-  return value.toLocaleString("ko-KR", {
+  return value.toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -112,7 +112,7 @@ function formatCount(value: number | null) {
     return "-";
   }
 
-  return Math.round(value).toLocaleString("ko-KR");
+  return Math.round(value).toLocaleString("en-US");
 }
 
 function buildQuoteSentence(snapshot: unknown) {
@@ -121,7 +121,7 @@ function buildQuoteSentence(snapshot: unknown) {
   const selectedN = formatCount(summary.selectedN);
 
   if (summary.beforeAvg === null) {
-    return `선택 구간 평균은 ${selectedAvg}(${selectedN}개)이며, 직전 구간 데이터가 없어 변화는 계산되지 않았습니다.`;
+    return `Selected range average is ${selectedAvg} (${selectedN} points). Change is not available because there is no previous range data.`;
   }
 
   const beforeAvg = formatDecimal(summary.beforeAvg);
@@ -129,7 +129,7 @@ function buildQuoteSentence(snapshot: unknown) {
   const deltaAbs = formatDecimal(summary.deltaAbs);
   const deltaRelPercent = summary.deltaRel === null ? "-" : formatDecimal(summary.deltaRel * 100);
 
-  return `선택 구간 평균은 ${selectedAvg}(${selectedN}개), 직전 구간 평균은 ${beforeAvg}(${beforeN}개), 변화는 ${deltaAbs} / ${deltaRelPercent}%.`;
+  return `Selected range average is ${selectedAvg} (${selectedN} points), previous range average is ${beforeAvg} (${beforeN} points), delta is ${deltaAbs} / ${deltaRelPercent}%.`;
 }
 
 function areMessagesEqual(left: MessageItem[], right: MessageItem[]) {
@@ -403,14 +403,14 @@ export default function ThreadArena({
               onClick={() => void refreshThreadData()}
               disabled={refreshing}
             >
-              {refreshing ? "새로고침 중..." : "새로고침"}
+              {refreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
 
           <div className="mt-4 max-h-80 space-y-3 overflow-auto pr-1">
-            {loadingMessages ? <p className="text-sm text-zinc-600">메시지 로딩 중...</p> : null}
+            {loadingMessages ? <p className="text-sm text-zinc-600">Loading messages...</p> : null}
             {!loadingMessages && messages.length === 0 ? (
-              <p className="text-sm text-zinc-600">아직 메시지가 없습니다.</p>
+              <p className="text-sm text-zinc-600">No messages yet.</p>
             ) : null}
             {messages.map((message) => (
               <article key={message.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
@@ -425,7 +425,7 @@ export default function ThreadArena({
 
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-zinc-600">Enter 전송 / Shift+Enter 줄바꿈</p>
+              <p className="text-xs text-zinc-600">Press Enter to send / Shift+Enter for newline</p>
               <button
                 type="button"
                 className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100"
@@ -443,7 +443,7 @@ export default function ThreadArena({
                   void onSendMessage();
                 }
               }}
-              placeholder="메시지를 입력하세요."
+              placeholder="Type your message."
               rows={4}
               className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
             />
@@ -454,7 +454,7 @@ export default function ThreadArena({
                 disabled={sending || !draft.trim()}
                 className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {sending ? "전송 중..." : "전송"}
+                {sending ? "Sending..." : "Send"}
               </button>
             </div>
           </div>
@@ -469,7 +469,7 @@ export default function ThreadArena({
               onClick={() => void refreshThreadData()}
               disabled={refreshing}
             >
-              {refreshing ? "새로고침 중..." : "새로고침"}
+              {refreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
 
@@ -496,8 +496,8 @@ export default function ThreadArena({
             })}
           </div>
 
-          <p className="mt-3 text-xs text-zinc-600">1인 1표이며, 다시 선택하면 투표가 변경됩니다.</p>
-          {myStance ? <p className="mt-2 text-sm text-zinc-800">내 선택: {myStance}</p> : null}
+          <p className="mt-3 text-xs text-zinc-600">One person, one vote. Selecting again updates your vote.</p>
+          {myStance ? <p className="mt-2 text-sm text-zinc-800">My vote: {myStance}</p> : null}
           {votesError ? <p className="mt-2 text-sm text-red-600">{votesError}</p> : null}
 
           <div className="mt-4">
@@ -508,7 +508,7 @@ export default function ThreadArena({
                 disabled={judging}
                 className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {judging ? "Referee 실행 중..." : "Run Referee"}
+                {judging ? "Running Referee..." : "Run Referee"}
               </button>
               <button
                 type="button"
@@ -517,7 +517,7 @@ export default function ThreadArena({
                     return;
                   }
 
-                  const confirmed = window.confirm("비용이 발생할 수 있습니다. 재판정하시겠습니까?");
+                  const confirmed = window.confirm("This may incur cost. Re-run referee?");
 
                   if (confirmed) {
                     void onRunReferee(true);
@@ -526,7 +526,7 @@ export default function ThreadArena({
                 disabled={judging}
                 className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {judging ? "재판정 중..." : "Re-run (costs)"}
+                {judging ? "Re-running..." : "Re-run (costs)"}
               </button>
               {refereeReused ? (
                 <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
@@ -552,7 +552,7 @@ export default function ThreadArena({
                 disabled={promoting}
                 className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {promoting ? "승격 중..." : "Promote to Decision"}
+                {promoting ? "Promoting..." : "Promote to Decision"}
               </button>
             )}
             {promoteError ? <p className="text-sm text-red-600">{promoteError}</p> : null}
@@ -565,7 +565,7 @@ export default function ThreadArena({
       ) : (
         <section className="rounded-lg border border-zinc-200 bg-white p-5">
           <h2 className="text-base font-semibold">Referee Report</h2>
-          <p className="mt-2 text-sm text-zinc-600">아직 생성된 Referee report가 없습니다.</p>
+          <p className="mt-2 text-sm text-zinc-600">No referee report yet.</p>
         </section>
       )}
     </div>

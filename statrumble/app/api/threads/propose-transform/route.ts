@@ -254,6 +254,9 @@ function parseComparableStats(value: unknown): TransformStats | null {
   const countBefore = asFiniteNumber(record.count_before);
   const countAfter = asFiniteNumber(record.count_after);
   const outliersRemoved = asFiniteNumber(record.outliers_removed);
+  const outliersClippedRaw = record.outliers_clipped;
+  const outliersClipped =
+    outliersClippedRaw === undefined || outliersClippedRaw === null ? 0 : asFiniteNumber(outliersClippedRaw);
   const mean = asNullableFiniteNumber(record.mean);
   const std = asNullableFiniteNumber(record.std);
   const slope = asNullableFiniteNumber(record.slope);
@@ -262,6 +265,7 @@ function parseComparableStats(value: unknown): TransformStats | null {
     countBefore === null ||
     countAfter === null ||
     outliersRemoved === null ||
+    outliersClipped === null ||
     mean === undefined ||
     std === undefined ||
     slope === undefined
@@ -292,6 +296,7 @@ function parseComparableStats(value: unknown): TransformStats | null {
     count_before: countBefore,
     count_after: countAfter,
     outliers_removed: outliersRemoved,
+    outliers_clipped: outliersClipped,
     mean,
     std,
     slope,

@@ -268,8 +268,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     };
 
     const systemContent =
-      "너는 데이터 논쟁의 Referee다. 제공된 snapshot/votes/messages만 근거로 판단하라. 모르는 내용은 추정하지 말고 confounders/next_checks에 명시하고 verdict.leading은 unclear를 사용할 수 있다. data_facts는 반드시 주어진 숫자/문장에서 직접 인용 가능한 사실만 작성하라. 출력은 반드시 JSON만 반환하고 스키마를 정확히 준수하라. 모든 문장은 가능한 한 한국어로 작성하라. 모든 string 필드는 줄바꿈 없이 한 줄로 작성하고, 줄바꿈이 필요하면 \\n 이스케이프를 사용하라.";
-    const userContent = `다음 입력을 바탕으로 referee_report JSON을 생성하라.\n\n${JSON.stringify(modelInput, null, 2)}`;
+      "You are the Referee for a data debate. Use only the provided snapshot/votes/messages as evidence. Do not guess unknown facts; record uncertainty in confounders/next_checks and use verdict.leading=unclear when needed. data_facts must be directly traceable to provided numbers/text. Output JSON only and strictly follow the schema. Keep all string fields single-line; if needed, use escaped \\n sequences.";
+    const userContent = `Generate referee_report JSON from the following input.\n\n${JSON.stringify(modelInput, null, 2)}`;
 
     const primaryRaw = await requestRefereeOutput({
       openai,

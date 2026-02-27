@@ -213,7 +213,7 @@ export default function WorkspacesHub({
                 role: {activeWorkspace.role} · joined {formatJoinedAt(activeWorkspace.joined_at)}
               </p>
             ) : (
-              <p className="mt-1 text-sm text-zinc-600">워크스페이스를 선택해 주세요.</p>
+              <p className="mt-1 text-sm text-zinc-600">Please select a workspace.</p>
             )}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -244,7 +244,7 @@ export default function WorkspacesHub({
           <div className="flex items-baseline justify-between gap-2">
             <div>
               <h2 className="text-lg font-semibold">Workspace Public Portal</h2>
-              <p className="mt-1 text-sm text-zinc-600">공개 워크스페이스 포털을 설정합니다.</p>
+              <p className="mt-1 text-sm text-zinc-600">Configure the public workspace portal.</p>
             </div>
           </div>
           <div className="mt-4">
@@ -261,7 +261,7 @@ export default function WorkspacesHub({
         <div className="flex items-baseline justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">Your workspaces</h2>
-            <p className="mt-1 text-sm text-zinc-600">role, joined_at, invite 상태를 확인하고 전환하세요.</p>
+            <p className="mt-1 text-sm text-zinc-600">Review and manage role, joined_at, and invite status.</p>
           </div>
           <p className="text-xs text-zinc-500">{memberships.length} total</p>
         </div>
@@ -311,7 +311,7 @@ export default function WorkspacesHub({
                 </div>
                 {isLastOwner ? (
                   <p className="mt-2 text-xs text-amber-700">
-                    마지막 owner라서 나갈 수 없습니다. 다른 owner를 지정하거나 워크스페이스를 삭제하세요.
+                    You cannot leave because you are the last owner. Promote another owner or delete the workspace.
                   </p>
                 ) : null}
 
@@ -340,7 +340,7 @@ export default function WorkspacesHub({
         <div className="flex items-baseline justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">Members</h2>
-            <p className="mt-1 text-sm text-zinc-600">active workspace 멤버를 확인하고 owner로 승격하세요.</p>
+            <p className="mt-1 text-sm text-zinc-600">Review members of the active workspace and promote them to owner.</p>
           </div>
           <p className="text-xs text-zinc-500">{canShowMembers ? members.length : 0} total</p>
         </div>
@@ -352,15 +352,15 @@ export default function WorkspacesHub({
         ) : null}
 
         {!activeWorkspace ? (
-          <p className="mt-3 text-sm text-zinc-600">워크스페이스를 선택해 주세요.</p>
+          <p className="mt-3 text-sm text-zinc-600">Please select a workspace.</p>
         ) : !isActiveOwner ? (
-          <p className="mt-3 text-sm text-zinc-600">owner만 멤버를 승격할 수 있습니다.</p>
+          <p className="mt-3 text-sm text-zinc-600">Only owners can promote members.</p>
         ) : membersError ? (
-          <p className="mt-3 text-sm text-zinc-600">멤버를 불러오지 못했습니다.</p>
+          <p className="mt-3 text-sm text-zinc-600">Failed to load members.</p>
         ) : !canShowMembers ? (
-          <p className="mt-3 text-sm text-zinc-600">멤버를 불러오는 중입니다.</p>
+          <p className="mt-3 text-sm text-zinc-600">Loading members...</p>
         ) : members.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-600">표시할 멤버가 없습니다.</p>
+          <p className="mt-3 text-sm text-zinc-600">No members to display.</p>
         ) : (
           <ul className="mt-4 space-y-3">
             {members.map((member) => {

@@ -224,7 +224,7 @@ export default async function Page({ params }: ThreadPageProps) {
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">Thread #{id}</h1>
         <p className="mt-2 text-sm text-red-600">
-          조회 실패: {error instanceof Error ? error.message : "Unknown error"}
+          Failed to load: {error instanceof Error ? error.message : "Unknown error"}
         </p>
       </main>
     );
@@ -275,7 +275,7 @@ export default async function Page({ params }: ThreadPageProps) {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-2xl font-semibold">Thread #{id}</h1>
-      <p className="mt-2 text-sm text-zinc-600">생성 시점 snapshot 기준으로 토론과 투표를 진행합니다.</p>
+      <p className="mt-2 text-sm text-zinc-600">Debate and vote based on the snapshot at creation time.</p>
 
       {isTransformProposal ? (
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50/50 p-5">
@@ -364,7 +364,7 @@ export default async function Page({ params }: ThreadPageProps) {
       ) : null}
 
       <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">Snapshot 요약</h2>
+        <h2 className="text-base font-semibold">Snapshot Summary</h2>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
             <p className="text-xs text-zinc-500">Metric</p>
@@ -374,27 +374,27 @@ export default async function Page({ params }: ThreadPageProps) {
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">선택 구간 평균 / n</p>
+            <p className="text-xs text-zinc-500">Selected range avg / n</p>
             <p className="mt-1 font-medium">
               {formatNumber(selectedAvg)} / {formatCount(selectedN)}
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">직전 구간 평균 / n</p>
+            <p className="text-xs text-zinc-500">Prior range avg / n</p>
             <p className="mt-1 font-medium">
               {formatNumber(beforeAvg)} / {formatCount(beforeN)}
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">변화량 (abs)</p>
+            <p className="text-xs text-zinc-500">Change (abs)</p>
             <p className="mt-1 font-medium">{formatNumber(deltaAbs)}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">변화율 (rel %)</p>
+            <p className="text-xs text-zinc-500">Change (rel %)</p>
             <p className="mt-1 font-medium">{deltaRel === null ? "-" : `${formatNumber(deltaRel * 100)}%`}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">생성 시각</p>
+            <p className="text-xs text-zinc-500">Created at</p>
             <p className="mt-1 font-medium">{formatDateLabel(thread.created_at)}</p>
           </div>
         </div>

@@ -36,7 +36,7 @@ export default function WorkspacePublicPortalControls({
   const [error, setError] = useState<string | null>(null);
 
   const statusLabel = useMemo(() => {
-    return isPublic ? "공개 상태입니다." : "비공개 상태입니다.";
+    return isPublic ? "Published." : "Not published.";
   }, [isPublic]);
 
   async function onToggle() {
@@ -93,7 +93,7 @@ export default function WorkspacePublicPortalControls({
     try {
       await navigator.clipboard.writeText(fullUrl);
     } catch {
-      setError("복사에 실패했습니다.");
+      setError("Failed to copy.");
     }
   }
 
@@ -110,7 +110,7 @@ export default function WorkspacePublicPortalControls({
           disabled={saving}
           className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "저장 중..." : isPublic ? "Unpublish" : "Publish"}
+          {saving ? "Saving..." : isPublic ? "Unpublish" : "Publish"}
         </button>
       </div>
 
@@ -129,7 +129,7 @@ export default function WorkspacePublicPortalControls({
       ) : null}
 
       {!isPublic ? (
-        <p className="mt-2 text-xs text-zinc-600">Unpublish 상태에서는 공개 URL이 404로 응답합니다.</p>
+        <p className="mt-2 text-xs text-zinc-600">When unpublished, the public URL returns a 404.</p>
       ) : null}
 
       {error ? <p className="mt-2 text-xs text-red-600">{error}</p> : null}

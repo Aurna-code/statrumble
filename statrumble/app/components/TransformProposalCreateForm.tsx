@@ -153,7 +153,7 @@ export default function TransformProposalCreateForm({ importId, disabled = false
           />
 
           <p className="text-xs text-zinc-500">
-            예시: IQR 기준으로 extreme outlier를 clip하고 추세를 유지해줘. / 7-point moving average를 적용하고 변화 요약을 보여줘.
+            Example: Clip extreme outliers using IQR while preserving the trend. / Apply a 7-point moving average and summarize the change.
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -174,7 +174,7 @@ export default function TransformProposalCreateForm({ importId, disabled = false
             </button>
           </div>
 
-          {error ? <p className="text-xs text-red-600">제안 생성 실패: {error}</p> : null}
+          {error ? <p className="text-xs text-red-600">Failed to create proposal: {error}</p> : null}
           {issues.length > 0 ? (
             <ul className="space-y-1 text-xs text-red-600">
               {issues.map((issue) => (

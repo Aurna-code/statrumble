@@ -8,13 +8,13 @@ import {
 const cases = [
   {
     input: "2026-02-25T15:00:00Z",
-    expectedUi: "2026. 2. 26. 오전 12:00:00",
+    expectedUi: "2026. 2. 26. AM 12:00:00",
     expectedDate: "2026. 2. 26.",
     expected24: "2026.02.26 00:00:00",
   },
   {
     input: "2026-02-25T00:02:35Z",
-    expectedUi: "2026. 2. 25. 오전 9:02:35",
+    expectedUi: "2026. 2. 25. AM 9:02:35",
     expectedDate: "2026. 2. 25.",
     expected24: "2026.02.25 09:02:35",
   },

@@ -32,7 +32,7 @@ export default async function Home() {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
-        <p className="mt-2 text-sm text-zinc-600">데이터 토론을 시작하려면 워크스페이스에 먼저 참여하세요.</p>
+        <p className="mt-2 text-sm text-zinc-600">Join a workspace to start a data debate.</p>
         <OnboardingCard />
       </main>
     );
@@ -63,17 +63,17 @@ export default async function Home() {
       </p>
 
       <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="font-medium">CSV 업로드</h2>
-        <p className="mt-1 text-sm text-zinc-600">업로드 UI 자리표시</p>
+        <h2 className="font-medium">CSV Upload</h2>
+        <p className="mt-1 text-sm text-zinc-600">Upload UI placeholder</p>
         <UploadCsvForm />
       </section>
 
       <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="font-medium">차트</h2>
-        <p className="mt-1 text-sm text-zinc-600">Import를 선택하고 구간을 지정해 Arena Thread를 생성합니다.</p>
+        <h2 className="font-medium">Chart</h2>
+        <p className="mt-1 text-sm text-zinc-600">Select an import and a range to create an Arena Thread.</p>
         {importsError ? (
           <p className="mt-2 text-sm text-red-600">
-            조회 실패: {importsError instanceof Error ? importsError.message : "Unknown error"}
+            Failed to load: {importsError instanceof Error ? importsError.message : "Unknown error"}
           </p>
         ) : (
           <ImportChart imports={importsForChart} />
@@ -81,13 +81,13 @@ export default async function Home() {
       </section>
 
       <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="font-medium">스레드 목록</h2>
+        <h2 className="font-medium">Threads</h2>
         {threadsError ? (
           <p className="mt-2 text-sm text-red-600">
-            조회 실패: {threadsError instanceof Error ? threadsError.message : "Unknown error"}
+            Failed to load: {threadsError instanceof Error ? threadsError.message : "Unknown error"}
           </p>
         ) : threads.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-600">아직 없음</p>
+          <p className="mt-2 text-sm text-zinc-600">None yet</p>
         ) : (
           <ul className="mt-3 space-y-2 text-sm">
             {threads.map((thread) => (
@@ -117,10 +117,10 @@ export default async function Home() {
           <h2 className="font-medium">Metrics</h2>
           {metricsError ? (
             <p className="mt-2 text-sm text-red-600">
-              조회 실패: {metricsError instanceof Error ? metricsError.message : "Unknown error"}
+              Failed to load: {metricsError instanceof Error ? metricsError.message : "Unknown error"}
             </p>
           ) : metrics.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">아직 없음</p>
+            <p className="mt-2 text-sm text-zinc-600">None yet</p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
               {metrics.map((metric) => (
@@ -137,13 +137,13 @@ export default async function Home() {
         </div>
 
         <div className="rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="font-medium">Imports (최신 10개)</h2>
+          <h2 className="font-medium">Imports (latest 10)</h2>
           {importsError ? (
             <p className="mt-2 text-sm text-red-600">
-              조회 실패: {importsError instanceof Error ? importsError.message : "Unknown error"}
+              Failed to load: {importsError instanceof Error ? importsError.message : "Unknown error"}
             </p>
           ) : imports.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">아직 없음</p>
+            <p className="mt-2 text-sm text-zinc-600">None yet</p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
               {imports.map((item) => (

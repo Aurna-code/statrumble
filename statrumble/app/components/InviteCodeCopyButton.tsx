@@ -19,7 +19,7 @@ export default function InviteCodeCopyButton({ inviteCode }: InviteCodeCopyButto
         setCopied(false);
       }, 1500);
     } catch {
-      setError("복사에 실패했습니다.");
+      setError("Failed to copy.");
     }
   }
 

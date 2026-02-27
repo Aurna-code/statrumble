@@ -64,7 +64,7 @@ export default function CreateWorkspacePage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-2xl font-semibold">Create Workspace</h1>
-      <p className="mt-2 text-sm text-zinc-600">새 워크스페이스를 만들고 owner로 시작합니다.</p>
+      <p className="mt-2 text-sm text-zinc-600">Create a new workspace and start as the owner.</p>
 
       <section className="mt-6 max-w-md rounded-lg border border-zinc-200 bg-white p-5">
         <form className="space-y-4" onSubmit={onSubmit}>

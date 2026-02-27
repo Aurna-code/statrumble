@@ -4035,3 +4035,144 @@ Output
 - [ ] Manual nav: Join hidden when membership exists, visible otherwise
 #### Commit Link
 - TODO
+
+### Prompt ID: Arena chart state in URL + return-to-Arena context + remove scaffolding copy (commit: TODO)
+#### Prompt
+```text
+[Prompt] Arena chart state in URL + return-to-Arena context + remove scaffolding copy
+
+Context
+- Arena is the home page (statrumble/app/page.tsx) with the Chart section rendering ImportChart.
+- ImportChart is a client component (statrumble/app/components/ImportChart.tsx) holding selectedImportId + brushRange in local state.
+- Threads are created from ImportChart via POST /api/threads/create and then router.push(`/threads/${thread_id}`).
+- Goal: preserve selected import + selected range in the URL so returning from a thread to Arena restores context.
+- Also: remove “Prompt 00 scaffolding page…” and “Upload UI placeholder” copy from the home page.
+
+Constraints
+- No new dependencies.
+- Keep “Hangul 0” rule: no Korean text in code/UI copy/docs.
+- Use Tailwind only.
+- Update docs/CODEX_LOG.md and keep verification green.
+
+URL scheme (Arena)
+- Use query params:
+  - import: <uuid>
+  - start: <number>  (brush startIndex)
+  - end: <number>    (brush endIndex)
+- Use anchor #chart to scroll to the chart section.
+- Example: /?import=<uuid>&start=10&end=40#chart
+
+Tasks
+
+A) Add a stable anchor to the Chart section
+1) Edit statrumble/app/page.tsx
+- Add id="chart" on the Chart <section> so /#chart works reliably.
+
+B) Clean home page copy (remove scaffolding placeholders)
+1) Edit statrumble/app/page.tsx
+- Replace the paragraph:
+  "Prompt 00 scaffolding page. Functional logic will be implemented in later prompts."
+  with a real product description (English), e.g.:
+  "Upload a metric series, select a range, and start an Arena thread."
+- In the CSV Upload section, replace:
+  "Upload UI placeholder"
+  with something accurate (English), e.g.:
+  "Upload a CSV to create an import."
+- Consider renaming heading "StatRumble MVP" -> "StatRumble" (keep it consistent for both membership/no-membership branch).
+
+C) ImportChart: read URL params to initialize and restore state
+1) Edit statrumble/app/components/ImportChart.tsx
+- Use next/navigation hooks:
+  - useSearchParams()
+  - usePathname()
+  - useRouter()
+- Parse urlImportId, urlStart, urlEnd:
+  - urlStart/urlEnd must be finite integers >= 0
+- State sync rules (avoid loops):
+  1) If urlImportId is valid and exists in imports list:
+     - sync selectedImportId to urlImportId if different.
+  2) After points load (points.length > 0):
+     - if urlStart/urlEnd are provided:
+       clamp to [0, points.length - 1] and set brushRange accordingly (only if differs).
+     - else keep existing default behavior (full range).
+- When selectedImportId changes by user:
+  - Update URL: set import=<selectedImportId>, and delete start/end (or set to 0/0) without scrolling.
+  - Important: do not cause a re-render loop. Only call router.replace if the resulting query differs.
+- When brushRange changes by user:
+  - Update URL: set start/end to the current brushRange indices (keep import too).
+  - Debounce (e.g. 200ms) to avoid spamming router.replace while dragging.
+  - Use router.replace(url, { scroll: false }).
+
+D) Preserve Arena context when navigating to a thread
+1) Edit statrumble/app/components/ImportChart.tsx
+- When creating a thread succeeds:
+  - Navigate to:
+    `/threads/${threadId}?from=arena&import=<selectedImportId>&start=<brushStart>&end=<brushEnd>`
+  - (Keep from=arena optional but useful.)
+
+2) Edit statrumble/app/components/TransformProposalCreateForm.tsx
+- When a transform proposal thread is created and redirected:
+  - Also include the same query params (import/start/end) so the thread page can offer “Back to Arena” with context.
+- If TransformProposalCreateForm does not currently know brushRange:
+  - Add optional props from ImportChart:
+    - arenaImportId, arenaStartIndex, arenaEndIndex
+  - Pass them from ImportChart.
+
+E) Thread page: add “Back to Arena (restore context)” link
+1) Edit statrumble/app/threads/[id]/page.tsx
+- Read searchParams (server component signature includes { params, searchParams }).
+- Build the Arena href:
+  - If searchParams.import exists:
+    - `/?import=...&start=...&end=...#chart` (include start/end only if present; otherwise omit)
+  - Else:
+    - `/#chart`
+- Render a small top row with:
+  - Link: "Back to Arena"
+  - (Optional) also keep "Back to Threads" if it exists from previous nav work.
+
+F) Docs + Verification
+1) Append an entry to docs/CODEX_LOG.md:
+- Prompt text, summary, changed files, manual checklist.
+2) Run:
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+
+Manual checklist (must be doable quickly)
+- Open Arena with a URL like /?import=<id>&start=2&end=8#chart:
+  - Verify the import select matches the URL.
+  - Verify the selected range matches the URL (clamped if needed).
+- Drag brush, verify URL start/end updates.
+- Create a thread, verify you land on /threads/<id>?import=...&start=...&end=...
+- Click "Back to Arena", verify chart state is restored.
+
+Suggested commit message
+- feat(arena): persist import + brush range in URL and restore on return
+```
+#### Result
+- Updated `statrumble/app/page.tsx` to use a stable chart anchor (`id="chart"`), replaced scaffolding copy with product-facing English copy, and normalized the home title to `StatRumble`.
+- Updated `statrumble/app/components/ImportChart.tsx` to:
+  - parse `import/start/end` from URL,
+  - sync selected import from URL when valid,
+  - restore brush range from URL with clamping after points load,
+  - update URL on user import changes (clearing range),
+  - debounce URL updates (200ms) on brush drag,
+  - include Arena context query params when creating threads,
+  - pass Arena context props into `TransformProposalCreateForm`.
+- Updated `statrumble/app/components/TransformProposalCreateForm.tsx` to accept optional `arenaImportId`, `arenaStartIndex`, `arenaEndIndex` props and include context params (`from/import/start/end`) in thread redirects.
+- Updated `statrumble/app/threads/[id]/page.tsx` to read `searchParams` and build a context-aware `Back to Arena` link (`/?import=...&start=...&end=...#chart` or `/#chart`).
+- Changed files:
+  - `statrumble/app/page.tsx`
+  - `statrumble/app/components/ImportChart.tsx`
+  - `statrumble/app/components/TransformProposalCreateForm.tsx`
+  - `statrumble/app/threads/[id]/page.tsx`
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Open Arena with `/?import=<id>&start=2&end=8#chart` and verify import/range restoration (with clamping)
+- [ ] Drag brush and verify URL `start/end` updates
+- [ ] Create a thread and verify `/threads/<id>?import=...&start=...&end=...`
+- [ ] Click `Back to Arena` and verify chart state restoration
+#### Commit Link
+- TODO

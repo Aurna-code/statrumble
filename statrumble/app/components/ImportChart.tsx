@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Brush,
   CartesianGrid,
@@ -71,10 +71,31 @@ function getDefaultBrushRange(pointsLength: number): BrushRange {
   };
 }
 
+function parseNonNegativeInteger(value: string | null): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  if (!/^\d+$/.test(value)) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 export default function ImportChart({ imports }: ImportChartProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const renderCountRef = useRef(0);
   const didWarnRenderLoopRef = useRef(false);
+  const brushUrlUpdateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [selectedImportId, setSelectedImportId] = useState(imports[0]?.id ?? "");
   const [points, setPoints] = useState<PointItem[]>([]);
   const [totalPoints, setTotalPoints] = useState<number | null>(null);
@@ -85,8 +106,19 @@ export default function ImportChart({ imports }: ImportChartProps) {
   const [isCreatingThread, setIsCreatingThread] = useState(false);
   const [threadError, setThreadError] = useState<string | null>(null);
   const importIds = useMemo(() => imports.map((item) => item.id), [imports]);
+  const importIdSet = useMemo(() => new Set(importIds), [importIds]);
   const firstImportId = importIds[0] ?? "";
-  const importIdsKey = useMemo(() => importIds.join("|"), [importIds]);
+  const urlImportId = useMemo(() => {
+    const raw = searchParams.get("import");
+    if (!raw) {
+      return null;
+    }
+
+    const trimmed = raw.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }, [searchParams]);
+  const urlStartIndex = useMemo(() => parseNonNegativeInteger(searchParams.get("start")), [searchParams]);
+  const urlEndIndex = useMemo(() => parseNonNegativeInteger(searchParams.get("end")), [searchParams]);
 
   renderCountRef.current += 1;
   if (
@@ -102,17 +134,87 @@ export default function ImportChart({ imports }: ImportChartProps) {
     });
   }
 
+  function replaceArenaQuery(nextParams: URLSearchParams) {
+    const currentQuery = searchParams.toString();
+    const nextQuery = nextParams.toString();
+
+    if (currentQuery === nextQuery) {
+      return;
+    }
+
+    const nextUrl = nextQuery ? `${pathname}?${nextQuery}#chart` : `${pathname}#chart`;
+    router.replace(nextUrl, { scroll: false });
+  }
+
+  function onImportChange(nextImportId: string) {
+    if (brushUrlUpdateTimeoutRef.current) {
+      clearTimeout(brushUrlUpdateTimeoutRef.current);
+      brushUrlUpdateTimeoutRef.current = null;
+    }
+
+    setSelectedImportId(nextImportId);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextImportId) {
+      nextParams.set("import", nextImportId);
+    } else {
+      nextParams.delete("import");
+    }
+    nextParams.delete("start");
+    nextParams.delete("end");
+    replaceArenaQuery(nextParams);
+  }
+
+  function scheduleBrushRangeQueryUpdate(nextRange: BrushRange) {
+    if (!selectedImportId || points.length === 0) {
+      return;
+    }
+
+    const maxIndex = Math.max(points.length - 1, 0);
+    const normalizedStart = Math.min(nextRange.startIndex, nextRange.endIndex);
+    const normalizedEnd = Math.max(nextRange.startIndex, nextRange.endIndex);
+    const clampedStart = Math.max(0, Math.min(normalizedStart, maxIndex));
+    const clampedEnd = Math.max(0, Math.min(normalizedEnd, maxIndex));
+
+    if (brushUrlUpdateTimeoutRef.current) {
+      clearTimeout(brushUrlUpdateTimeoutRef.current);
+    }
+
+    brushUrlUpdateTimeoutRef.current = setTimeout(() => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("import", selectedImportId);
+      nextParams.set("start", String(clampedStart));
+      nextParams.set("end", String(clampedEnd));
+      replaceArenaQuery(nextParams);
+      brushUrlUpdateTimeoutRef.current = null;
+    }, 200);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (brushUrlUpdateTimeoutRef.current) {
+        clearTimeout(brushUrlUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!firstImportId) {
       setSelectedImportId((prev) => (prev === "" ? prev : ""));
       return;
     }
 
-    const idSet = new Set(importIdsKey.split("|"));
+    const hasValidUrlImport = Boolean(urlImportId && importIdSet.has(urlImportId));
+    const nextSelectedImportId = hasValidUrlImport ? (urlImportId as string) : firstImportId;
+
     setSelectedImportId((prev) => {
-      return idSet.has(prev) ? prev : firstImportId;
+      if (hasValidUrlImport) {
+        return prev === nextSelectedImportId ? prev : nextSelectedImportId;
+      }
+
+      return importIdSet.has(prev) ? prev : nextSelectedImportId;
     });
-  }, [firstImportId, importIdsKey]);
+  }, [firstImportId, importIdSet, urlImportId]);
 
   useEffect(() => {
     if (!selectedImportId) {
@@ -151,10 +253,6 @@ export default function ImportChart({ imports }: ImportChartProps) {
         setTotalPoints((prev) => (prev === nextTotalPoints ? prev : nextTotalPoints));
         setSampled((prev) => (prev === nextSampled ? prev : nextSampled));
 
-        const nextBrushRange = getDefaultBrushRange(loadedPoints.length);
-        setBrushRange((prev) =>
-          prev.startIndex === nextBrushRange.startIndex && prev.endIndex === nextBrushRange.endIndex ? prev : nextBrushRange,
-        );
       } catch (error) {
         if (controller.signal.aborted) {
           return;
@@ -181,6 +279,36 @@ export default function ImportChart({ imports }: ImportChartProps) {
       controller.abort();
     };
   }, [selectedImportId]);
+
+  useEffect(() => {
+    if (points.length === 0) {
+      const nextRange = getDefaultBrushRange(0);
+      setBrushRange((prev) =>
+        prev.startIndex === nextRange.startIndex && prev.endIndex === nextRange.endIndex ? prev : nextRange,
+      );
+      return;
+    }
+
+    if (urlStartIndex !== null && urlEndIndex !== null) {
+      const maxIndex = points.length - 1;
+      const clampedStart = Math.max(0, Math.min(Math.min(urlStartIndex, urlEndIndex), maxIndex));
+      const clampedEnd = Math.max(0, Math.min(Math.max(urlStartIndex, urlEndIndex), maxIndex));
+      const nextRange = {
+        startIndex: clampedStart,
+        endIndex: clampedEnd,
+      };
+
+      setBrushRange((prev) =>
+        prev.startIndex === nextRange.startIndex && prev.endIndex === nextRange.endIndex ? prev : nextRange,
+      );
+      return;
+    }
+
+    const defaultRange = getDefaultBrushRange(points.length);
+    setBrushRange((prev) =>
+      prev.startIndex === defaultRange.startIndex && prev.endIndex === defaultRange.endIndex ? prev : defaultRange,
+    );
+  }, [points.length, selectedImportId, urlStartIndex, urlEndIndex]);
 
   const chartData = useMemo(
     () =>
@@ -257,7 +385,13 @@ export default function ImportChart({ imports }: ImportChartProps) {
         throw new Error(payload.error ?? "Failed to create thread.");
       }
 
-      router.push(`/threads/${payload.thread_id}`);
+      const threadParams = new URLSearchParams();
+      threadParams.set("from", "arena");
+      threadParams.set("import", selectedImportId);
+      threadParams.set("start", String(selectedRange.startIndex));
+      threadParams.set("end", String(selectedRange.endIndex));
+
+      router.push(`/threads/${payload.thread_id}?${threadParams.toString()}`);
     } catch (error) {
       setThreadError(error instanceof Error ? error.message : "Unknown thread creation error");
     } finally {
@@ -279,7 +413,7 @@ export default function ImportChart({ imports }: ImportChartProps) {
           id="import-select"
           className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-0 transition focus:border-zinc-500"
           value={selectedImportId}
-          onChange={(event) => setSelectedImportId(event.target.value)}
+          onChange={(event) => onImportChange(event.target.value)}
         >
           {imports.map((item) => (
             <option key={item.id} value={item.id}>
@@ -320,10 +454,20 @@ export default function ImportChart({ imports }: ImportChartProps) {
                   startIndex={brushRange.startIndex}
                   endIndex={brushRange.endIndex}
                   onChange={(nextRange) => {
-                    setBrushRange({
-                      startIndex: nextRange.startIndex ?? 0,
-                      endIndex: nextRange.endIndex ?? Math.max(points.length - 1, 0),
-                    });
+                    const maxIndex = Math.max(points.length - 1, 0);
+                    const rawStart = Math.max(0, Math.min(nextRange.startIndex ?? 0, maxIndex));
+                    const rawEnd = Math.max(0, Math.min(nextRange.endIndex ?? maxIndex, maxIndex));
+                    const nextBrushRange = {
+                      startIndex: Math.min(rawStart, rawEnd),
+                      endIndex: Math.max(rawStart, rawEnd),
+                    };
+
+                    setBrushRange((prev) =>
+                      prev.startIndex === nextBrushRange.startIndex && prev.endIndex === nextBrushRange.endIndex
+                        ? prev
+                        : nextBrushRange,
+                    );
+                    scheduleBrushRangeQueryUpdate(nextBrushRange);
                   }}
                   tickFormatter={(value) => chartData[value]?.label ?? String(value)}
                 />
@@ -352,7 +496,13 @@ export default function ImportChart({ imports }: ImportChartProps) {
             >
               {isCreatingThread ? "Creating..." : "Create Thread"}
             </button>
-            <TransformProposalCreateForm importId={selectedImportId} disabled={!selectedImportId} />
+            <TransformProposalCreateForm
+              importId={selectedImportId}
+              disabled={!selectedImportId}
+              arenaImportId={selectedImportId}
+              arenaStartIndex={selectedRange?.startIndex ?? null}
+              arenaEndIndex={selectedRange?.endIndex ?? null}
+            />
           </div>
 
           {threadError ? <p className="text-sm text-red-600">Failed to create thread: {threadError}</p> : null}

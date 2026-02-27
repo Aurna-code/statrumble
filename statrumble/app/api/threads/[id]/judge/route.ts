@@ -4,7 +4,7 @@ import { getWorkspaceVoteProfile } from "@/lib/db/voteProfile";
 import { getThread } from "@/lib/db/threads";
 import { listMessages } from "@/lib/db/messages";
 import { getVoteSummary } from "@/lib/db/votes";
-import { resolveVoteProfileConfig, type VoteProfileKind } from "@/lib/voteProfile";
+import { resolveThreadVoteConfig, resolveVoteProfileConfig, type VoteProfileKind } from "@/lib/voteProfile";
 import { refereeJsonSchema, type RefereeReport } from "@/lib/referee/schema";
 import { createClient } from "@/lib/supabase/server";
 
@@ -251,7 +251,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const voteKind: VoteProfileKind = thread.kind === "transform_proposal" ? "transform_proposal" : "discussion";
-    const voteConfig = resolveVoteProfileConfig(workspaceVoteProfile)[voteKind];
+    const workspaceConfig = resolveVoteProfileConfig(workspaceVoteProfile)[voteKind];
+    const effectiveVoteConfig = resolveThreadVoteConfig(thread.vote_prompt, thread.vote_labels, workspaceConfig);
     const model = process.env.OPENAI_REFEREE_MODEL || DEFAULT_REFEREE_MODEL;
     const fallbackModel = process.env.OPENAI_REFEREE_FALLBACK_MODEL || DEFAULT_REFEREE_FALLBACK_MODEL;
     const openai = new OpenAI({ apiKey });
@@ -266,8 +267,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         end_ts: thread.end_ts,
       },
       thread_kind: voteKind,
-      vote_prompt: voteConfig.prompt,
-      vote_labels: voteConfig.labels,
+      vote_prompt: effectiveVoteConfig.prompt,
+      vote_labels: effectiveVoteConfig.labels,
       snapshot: thread.snapshot,
       votes: {
         A: voteSummary.counts.A,

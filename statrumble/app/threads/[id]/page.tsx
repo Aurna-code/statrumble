@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ThreadArena from "@/app/components/ThreadArena";
+import ThreadVoteSettings from "@/app/components/ThreadVoteSettings";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
+import { getVoteSummary } from "@/lib/db/votes";
 import { getWorkspaceVoteProfile } from "@/lib/db/voteProfile";
 import { getThread } from "@/lib/db/threads";
+import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
-import { resolveVoteProfileConfig, type VoteProfileKind } from "@/lib/voteProfile";
+import { resolveThreadVoteConfig, resolveVoteProfileConfig, type VoteProfileKind } from "@/lib/voteProfile";
 
 export const dynamic = "force-dynamic";
 
@@ -262,6 +265,11 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   let thread = null;
   let initialDecisionId: string | null = null;
   let workspaceVoteProfile = null;
+  let workspaceSelection = {
+    workspaces: [],
+    activeWorkspaceId: null,
+  } as Awaited<ReturnType<typeof getActiveWorkspaceSelection>>;
+  let hasVotes = false;
 
   try {
     thread = await getThread(id);
@@ -295,10 +303,26 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   }
 
   try {
+    workspaceSelection = await getActiveWorkspaceSelection();
+  } catch {
+    workspaceSelection = {
+      workspaces: [],
+      activeWorkspaceId: null,
+    };
+  }
+
+  try {
     const decision = await getDecisionForThread(id);
     initialDecisionId = decision?.id ?? null;
   } catch {
     initialDecisionId = null;
+  }
+
+  try {
+    const summary = await getVoteSummary(id);
+    hasVotes = summary.counts.A + summary.counts.B + summary.counts.C > 0;
+  } catch {
+    hasVotes = false;
   }
 
   const snapshot = (thread.snapshot ?? {}) as ThreadSnapshot;
@@ -326,7 +350,9 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   const countAfterDelta = readDeltaValue(deltas, "count_after");
   const hasCompareSection = isTransformProposal && (Boolean(thread.parent_thread_id) || diffReport !== null);
   const voteKind: VoteProfileKind = thread.kind === "transform_proposal" ? "transform_proposal" : "discussion";
-  const voteConfig = resolveVoteProfileConfig(workspaceVoteProfile)[voteKind];
+  const workspaceVoteConfig = resolveVoteProfileConfig(workspaceVoteProfile)[voteKind];
+  const voteConfig = resolveThreadVoteConfig(thread.vote_prompt, thread.vote_labels, workspaceVoteConfig);
+  const isOwner = workspaceSelection.workspaces.find((workspace) => workspace.id === thread.workspace_id)?.role === "owner";
   const compareItems = [
     { label: "Mean Δ", value: formatSignedNumber(meanDelta) },
     { label: "Std Δ", value: formatSignedNumber(stdDelta) },
@@ -478,6 +504,14 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
           </p>
         </div>
       </div>
+
+      <ThreadVoteSettings
+        threadId={thread.id}
+        isOwner={isOwner}
+        initialPrompt={voteConfig.prompt}
+        initialLabels={voteConfig.labels}
+        initialHasVotes={hasVotes}
+      />
 
       <ThreadArena
         threadId={thread.id}

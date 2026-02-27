@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import OnboardingCard from "@/app/components/OnboardingCard";
 import WorkspacesHub from "@/app/components/WorkspacesHub";
+import { getWorkspaceVoteProfile } from "@/lib/db/voteProfile";
+import type { VoteProfileConfig } from "@/lib/voteProfile";
 import {
   listMemberWorkspaces,
   listWorkspaceMembers,
@@ -30,6 +32,7 @@ export default async function WorkspacesPage() {
   let membersWorkspaceId: string | null = null;
   let membersError: string | null = null;
   let workspacePublicProfile: WorkspacePublicProfile | null = null;
+  let workspaceVoteProfile: VoteProfileConfig | null = null;
 
   if (needsLogin) {
     loadError = "Sign in required.";
@@ -50,6 +53,12 @@ export default async function WorkspacesPage() {
 
   if (!loadError && activeWorkspaceId) {
     const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+
+    try {
+      workspaceVoteProfile = await getWorkspaceVoteProfile(activeWorkspaceId);
+    } catch {
+      workspaceVoteProfile = null;
+    }
 
     if (activeWorkspace?.role === "owner") {
       try {
@@ -98,6 +107,7 @@ export default async function WorkspacesPage() {
           membersWorkspaceId={membersWorkspaceId}
           membersError={membersError}
           workspacePublicProfile={workspacePublicProfile}
+          workspaceVoteProfile={workspaceVoteProfile}
         />
       ) : null}
     </main>

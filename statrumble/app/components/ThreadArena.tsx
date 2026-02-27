@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefereeReportView from "@/app/components/RefereeReportView";
 import type { RefereeReport } from "@/lib/referee/schema";
+import type { VoteLabels } from "@/lib/voteProfile";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 
 type VoteStance = "A" | "B" | "C";
@@ -61,6 +62,8 @@ type ThreadArenaProps = {
   snapshot: unknown;
   initialRefereeReport?: RefereeReport | null;
   initialDecisionId?: string | null;
+  votePrompt: string;
+  voteLabels: VoteLabels;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -158,6 +161,8 @@ export default function ThreadArena({
   snapshot,
   initialRefereeReport = null,
   initialDecisionId = null,
+  votePrompt,
+  voteLabels,
 }: ThreadArenaProps) {
   const router = useRouter();
   const renderWindowRef = useRef({
@@ -473,9 +478,12 @@ export default function ThreadArena({
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <p className="mt-4 text-sm text-zinc-800">{votePrompt}</p>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
             {(Object.keys(voteCounts) as VoteStance[]).map((stance) => {
               const selected = myStance === stance;
+              const voteLabel = voteLabels[stance];
 
               return (
                 <button
@@ -487,9 +495,11 @@ export default function ThreadArena({
                     selected
                       ? "border-zinc-900 bg-zinc-900 text-white"
                       : "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
-                  }`}
+	                  }`}
                 >
-                  <span className="font-semibold">{stance}</span>
+                  <span className="font-semibold">
+                    {stance} · {voteLabel}
+                  </span>
                   <span className="ml-2 text-xs">({voteCounts[stance]})</span>
                 </button>
               );
@@ -497,7 +507,11 @@ export default function ThreadArena({
           </div>
 
           <p className="mt-3 text-xs text-zinc-600">One vote per person. Selecting again changes your vote.</p>
-          {myStance ? <p className="mt-2 text-sm text-zinc-800">My vote: {myStance}</p> : null}
+          {myStance ? (
+            <p className="mt-2 text-sm text-zinc-800">
+              My vote: {myStance} · {voteLabels[myStance]}
+            </p>
+          ) : null}
           {votesError ? <p className="mt-2 text-sm text-red-600">{votesError}</p> : null}
 
           <div className="mt-4">

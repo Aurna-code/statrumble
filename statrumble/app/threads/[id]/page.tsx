@@ -2,9 +2,11 @@ import { notFound } from "next/navigation";
 import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
+import { getWorkspaceVoteProfile } from "@/lib/db/voteProfile";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { resolveVoteProfileConfig, type VoteProfileKind } from "@/lib/voteProfile";
 
 export const dynamic = "force-dynamic";
 
@@ -216,6 +218,7 @@ export default async function Page({ params }: ThreadPageProps) {
   const { id } = await params;
   let thread = null;
   let initialDecisionId: string | null = null;
+  let workspaceVoteProfile = null;
 
   try {
     thread = await getThread(id);
@@ -232,6 +235,12 @@ export default async function Page({ params }: ThreadPageProps) {
 
   if (thread === null) {
     notFound();
+  }
+
+  try {
+    workspaceVoteProfile = await getWorkspaceVoteProfile(thread.workspace_id);
+  } catch {
+    workspaceVoteProfile = null;
   }
 
   try {
@@ -265,6 +274,8 @@ export default async function Page({ params }: ThreadPageProps) {
   const slopeDelta = readDeltaValue(deltas, "slope");
   const countAfterDelta = readDeltaValue(deltas, "count_after");
   const hasCompareSection = isTransformProposal && (Boolean(thread.parent_thread_id) || diffReport !== null);
+  const voteKind: VoteProfileKind = thread.kind === "transform_proposal" ? "transform_proposal" : "discussion";
+  const voteConfig = resolveVoteProfileConfig(workspaceVoteProfile)[voteKind];
   const compareItems = [
     { label: "Mean Δ", value: formatSignedNumber(meanDelta) },
     { label: "Std Δ", value: formatSignedNumber(stdDelta) },
@@ -414,6 +425,8 @@ export default async function Page({ params }: ThreadPageProps) {
         snapshot={thread.snapshot}
         initialRefereeReport={(thread.referee_report as RefereeReport | null) ?? null}
         initialDecisionId={initialDecisionId}
+        votePrompt={voteConfig.prompt}
+        voteLabels={voteConfig.labels}
       />
     </main>
   );

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
@@ -225,7 +226,15 @@ export default async function Page({ params }: ThreadPageProps) {
   } catch (error) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-        <h1 className="text-2xl font-semibold">Thread #{id}</h1>
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <Link href="/threads" className="text-zinc-600 hover:text-zinc-900">
+            Back to Threads
+          </Link>
+          <Link href="/" className="text-zinc-600 hover:text-zinc-900">
+            Back to Arena
+          </Link>
+        </div>
+        <h1 className="mt-3 text-2xl font-semibold">Thread #{id}</h1>
         <p className="mt-2 text-sm text-red-600">
           Failed to load: {error instanceof Error ? error.message : "Unknown error"}
         </p>
@@ -285,7 +294,15 @@ export default async function Page({ params }: ThreadPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <h1 className="text-2xl font-semibold">Thread #{id}</h1>
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <Link href="/threads" className="text-zinc-600 hover:text-zinc-900">
+          Back to Threads
+        </Link>
+        <Link href="/" className="text-zinc-600 hover:text-zinc-900">
+          Back to Arena
+        </Link>
+      </div>
+      <h1 className="mt-3 text-2xl font-semibold">Thread #{id}</h1>
       <p className="mt-2 text-sm text-zinc-600">Debate and vote based on the snapshot at creation time.</p>
 
       {isTransformProposal ? (

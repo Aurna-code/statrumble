@@ -109,9 +109,14 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
           <h1 className="text-2xl font-semibold">Decision</h1>
           <p className="mt-2 text-sm text-zinc-600">Decision details</p>
         </div>
-        <Link href="/decisions" className="text-sm text-zinc-600 hover:text-zinc-900">
-          Back to list
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/threads" className="text-sm text-zinc-600 hover:text-zinc-900">
+            Back to Threads
+          </Link>
+          <Link href="/decisions" className="text-sm text-zinc-600 hover:text-zinc-900">
+            Back to list
+          </Link>
+        </div>
       </div>
 
       {loadError ? (

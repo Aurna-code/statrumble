@@ -24,6 +24,8 @@ type ValidationIssue = {
   message: string;
 };
 
+const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 function normalizeIssues(payload: ProposeTransformApiResponse | null): ValidationIssue[] {
   const issuesRaw = payload?.details?.issues;
 
@@ -134,15 +136,22 @@ export default function TransformProposalCreateForm({
 
   return (
     <div className="w-full sm:w-auto">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        disabled={isDisabled || submitting}
-        title={isDisabled ? disabledReason : undefined}
-        className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {open ? "Close Proposal" : "Propose Transform (AI)"}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          disabled={isDisabled || submitting}
+          title={isDisabled ? disabledReason : undefined}
+          className="inline-flex items-center rounded-md border border-emerald-300 bg-white px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {open ? "Close Proposal" : "Propose Transform (AI)"}
+        </button>
+        {SHOW_DEMO_BADGE ? (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
+            Demo mode
+          </span>
+        ) : null}
+      </div>
 
       {isDisabled ? <p className="mt-1 text-xs text-zinc-500">{disabledReason}</p> : null}
 

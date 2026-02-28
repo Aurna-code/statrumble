@@ -2,6 +2,8 @@ import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { createMessage } from "@/lib/db/messages";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
+import { mockTransformProposal } from "@/lib/demoMock";
+import { isDemoMode } from "@/lib/demoMode";
 import { mergeSelectedSeriesIntoSnapshot } from "@/lib/snapshot";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -757,10 +759,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "start_ts and end_ts must be provided together." }, { status: 400 });
   }
 
+  const demoMode = isDemoMode();
   const configuredModel = process.env.CODEX_MODEL?.trim() ?? "";
   const normalizedModel = configuredModel.toLowerCase();
 
-  if (normalizedModel === REMOVED_CODEX_MODEL) {
+  if (!demoMode && normalizedModel === REMOVED_CODEX_MODEL) {
     return NextResponse.json(
       {
         ok: false,
@@ -934,66 +937,106 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Vote profile resolution failed" }, { status: 500 });
     }
     const snapshotWithSeries = mergeSelectedSeriesIntoSnapshot(snapshot, selectedSeries);
-
-    const apiKey = process.env.OPENAI_API_KEY;
-
-    if (!apiKey) {
-      return NextResponse.json({ ok: false, error: "OPENAI_API_KEY not set" }, { status: 500 });
-    }
-
-    const openai = new OpenAI({ apiKey });
-    const proposal = await requestProposalFromModel({
-      openai,
-      model,
-      userPrompt: prompt,
-      importId,
-      parentThreadId,
-      series: selectedSeries,
-    });
-    const transformed = applyTransform(proposal.transformSpec, selectedSeries);
-    const childStats = transformed.stats;
-    const baseline = applyTransform(
-      {
-        version: 1,
-        ops: [{ op: "moving_average", window: 1 }],
-      },
-      selectedSeries,
-    );
-    const statsPayload = {
-      transformed: childStats,
-      baseline: baseline.stats,
-      diff: compareStats(baseline.stats, childStats),
-    };
+    const snapshotRecord = asRecord(snapshotWithSeries);
+    const snapshotMetric = asRecord(snapshotRecord?.metric);
+    let proposalTitle = "";
+    let proposalExplanation = "";
+    let proposalSqlPreview = "";
+    let proposalTransformSpec: unknown = null;
+    let childStats: TransformStats;
+    let statsPayload: Record<string, unknown>;
     let transformDiffReport: Record<string, unknown> | null = null;
 
-    if (parentThreadId) {
-      const childComparableStats = extractComparableStats(childStats);
+    if (demoMode) {
+      const demoProposal = mockTransformProposal({
+        prompt,
+        importId,
+        importMeta: {
+          name: asNonEmptyString(snapshotMetric?.name),
+          unit: asNonEmptyString(snapshotMetric?.unit),
+        },
+        startTs,
+        endTs,
+        parentThreadId,
+      });
 
-      if (!childComparableStats) {
-        transformDiffReport = {
-          parent_thread_id: parentThreadId,
-          error: "missing_child_stats",
-        };
-      } else {
-        const parentComparableStats = extractComparableStats(parentThread?.transform_stats ?? null);
+      proposalTitle = demoProposal.title;
+      proposalExplanation = demoProposal.explanation;
+      proposalSqlPreview = demoProposal.sqlPreview;
+      proposalTransformSpec = demoProposal.transformSpec;
+      childStats = demoProposal.statsPayload.transformed;
+      statsPayload = {
+        transformed: demoProposal.statsPayload.transformed,
+        baseline: demoProposal.statsPayload.baseline,
+        diff: demoProposal.statsPayload.diff,
+        demo_note: demoProposal.statsPayload.demo_note,
+      };
+      transformDiffReport = demoProposal.diffReport;
+    } else {
+      const apiKey = process.env.OPENAI_API_KEY;
 
-        if (!parentComparableStats) {
+      if (!apiKey) {
+        return NextResponse.json({ ok: false, error: "OPENAI_API_KEY not set" }, { status: 500 });
+      }
+
+      const openai = new OpenAI({ apiKey });
+      const proposal = await requestProposalFromModel({
+        openai,
+        model,
+        userPrompt: prompt,
+        importId,
+        parentThreadId,
+        series: selectedSeries,
+      });
+      const transformed = applyTransform(proposal.transformSpec, selectedSeries);
+      childStats = transformed.stats;
+      const baseline = applyTransform(
+        {
+          version: 1,
+          ops: [{ op: "moving_average", window: 1 }],
+        },
+        selectedSeries,
+      );
+      statsPayload = {
+        transformed: childStats,
+        baseline: baseline.stats,
+        diff: compareStats(baseline.stats, childStats),
+      };
+
+      if (parentThreadId) {
+        const childComparableStats = extractComparableStats(childStats);
+
+        if (!childComparableStats) {
           transformDiffReport = {
             parent_thread_id: parentThreadId,
-            error: "missing_parent_stats",
+            error: "missing_child_stats",
           };
         } else {
-          transformDiffReport = {
-            parent_thread_id: parentThreadId,
-            parent_stats: parentComparableStats,
-            child_stats: childComparableStats,
-            deltas: compareStats(parentComparableStats, childComparableStats),
-            ...(parentThread?.transform_spec !== null && parentThread?.transform_spec !== undefined
-              ? { parent_transform_spec_present: true }
-              : {}),
-          };
+          const parentComparableStats = extractComparableStats(parentThread?.transform_stats ?? null);
+
+          if (!parentComparableStats) {
+            transformDiffReport = {
+              parent_thread_id: parentThreadId,
+              error: "missing_parent_stats",
+            };
+          } else {
+            transformDiffReport = {
+              parent_thread_id: parentThreadId,
+              parent_stats: parentComparableStats,
+              child_stats: childComparableStats,
+              deltas: compareStats(parentComparableStats, childComparableStats),
+              ...(parentThread?.transform_spec !== null && parentThread?.transform_spec !== undefined
+                ? { parent_transform_spec_present: true }
+                : {}),
+            };
+          }
         }
       }
+
+      proposalTitle = proposal.title;
+      proposalExplanation = proposal.explanation;
+      proposalSqlPreview = proposal.sqlPreview;
+      proposalTransformSpec = proposal.transformSpec;
     }
 
     const { data: insertedThread, error: insertError } = await supabase
@@ -1010,7 +1053,7 @@ export async function POST(request: NextRequest) {
         snapshot: snapshotWithSeries,
         vote_prompt: voteProfile.prompt,
         vote_labels: voteProfile.labels,
-        title: buildTransformProposalTitle(proposal.title, snapshotWithSeries),
+        title: buildTransformProposalTitle(proposalTitle, snapshotWithSeries),
       })
       .select("id")
       .single();
@@ -1027,8 +1070,8 @@ export async function POST(request: NextRequest) {
       .from("arena_threads")
       .update({
         transform_prompt: prompt,
-        transform_spec: proposal.transformSpec,
-        transform_sql_preview: proposal.sqlPreview,
+        transform_spec: proposalTransformSpec,
+        transform_sql_preview: proposalSqlPreview,
         transform_stats: statsPayload,
         transform_diff_report: transformDiffReport,
       })
@@ -1041,14 +1084,20 @@ export async function POST(request: NextRequest) {
     await createMessage(
       threadId,
       buildInitialMessage({
-        title: proposal.title,
-        explanation: proposal.explanation,
-        sqlPreview: proposal.sqlPreview,
+        title: proposalTitle,
+        explanation: proposalExplanation,
+        sqlPreview: proposalSqlPreview,
         stats: childStats,
       }),
     );
 
-    return NextResponse.json({ thread_id: threadId });
+    return NextResponse.json({
+      thread_id: threadId,
+      transform_spec: proposalTransformSpec,
+      transform_sql_preview: proposalSqlPreview,
+      transform_stats: statsPayload,
+      transform_diff_report: transformDiffReport,
+    });
   } catch (error) {
     if (error instanceof RouteError) {
       return NextResponse.json(

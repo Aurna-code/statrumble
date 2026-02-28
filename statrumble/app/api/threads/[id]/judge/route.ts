@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getThread } from "@/lib/db/threads";
 import { listMessages } from "@/lib/db/messages";
 import { getVoteSummary } from "@/lib/db/votes";
+import { mockRefereeReport } from "@/lib/demoMock";
+import { isDemoMode } from "@/lib/demoMode";
 import { refereeJsonSchema, type RefereeReport } from "@/lib/referee/schema";
 import { createClient } from "@/lib/supabase/server";
 
@@ -84,6 +86,63 @@ async function readForceFromBody(request: NextRequest) {
 
 function isGpt5Model(model: string) {
   return model.startsWith("gpt-5");
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function formatNumber(value: number | null, digits = 2) {
+  if (value === null) {
+    return "-";
+  }
+
+  return value.toFixed(digits);
+}
+
+function formatCount(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+
+  return `${Math.round(value)}`;
+}
+
+function buildSnapshotSummary(snapshot: unknown) {
+  const root = asRecord(snapshot);
+  const selected = asRecord(root?.selected);
+  const before = asRecord(root?.before);
+  const delta = asRecord(root?.delta);
+  const selectedAvg = asFiniteNumber(selected?.avg);
+  const selectedN = asFiniteNumber(selected?.n);
+  const beforeAvg = asFiniteNumber(before?.avg);
+  const beforeN = asFiniteNumber(before?.n);
+  const deltaAbs = asFiniteNumber(delta?.abs);
+  const deltaRel = asFiniteNumber(delta?.rel);
+  const deltaPct = deltaRel === null ? "-" : formatNumber(deltaRel * 100, 2);
+
+  if (beforeAvg === null) {
+    return `Selected average ${formatNumber(selectedAvg)} over ${formatCount(selectedN)} points; no prior-range baseline available.`;
+  }
+
+  return `Selected average ${formatNumber(selectedAvg)} over ${formatCount(selectedN)} points; previous average ${formatNumber(beforeAvg)} over ${formatCount(beforeN)} points; delta ${formatNumber(deltaAbs)} (${deltaPct}%).`;
 }
 
 function toJsonCandidate(raw: string) {
@@ -232,14 +291,45 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: true, report: existingReport, reused: true });
     }
 
+    const voteSummary = await getVoteSummary(id);
+    const recentMessages = await listMessages(id, 30);
+    const messagesForModel = recentMessages.length > 20 ? recentMessages.slice(-20) : recentMessages;
+    const demoMode = isDemoMode();
+
+    if (demoMode) {
+      const report = mockRefereeReport({
+        threadId: id,
+        votes: {
+          A: voteSummary.counts.A,
+          B: voteSummary.counts.B,
+          C: voteSummary.counts.C,
+          my_stance: voteSummary.my_stance,
+        },
+        snapshotSummary: buildSnapshotSummary(thread.snapshot),
+        messages: messagesForModel.map((message) => ({
+          content: message.content,
+          user_id: message.user_id,
+          created_at: message.created_at,
+        })),
+      });
+
+      const { error: updateError } = await supabase
+        .from("arena_threads")
+        .update({ referee_report: report, referee_report_updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+      if (updateError) {
+        return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ ok: true, report, reused: false });
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ ok: false, error: "OPENAI_API_KEY not set" }, { status: 500 });
     }
 
-    const voteSummary = await getVoteSummary(id);
-    const recentMessages = await listMessages(id, 30);
-    const messagesForModel = recentMessages.length > 20 ? recentMessages.slice(-20) : recentMessages;
     const model = process.env.OPENAI_REFEREE_MODEL || DEFAULT_REFEREE_MODEL;
     const fallbackModel = process.env.OPENAI_REFEREE_FALLBACK_MODEL || DEFAULT_REFEREE_FALLBACK_MODEL;
     const openai = new OpenAI({ apiKey });

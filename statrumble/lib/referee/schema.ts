@@ -21,6 +21,7 @@ export type RefereeReport = {
     confidence_0_100: number;
     reason: string;
   };
+  demo_note?: string;
 };
 
 export const refereeJsonSchema = {
@@ -29,6 +30,7 @@ export const refereeJsonSchema = {
   required: ["tldr", "data_facts", "stances", "confounders", "next_checks", "verdict"],
   properties: {
     tldr: { type: "string" },
+    demo_note: { type: "string" },
     data_facts: {
       type: "array",
       items: {

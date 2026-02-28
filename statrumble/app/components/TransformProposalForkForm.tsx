@@ -22,6 +22,8 @@ type ValidationIssue = {
   message: string;
 };
 
+const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 function normalizeIssues(payload: ProposeTransformApiResponse | null): ValidationIssue[] {
   const issuesRaw = payload?.details?.issues;
 
@@ -115,14 +117,21 @@ export default function TransformProposalForkForm({ importId, parentThreadId }: 
 
   return (
     <div className="w-full sm:w-auto">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        disabled={submitting}
-        className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {open ? "Close Fork" : "Fork"}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          disabled={submitting}
+          className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {open ? "Close Fork" : "Fork"}
+        </button>
+        {SHOW_DEMO_BADGE ? (
+          <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
+            Demo mode
+          </span>
+        ) : null}
+      </div>
 
       {open ? (
         <form onSubmit={onSubmit} className="mt-3 space-y-2 rounded-md border border-emerald-200 bg-white p-3">

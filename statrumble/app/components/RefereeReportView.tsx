@@ -8,6 +8,11 @@ export default function RefereeReportView({ report }: RefereeReportViewProps) {
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5">
       <h2 className="text-base font-semibold">Referee Report</h2>
+      {report.demo_note ? (
+        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          {report.demo_note}
+        </p>
+      ) : null}
 
       <div className="mt-4 space-y-5">
         <div>

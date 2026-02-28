@@ -317,7 +317,9 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
   const sqlPreview = asNonEmptyString(thread.transform_sql_preview);
+  const proposalStatsRecord = asRecord(thread.transform_stats);
   const proposalStats = extractComparableStats(thread.transform_stats);
+  const proposalDemoNote = asNonEmptyString(proposalStatsRecord?.demo_note);
   const diffReport = asRecord(thread.transform_diff_report);
   const diffError = asNonEmptyString(diffReport?.error);
   const deltas = asRecord(diffReport?.deltas);
@@ -356,6 +358,11 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
             <div>
               <h2 className="text-base font-semibold">{proposalTitle}</h2>
               <p className="mt-1 text-xs text-zinc-600">Proposal thread for collaborative transform review.</p>
+              {proposalDemoNote ? (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                  {proposalDemoNote}
+                </p>
+              ) : null}
             </div>
             <TransformProposalForkForm importId={thread.import_id} parentThreadId={thread.id} />
           </div>

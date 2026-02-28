@@ -68,6 +68,7 @@ type ThreadArenaProps = {
 };
 
 const POLL_INTERVAL_MS = 4000;
+const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -608,6 +609,11 @@ export default function ThreadArena({
               {refereeReused ? (
                 <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
                   Reused
+                </span>
+              ) : null}
+              {SHOW_DEMO_BADGE ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
+                  Demo mode
                 </span>
               ) : null}
             </div>

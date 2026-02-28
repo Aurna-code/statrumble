@@ -4363,3 +4363,70 @@ Context
 - [ ] `./scripts/contest-preflight.sh` with clean tree after commit
 #### Commit Link
 - TODO
+
+### Prompt ID: Demo/mock mode for AI actions (commit: TODO)
+#### Prompt
+```text
+[Prompt] Demo/Mock mode for AI actions: no API key required, full collaboration flow still works, optional real AI if key present
+
+Context
+- Hosted demo without strict OpenAI project limits risks runaway costs.
+- We want a contest-friendly fallback so testers can run the full flow without an API key:
+  - threads, comments, votes work normally
+  - AI features (Referee, Transform proposal, Diff summary) return realistic mock outputs
+- When OPENAI_API_KEY is present and demo mode is off, routes should call real AI as before.
+
+Constraints
+- No new dependencies.
+- English-only UI copy.
+- Keep lint/typecheck/tests/build/preflight green.
+- Must not expose API keys to the client.
+
+Goals
+1) Add a “Demo mode” switch:
+   - Demo mode is ON if:
+     - process.env.DEMO_MODE === "1" OR process.env.NEXT_PUBLIC_DEMO_MODE === "1"
+     - OR OPENAI_API_KEY is missing
+   - Demo mode OFF only when explicitly disabled AND OPENAI_API_KEY exists.
+2) In demo mode:
+   - /api/threads/[id]/judge returns a deterministic mock Referee report (uses votes + snapshot stats + last messages).
+   - /api/threads/propose-transform returns a deterministic mock proposal (TransformSpec + SQL preview + stats/diff).
+   - /api/threads/[id]/summarize-diff (if exists) returns a deterministic mock summary.
+3) UI should clearly indicate demo mode:
+   - Badge near AI buttons: “Demo mode”
+   - Result headers include “Generated in demo mode (no API calls).”
+4) README update:
+   - Document DEMO_MODE and how to enable real AI.
+```
+#### Result
+- Added `statrumble/lib/demoMode.ts` with `isDemoMode()` (`DEMO_MODE=1` or `NEXT_PUBLIC_DEMO_MODE=1` or missing `OPENAI_API_KEY`).
+- Added deterministic mock generators in `statrumble/lib/demoMock.ts`:
+  - `stableHash`, `pick`
+  - `mockRefereeReport` (vote-derived leading stance + confidence, snapshot summary, truncated quote from recent messages, demo note)
+  - `mockTransformProposal` (deterministic transform spec/sql/stats/diff + demo note)
+  - `mockDiffSummary`
+- Wired demo mode on server routes:
+  - `statrumble/app/api/threads/[id]/judge/route.ts` now branches to deterministic mock report in demo mode and persists to `arena_threads.referee_report` exactly like real mode.
+  - `statrumble/app/api/threads/propose-transform/route.ts` now branches to deterministic mock proposal in demo mode, still creates/provisions proposal thread and transform fields, and now returns `thread_id` plus transform payload fields.
+  - No existing summarize-diff route was found in this repo, so no route change was applied there.
+- Added UI/demo-mode indicators:
+  - Demo badge near AI actions in `ThreadArena`, `TransformProposalCreateForm`, and `TransformProposalForkForm` when `NEXT_PUBLIC_DEMO_MODE=1`.
+  - Referee result view now renders demo note from report.
+  - Transform proposal thread header now renders demo note from `transform_stats.demo_note`.
+- Extended referee type/schema with optional `demo_note` in `statrumble/lib/referee/schema.ts`.
+- Updated docs/examples:
+  - `README.md` env section now documents `DEMO_MODE` and `NEXT_PUBLIC_DEMO_MODE` and real-AI behavior.
+  - Added demo env placeholders in `.env.example` and `statrumble/.env.example`.
+- Added deterministic verification script `scripts/verify-demo-mock.mjs` and wired it into `statrumble/package.json` `test` script.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [ ] `./scripts/contest-preflight.sh` (fails by design in this working tree at step 1: requires clean git status)
+- [ ] Manual runtime check with no `OPENAI_API_KEY`
+- [ ] Manual runtime check with `OPENAI_API_KEY` and demo mode unset
+- [ ] Manual UI check for `NEXT_PUBLIC_DEMO_MODE=1` badge visibility
+#### Commit Link
+- TODO

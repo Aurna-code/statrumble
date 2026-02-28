@@ -85,6 +85,29 @@ function extractPointArray(value: unknown): SnapshotPoint[] | null {
   return points.length > 0 ? points : null;
 }
 
+export function mergeSelectedSeriesIntoSnapshot(snapshot: unknown, points: SnapshotPoint[]): Record<string, unknown> {
+  const root = asRecord(snapshot);
+  const selected = asRecord(root?.selected);
+  const selectedRange = asRecord(root?.selectedRange);
+  const normalizedPoints = points
+    .map((item) => extractPoint(item))
+    .filter((item): item is SnapshotPoint => item !== null);
+
+  return {
+    ...(root ?? {}),
+    selected_points: normalizedPoints,
+    selected_series: normalizedPoints,
+    selected: {
+      ...(selected ?? {}),
+      points: normalizedPoints,
+    },
+    selectedRange: {
+      ...(selectedRange ?? {}),
+      points: normalizedPoints,
+    },
+  };
+}
+
 export function extractSelectedSeries(snapshot: unknown): SnapshotPoint[] | null {
   const root = asRecord(snapshot);
 
@@ -94,11 +117,19 @@ export function extractSelectedSeries(snapshot: unknown): SnapshotPoint[] | null
 
   const selectedRange = asRecord(root.selectedRange);
   const selected = asRecord(root.selected);
+  const range = asRecord(root.range);
+  const series = asRecord(root.series);
 
   const candidates: unknown[] = [
     root.selected_points,
+    root.selected_series,
     selectedRange?.points,
     selected?.points,
+    range?.points,
+    root.snapshot_points,
+    root.points,
+    root.series,
+    series?.selected,
     root.selected,
   ];
 

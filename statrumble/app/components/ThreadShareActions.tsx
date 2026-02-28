@@ -24,7 +24,12 @@ export default function ThreadShareActions({ threadId, backHref }: ThreadShareAc
         setCopied((prev) => (prev === target ? null : prev));
       }, 1500);
     } catch {
-      setError("Failed to copy. Please try again.");
+      try {
+        window.prompt("Copy to clipboard:", value);
+      } catch {
+        // no-op: keep inline error message below
+      }
+      setError("Clipboard access failed. Use the prompt to copy manually.");
     }
   }
 
@@ -43,6 +48,12 @@ export default function ThreadShareActions({ threadId, backHref }: ThreadShareAc
         className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
       >
         Back to Arena
+      </Link>
+      <Link
+        href="/threads"
+        className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+      >
+        Back to Threads
       </Link>
       <button
         type="button"

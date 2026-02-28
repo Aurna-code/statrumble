@@ -18,6 +18,11 @@ type ThreadProposalFields = {
   transform_diff_report?: unknown | null;
 };
 
+type ThreadVoteProfileFields = {
+  vote_prompt: string;
+  vote_labels: unknown;
+};
+
 type ThreadRow = {
   id: string;
   workspace_id: string;
@@ -36,12 +41,15 @@ type ThreadRow = {
   transform_sql_preview: string | null;
   transform_stats: unknown | null;
   transform_diff_report: unknown | null;
+  vote_prompt: string;
+  vote_labels: unknown;
   created_at: string;
   metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
 };
 
-export type ArenaThread = Omit<ThreadRow, "metrics" | keyof ThreadProposalFields> &
-  ThreadProposalFields & {
+export type ArenaThread = Omit<ThreadRow, "metrics" | keyof ThreadProposalFields | keyof ThreadVoteProfileFields> &
+  ThreadProposalFields &
+  ThreadVoteProfileFields & {
   metric: ThreadMetricMeta | null;
 };
 

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { formatDateTimeLabel24 } from "@/lib/formatDate";
+import { formatDateTimeLabel } from "@/lib/formatDate";
 import type { SnapshotPoint } from "@/lib/snapshot";
 
 type ThreadSnapshotChartProps = {
@@ -12,15 +12,21 @@ type ThreadSnapshotChartProps = {
 
 function formatTimestamp(value: string | number): string {
   if (typeof value === "number") {
-    return value.toLocaleString("en-US");
+    const asDate = new Date(value);
+
+    if (!Number.isNaN(asDate.getTime())) {
+      return formatDateTimeLabel(asDate.toISOString());
+    }
+
+    return value.toLocaleString("ko-KR");
   }
 
-  const formatted = formatDateTimeLabel24(value);
+  const formatted = formatDateTimeLabel(value);
   return formatted === value ? value : formatted;
 }
 
 function formatMetricValue(value: number): string {
-  return value.toLocaleString("en-US", {
+  return value.toLocaleString("ko-KR", {
     maximumFractionDigits: 6,
   });
 }

@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
 import { createMessage } from "@/lib/db/messages";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
+import { mergeSelectedSeriesIntoSnapshot } from "@/lib/snapshot";
 import { createClient } from "@/lib/supabase/server";
 import {
   TransformSpecSchema,
@@ -11,6 +12,7 @@ import {
   type TransformWarning,
   type TransformStats,
 } from "@/lib/transforms";
+import { getDefaultVoteProfile, isVoteProfile, resolveVoteProfileFromConfig } from "@/lib/voteProfile";
 
 type ProposeTransformRequest = {
   import_id?: string;
@@ -854,6 +856,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Snapshot calculation returned empty result." }, { status: 500 });
     }
 
+    const { data: voteProfileConfig, error: voteProfileError } = await supabase.rpc("get_workspace_vote_profile", {
+      p_workspace_id: (metricImport as ImportRow).workspace_id,
+    });
+
+    if (voteProfileError) {
+      return NextResponse.json({ ok: false, error: "Vote profile resolution failed" }, { status: 500 });
+    }
+
+    const voteProfile =
+      resolveVoteProfileFromConfig(voteProfileConfig, "transform_proposal") ??
+      getDefaultVoteProfile("transform_proposal");
+
+    if (!isVoteProfile(voteProfile)) {
+      return NextResponse.json({ ok: false, error: "Vote profile resolution failed" }, { status: 500 });
+    }
+    const snapshotWithSeries = mergeSelectedSeriesIntoSnapshot(snapshot, series);
+
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -926,7 +945,9 @@ export async function POST(request: NextRequest) {
         import_id: importId,
         start_ts: startTs,
         end_ts: endTs,
-        snapshot,
+        snapshot: snapshotWithSeries,
+        vote_prompt: voteProfile.prompt,
+        vote_labels: voteProfile.labels,
       })
       .select("id")
       .single();

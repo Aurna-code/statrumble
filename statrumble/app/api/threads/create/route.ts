@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
+import { mergeSelectedSeriesIntoSnapshot } from "@/lib/snapshot";
 import { createClient } from "@/lib/supabase/server";
+import { getDefaultVoteProfile, isVoteProfile, resolveVoteProfileFromConfig } from "@/lib/voteProfile";
 
 type CreateThreadRequest = {
   import_id?: string;
   start_ts?: string;
   end_ts?: string;
+};
+
+type PointRow = {
+  ts: string;
+  value: number;
 };
 
 function parseDate(value: string | undefined) {
@@ -84,16 +91,53 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Snapshot calculation returned empty result." }, { status: 500 });
     }
 
+    const { data: voteProfileConfig, error: voteProfileError } = await supabase.rpc("get_workspace_vote_profile", {
+      p_workspace_id: metricImport.workspace_id,
+    });
+
+    if (voteProfileError) {
+      return NextResponse.json({ ok: false, error: "Vote profile resolution failed" }, { status: 500 });
+    }
+
+    const voteProfile =
+      resolveVoteProfileFromConfig(voteProfileConfig, "discussion") ?? getDefaultVoteProfile("discussion");
+
+    if (!isVoteProfile(voteProfile)) {
+      return NextResponse.json({ ok: false, error: "Vote profile resolution failed" }, { status: 500 });
+    }
+
+    const { data: selectedPointRows, error: selectedPointsError } = await supabase
+      .from("metric_points")
+      .select("ts, value")
+      .eq("workspace_id", metricImport.workspace_id)
+      .eq("import_id", importId)
+      .gte("ts", startTs)
+      .lt("ts", endTs)
+      .order("ts", { ascending: true });
+
+    if (selectedPointsError) {
+      return NextResponse.json({ ok: false, error: selectedPointsError.message }, { status: 500 });
+    }
+
+    const selectedPoints = ((selectedPointRows as PointRow[] | null) ?? []).map((point) => ({
+      ts: point.ts,
+      value: point.value,
+    }));
+    const snapshotWithSeries = mergeSelectedSeriesIntoSnapshot(snapshot, selectedPoints);
+
     const { data: insertedThread, error: insertError } = await supabase
       .from("arena_threads")
       .insert({
         workspace_id: metricImport.workspace_id,
         visibility: "workspace",
+        kind: "discussion",
         metric_id: metricImport.metric_id,
         import_id: importId,
         start_ts: startTs,
         end_ts: endTs,
-        snapshot,
+        snapshot: snapshotWithSeries,
+        vote_prompt: voteProfile.prompt,
+        vote_labels: voteProfile.labels,
       })
       .select("id")
       .single();

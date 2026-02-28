@@ -77,7 +77,7 @@ export default function LoginPage() {
       return;
     }
 
-    setSuccessMessage("Magic link sent. Open the link in your email to sign in.");
+    setSuccessMessage("Magic link를 전송했습니다. 이메일에서 링크를 열어 로그인하세요.");
     setIsMagicLinkSubmitting(false);
   }
 
@@ -109,7 +109,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-2xl font-semibold">Login</h1>
-      <p className="mt-2 text-sm text-zinc-600">Supabase Email OTP (Magic Link) login</p>
+      <p className="mt-2 text-sm text-zinc-600">Supabase Email OTP (Magic Link) 로그인</p>
 
       <div className="mt-6 max-w-md rounded-lg border border-zinc-200 bg-white p-5">
         <form className="space-y-4" onSubmit={onSendMagicLink}>

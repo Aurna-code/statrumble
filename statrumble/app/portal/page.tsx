@@ -17,8 +17,8 @@ export default async function PortalPage() {
     <main className="mx-auto w-full max-w-5xl px-4 py-10 md:px-8">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Public Portal</p>
-        <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Public Workspaces</h1>
-        <p className="mt-2 text-sm text-zinc-600">A workspace portal anyone can view.</p>
+        <h1 className="mt-2 text-2xl font-semibold text-zinc-900">공개 워크스페이스</h1>
+        <p className="mt-2 text-sm text-zinc-600">누구나 볼 수 있는 워크스페이스 포털입니다.</p>
       </div>
 
       {loadError ? (
@@ -29,7 +29,7 @@ export default async function PortalPage() {
 
       {!loadError && workspaces.length === 0 ? (
         <div className="mt-6 rounded-lg border border-zinc-200 bg-white px-4 py-6 text-sm text-zinc-600">
-          No public workspaces yet.
+          아직 공개된 워크스페이스가 없습니다.
         </div>
       ) : null}
 
@@ -40,7 +40,7 @@ export default async function PortalPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Workspace</p>
               <h2 className="mt-2 text-lg font-semibold text-zinc-900">{workspace.display_name}</h2>
               <p className="mt-2 text-sm text-zinc-600">
-                {workspace.description ? workspace.description : "No description"}
+                {workspace.description ? workspace.description : "설명 없음"}
               </p>
               <div className="mt-4">
                 <Link

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createAnonClient, createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 
 export type DecisionCardListItem = {
@@ -33,23 +33,6 @@ export type PublicDecisionCard = {
   snapshot_start: string | null;
   snapshot_end: string | null;
   referee_report: unknown | null;
-};
-
-export type PublicDecisionDetail = {
-  id: string | null;
-  title: string | null;
-  summary: string | null;
-  created_at: string | null;
-  snapshot_start: string | null;
-  snapshot_end: string | null;
-  referee_report: unknown | null;
-  thread_id: string | null;
-  thread_kind: string | null;
-  transform_prompt: string | null;
-  transform_spec: unknown | null;
-  transform_sql_preview: string | null;
-  transform_stats: unknown | null;
-  transform_diff_report: unknown | null;
 };
 
 export async function listDecisions(limit = 20): Promise<DecisionCardListItem[]> {
@@ -102,23 +85,6 @@ export async function getPublicDecisionByPublicId(publicId: string): Promise<Pub
   }
 
   return (data as PublicDecisionCard | null) ?? null;
-}
-
-export async function getPublicDecisionDetailByPublicId(publicId: string): Promise<PublicDecisionDetail | null> {
-  const supabase = await createAnonClient();
-  const { data, error } = await supabase.rpc("get_public_decision_detail", {
-    p_public_id: publicId,
-  });
-
-  if (error) {
-    throw new Error(`Failed to load public decision detail: ${error.message}`);
-  }
-
-  if (!Array.isArray(data) || data.length === 0) {
-    return null;
-  }
-
-  return (data[0] as PublicDecisionDetail | null) ?? null;
 }
 
 export async function getDecisionForThread(threadId: string): Promise<DecisionCardListItem | null> {

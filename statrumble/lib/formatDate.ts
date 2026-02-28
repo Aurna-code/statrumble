@@ -98,7 +98,7 @@ function formatDateTimeUiParts(parts: DateParts): string | null {
   }
 
   const hour24 = hourRaw === 24 ? 0 : hourRaw;
-  const dayPeriod = hour24 < 12 ? "AM" : "PM";
+  const dayPeriod = hour24 < 12 ? "오전" : "오후";
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
 
   return `${parts.year}. ${parts.month}. ${parts.day}. ${dayPeriod} ${hour12}:${parts.minute}:${parts.second}`;

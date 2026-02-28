@@ -6,8 +6,8 @@ type OnboardingCardProps = {
 };
 
 export default function OnboardingCard({
-  title = "You're not in a workspace yet",
-  description = "Join with an invite code or create a new workspace to get started.",
+  title = "워크스페이스에 아직 참여하지 않았습니다",
+  description = "초대 코드로 Join 하거나 새 워크스페이스를 만들어 시작하세요.",
 }: OnboardingCardProps) {
   return (
     <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-6">

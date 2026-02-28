@@ -59,7 +59,7 @@ export default function JoinPage() {
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-2xl font-semibold">Join Workspace</h1>
-      <p className="mt-2 text-sm text-zinc-600">Enter an invite code to join the workspace.</p>
+      <p className="mt-2 text-sm text-zinc-600">초대 코드를 입력하면 워크스페이스 멤버로 참여합니다.</p>
 
       <section className="mt-6 max-w-md rounded-lg border border-zinc-200 bg-white p-5">
         <form className="space-y-4" onSubmit={onSubmit}>

@@ -18,13 +18,13 @@ export default function RefereeReportView({ report }: RefereeReportViewProps) {
         <div>
           <h3 className="text-sm font-semibold text-zinc-700">Data Facts</h3>
           {report.data_facts.length === 0 ? (
-            <p className="mt-1 text-sm text-zinc-600">None</p>
+            <p className="mt-1 text-sm text-zinc-600">없음</p>
           ) : (
             <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-zinc-900">
               {report.data_facts.map((item, index) => (
                 <li key={`${item.fact}-${index}`}>
                   <p>{item.fact}</p>
-                  <p className="text-xs text-zinc-600">Support: {item.support}</p>
+                  <p className="text-xs text-zinc-600">근거: {item.support}</p>
                 </li>
               ))}
             </ul>
@@ -49,7 +49,7 @@ export default function RefereeReportView({ report }: RefereeReportViewProps) {
         <div>
           <h3 className="text-sm font-semibold text-zinc-700">Confounders</h3>
           {report.confounders.length === 0 ? (
-            <p className="mt-1 text-sm text-zinc-600">None</p>
+            <p className="mt-1 text-sm text-zinc-600">없음</p>
           ) : (
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-900">
               {report.confounders.map((item, index) => (
@@ -62,7 +62,7 @@ export default function RefereeReportView({ report }: RefereeReportViewProps) {
         <div>
           <h3 className="text-sm font-semibold text-zinc-700">Next Checks</h3>
           {report.next_checks.length === 0 ? (
-            <p className="mt-1 text-sm text-zinc-600">None</p>
+            <p className="mt-1 text-sm text-zinc-600">없음</p>
           ) : (
             <ul className="mt-2 space-y-2 text-sm text-zinc-900">
               {report.next_checks.map((item, index) => (

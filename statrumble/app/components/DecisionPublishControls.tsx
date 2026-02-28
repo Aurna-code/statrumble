@@ -70,7 +70,7 @@ export default function DecisionPublishControls({
     try {
       await navigator.clipboard.writeText(fullUrl);
     } catch {
-      setError("Failed to copy.");
+      setError("복사에 실패했습니다.");
     }
   }
 
@@ -80,7 +80,7 @@ export default function DecisionPublishControls({
         <div>
           <p className="text-sm font-semibold text-zinc-900">Public Portal</p>
           <p className="text-xs text-zinc-600">
-            {isPublic ? "Published." : "Not published."}
+            {isPublic ? "공개 상태입니다." : "비공개 상태입니다."}
           </p>
         </div>
         <button
@@ -89,7 +89,7 @@ export default function DecisionPublishControls({
           disabled={saving}
           className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? "Saving..." : isPublic ? "Unpublish" : "Publish"}
+          {saving ? "저장 중..." : isPublic ? "Unpublish" : "Publish"}
         </button>
       </div>
 

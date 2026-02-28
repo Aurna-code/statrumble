@@ -13,7 +13,6 @@ export const dynamic = "force-dynamic";
 
 interface ThreadPageProps {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 type SnapshotMetric = {
@@ -53,43 +52,6 @@ type ComparableStats = {
   slope: number | null;
   warnings?: string[];
 };
-
-function getFirstSearchParamValue(value: string | string[] | undefined): string | null {
-  if (Array.isArray(value)) {
-    const first = value[0];
-    return typeof first === "string" && first.trim().length > 0 ? first.trim() : null;
-  }
-
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function buildArenaBackHref(searchParams: Record<string, string | string[] | undefined>) {
-  const importId = getFirstSearchParamValue(searchParams.import);
-
-  if (!importId) {
-    return "/#chart";
-  }
-
-  const start = getFirstSearchParamValue(searchParams.start);
-  const end = getFirstSearchParamValue(searchParams.end);
-  const arenaParams = new URLSearchParams();
-  arenaParams.set("import", importId);
-
-  if (start) {
-    arenaParams.set("start", start);
-  }
-
-  if (end) {
-    arenaParams.set("end", end);
-  }
-
-  return `/?${arenaParams.toString()}#chart`;
-}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -253,12 +215,8 @@ function formatCount(value: number | null | undefined) {
   return Math.round(value).toLocaleString("ko-KR");
 }
 
-export default async function Page({ params, searchParams }: ThreadPageProps) {
-  const [{ id }, resolvedSearchParams] = await Promise.all([
-    params,
-    searchParams ?? Promise.resolve({} as Record<string, string | string[] | undefined>),
-  ]);
-  const backToArenaHref = buildArenaBackHref(resolvedSearchParams);
+export default async function Page({ params }: ThreadPageProps) {
+  const { id } = await params;
   let thread = null;
   let initialDecisionId: string | null = null;
   let workspaceVoteProfile = null;
@@ -272,7 +230,7 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
           <Link href="/threads" className="text-zinc-600 hover:text-zinc-900">
             Back to Threads
           </Link>
-          <Link href={backToArenaHref} className="text-zinc-600 hover:text-zinc-900">
+          <Link href="/" className="text-zinc-600 hover:text-zinc-900">
             Back to Arena
           </Link>
         </div>
@@ -340,7 +298,7 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
         <Link href="/threads" className="text-zinc-600 hover:text-zinc-900">
           Back to Threads
         </Link>
-        <Link href={backToArenaHref} className="text-zinc-600 hover:text-zinc-900">
+        <Link href="/" className="text-zinc-600 hover:text-zinc-900">
           Back to Arena
         </Link>
       </div>

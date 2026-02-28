@@ -6,9 +6,6 @@ import { useRouter } from "next/navigation";
 type TransformProposalCreateFormProps = {
   importId: string;
   disabled?: boolean;
-  arenaImportId?: string | null;
-  arenaStartIndex?: number | null;
-  arenaEndIndex?: number | null;
 };
 
 type ProposeTransformApiResponse = {
@@ -45,17 +42,7 @@ function normalizeIssues(payload: ProposeTransformApiResponse | null): Validatio
     .filter((issue) => issue.message.length > 0);
 }
 
-function isValidNonNegativeInteger(value: number | null | undefined): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
-}
-
-export default function TransformProposalCreateForm({
-  importId,
-  disabled = false,
-  arenaImportId,
-  arenaStartIndex,
-  arenaEndIndex,
-}: TransformProposalCreateFormProps) {
+export default function TransformProposalCreateForm({ importId, disabled = false }: TransformProposalCreateFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -63,7 +50,6 @@ export default function TransformProposalCreateForm({
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const normalizedImportId = useMemo(() => importId.trim(), [importId]);
-  const normalizedArenaImportId = useMemo(() => (typeof arenaImportId === "string" ? arenaImportId.trim() : ""), [arenaImportId]);
   const isDisabled = disabled || normalizedImportId.length === 0;
   const disabledReason = "Select an import first";
 
@@ -116,20 +102,7 @@ export default function TransformProposalCreateForm({
         return;
       }
 
-      const threadParams = new URLSearchParams();
-      threadParams.set("from", "arena");
-
-      if (normalizedArenaImportId) {
-        threadParams.set("import", normalizedArenaImportId);
-      }
-
-      if (isValidNonNegativeInteger(arenaStartIndex) && isValidNonNegativeInteger(arenaEndIndex)) {
-        threadParams.set("start", String(arenaStartIndex));
-        threadParams.set("end", String(arenaEndIndex));
-      }
-
-      const threadHref = threadParams.toString().length > 0 ? `/threads/${threadId}?${threadParams.toString()}` : `/threads/${threadId}`;
-      router.push(threadHref);
+      router.push(`/threads/${threadId}`);
       router.refresh();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unknown error");

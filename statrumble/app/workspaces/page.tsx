@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import OnboardingCard from "@/app/components/OnboardingCard";
+import DisplayNameEditor from "@/app/components/DisplayNameEditor";
 import WorkspacesHub from "@/app/components/WorkspacesHub";
 import {
   listMemberWorkspaces,
@@ -70,6 +71,7 @@ export default async function WorkspacesPage() {
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <h1 className="text-2xl font-semibold">Workspaces</h1>
       <p className="mt-2 text-sm text-zinc-600">Manage your workspace memberships and switch active workspace.</p>
+      {!loadError ? <DisplayNameEditor /> : null}
 
       {loadError ? (
         <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5">

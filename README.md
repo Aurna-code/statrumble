@@ -40,7 +40,9 @@ Use `statrumble/.env.local` and never commit real keys.
 - `NEXT_PUBLIC_SUPABASE_URL` (local default: `http://127.0.0.1:54321`)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (copy from `supabase status`)
 - `OPENAI_API_KEY` (user-provided API key)
-- `NEXT_PUBLIC_DEV_PASSWORD_LOGIN` (optional demo toggle)
+- `NEXT_PUBLIC_DEV_PASSWORD_LOGIN` (optional toggle to show password login UI)
+
+Password login only works for accounts that already have an email+password set in Supabase Auth. This repo does not include password sign-up or password-setting flows. For first-time demos, prefer email OTP (magic link) login.
 
 ## Contest Preflight
 - Standard preflight:
@@ -64,8 +66,9 @@ Use `statrumble/.env.local` and never commit real keys.
 4. User A uploads CSV data and creates a thread from a selected chart segment.
 5. User A and User B comment and vote in the same thread.
 6. User A runs Referee/Judge to generate the decision report.
-7. User A promotes the thread to decision and publishes it.
-8. Share the public decision link from the portal.
+7. User A promotes the thread to a decision.
+8. User A publishes the decision and shares `/p/decisions/<publicId>`.
+9. Optional: User A enables the workspace public portal so the workspace appears on `/portal`, then anonymous viewers can navigate to the public decision from there.
 
 ## Screenshots
 - `[TODO]` Arena with chart and selected segment

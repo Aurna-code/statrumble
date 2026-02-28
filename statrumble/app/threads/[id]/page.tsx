@@ -6,11 +6,13 @@ import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
+import { createClient } from "@/lib/supabase/server";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
 import { extractSelectedSeries } from "@/lib/snapshot";
 import { formatMetricLabel, shortId } from "@/lib/threadLabel";
+import { getDisplayNameFromUser } from "@/lib/userDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -250,6 +252,24 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   const resolvedSearchParams = searchParams ? await searchParams : {};
   let thread = null;
   let initialDecisionId: string | null = null;
+  let currentUserId: string | null = null;
+  let currentUserDisplayName: string | null = null;
+
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (!authError && user) {
+      currentUserId = user.id;
+      currentUserDisplayName = getDisplayNameFromUser(user);
+    }
+  } catch {
+    currentUserId = null;
+    currentUserDisplayName = null;
+  }
 
   try {
     thread = await getThread(id);
@@ -464,6 +484,8 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
         snapshot={thread.snapshot}
         initialRefereeReport={(thread.referee_report as RefereeReport | null) ?? null}
         initialDecisionId={initialDecisionId}
+        currentUserId={currentUserId}
+        currentUserDisplayName={currentUserDisplayName}
       />
     </main>
   );

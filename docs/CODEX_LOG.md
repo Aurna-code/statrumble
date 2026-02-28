@@ -4290,3 +4290,76 @@ Goals
 - [ ] `./scripts/contest-preflight.sh` (requires clean tree; run after commit)
 #### Commit Link
 - TODO
+
+### Prompt ID: README polish demo portal + password login limitations (commit: TODO)
+#### Prompt
+```text
+[Prompt] README polish: fix demo flow portal prerequisite + clarify password login limitations (English-only)
+
+Context
+- Root README.md has a "Two-user demo flow" section that currently implies you can always share a public decision link from /portal.
+  In reality, /portal only lists workspaces that have been published to the public portal; otherwise it will appear empty.
+- README also mentions NEXT_PUBLIC_DEV_PASSWORD_LOGIN, but does not clearly state that password login only works for users
+  that already have an email+password set in Supabase Auth (it does not create such users automatically).
+
+Goals
+1) Update README demo steps so a fresh tester does not get stuck at the portal step.
+2) Add a clear note about password login: when it works, when it doesn’t, and recommended path for demos.
+3) Keep README English-only (no Hangul), consistent tone, short and practical.
+4) Do not add any real secrets or example values that look like keys.
+```
+#### Result
+- Updated root `README.md` demo flow: after promotion, the guide now explicitly says to publish and share `/p/decisions/<publicId>`, and marks `/portal` navigation as optional and dependent on enabling workspace public portal.
+- Updated env var documentation for `NEXT_PUBLIC_DEV_PASSWORD_LOGIN` to clarify it only shows password login UI and only works for Supabase users who already have email+password set.
+- Added explicit note that this repo does not provide password sign-up/password-setting flows and that email OTP (magic link) is recommended for first-time demos.
+#### Manual Checklist
+- [x] README demo flow no longer implies `/portal` always contains the workspace
+- [x] Password-login limitation and recommended OTP path documented
+- [x] English-only README copy for the new text
+- [x] No secret-like strings introduced
+- [ ] `./scripts/contest-preflight.sh` (requires clean tree)
+#### Commit Link
+- TODO
+
+### Prompt ID: Collaboration UX polish v0 display names + polling + nickname editor (commit: TODO)
+#### Prompt
+```text
+[Prompt] Collaboration UX polish (v0): show display names (not raw user_id) + lightweight polling + editable nickname after login
+
+Context
+- Messages currently render `message.user_id` as the author label, which hurts readability/trust.
+- The thread view does not feel real-time; users may not see others’ messages until manual refresh.
+- We want a v0 nickname/display-name feature: after login, a user can set a preferred display name; UI should use it.
+```
+#### Result
+- Added `statrumble/app/api/me/profile/route.ts` with:
+  - `GET` returning `{ userId, email, displayName }` for the authenticated user.
+  - `POST` to update `auth.user_metadata.display_name` via `supabase.auth.updateUser`, including trim + validation (`2..32`, ASCII letters/numbers/spaces/hyphen/underscore).
+- Added `statrumble/lib/userDisplay.ts` helpers:
+  - `getDisplayNameFromUser(user)`
+  - `shortId(id)` (delegates to existing short-id helper)
+- Added `statrumble/app/components/DisplayNameEditor.tsx` and mounted it on `statrumble/app/workspaces/page.tsx`.
+  - Loads profile on mount, supports inline edit/save, and shows inline success/error states.
+- Updated thread author labels in `statrumble/app/components/ThreadArena.tsx`:
+  - Self: display name if set, else `Me`
+  - Others: `User <shortId>`
+  - raw UUID labels removed from message author header.
+- Added lightweight thread polling in `ThreadArena`:
+  - 4-second interval
+  - pauses when tab is hidden and resumes on visibility return
+  - no overlapping refresh requests (existing in-flight guard retained)
+- Added auto-scroll behavior in `ThreadArena`:
+  - scroll to newest message after send
+  - scroll when refreshed data includes a newer last message.
+- Updated `statrumble/app/threads/[id]/page.tsx` to pass current user id/display name into `ThreadArena`.
+#### Manual Checklist
+- [x] Display name can be set/updated from `/workspaces`
+- [x] Message authors no longer show raw UUID strings in thread UI
+- [x] Self label resolves to display name or `Me`
+- [x] Polling refreshes every ~4s while visible
+- [x] Polling pauses when hidden and resumes when visible
+- [x] Refresh guard prevents overlap spam
+- [ ] Two-browser manual check for near-real-time message sync
+- [ ] `./scripts/contest-preflight.sh` with clean tree after commit
+#### Commit Link
+- TODO

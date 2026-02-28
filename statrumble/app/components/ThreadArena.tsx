@@ -7,6 +7,7 @@ import RefereeReportView from "@/app/components/RefereeReportView";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
+import { shortId } from "@/lib/userDisplay";
 
 type VoteStance = "A" | "B" | "C";
 
@@ -62,7 +63,11 @@ type ThreadArenaProps = {
   snapshot: unknown;
   initialRefereeReport?: RefereeReport | null;
   initialDecisionId?: string | null;
+  currentUserId?: string | null;
+  currentUserDisplayName?: string | null;
 };
+
+const POLL_INTERVAL_MS = 4000;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -156,8 +161,11 @@ export default function ThreadArena({
   snapshot,
   initialRefereeReport = null,
   initialDecisionId = null,
+  currentUserId = null,
+  currentUserDisplayName = null,
 }: ThreadArenaProps) {
   const router = useRouter();
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const renderWindowRef = useRef({
     windowStart: Date.now(),
     renderCount: 0,
@@ -179,8 +187,12 @@ export default function ThreadArena({
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(() =>
+    typeof document === "undefined" ? true : document.visibilityState === "visible",
+  );
   const refreshInFlightRef = useRef(false);
   const votesSignatureRef = useRef(buildVoteSignature(voteCounts, myStance));
+  const lastMessageIdRef = useRef<string | null>(null);
 
   if (process.env.NEXT_PUBLIC_DEBUG_RENDER_LOOP === "1") {
     const now = Date.now();
@@ -210,6 +222,32 @@ export default function ThreadArena({
   const quoteSentence = useMemo(() => buildQuoteSentence(snapshot), [snapshot]);
   const loadingMessages = refreshing && messages.length === 0;
 
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const container = messagesContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior,
+    });
+  }, []);
+
+  const getAuthorLabel = useCallback(
+    (messageUserId: string) => {
+      const myDisplayName = currentUserDisplayName?.trim();
+
+      if (currentUserId && messageUserId === currentUserId) {
+        return myDisplayName && myDisplayName.length > 0 ? myDisplayName : "Me";
+      }
+
+      return `User ${shortId(messageUserId)}`;
+    },
+    [currentUserDisplayName, currentUserId],
+  );
+
   const refreshThreadData = useCallback(async () => {
     if (refreshInFlightRef.current) {
       return;
@@ -232,7 +270,16 @@ export default function ThreadArena({
       }
 
       const nextMessages = payload.messages ?? [];
+      const previousLastMessageId = lastMessageIdRef.current;
+      const nextLastMessageId = nextMessages[nextMessages.length - 1]?.id ?? null;
       setMessages((prev) => (areMessagesEqual(prev, nextMessages) ? prev : nextMessages));
+      lastMessageIdRef.current = nextLastMessageId;
+
+      if (nextLastMessageId && previousLastMessageId !== nextLastMessageId) {
+        window.requestAnimationFrame(() => {
+          scrollMessagesToBottom(previousLastMessageId ? "smooth" : "auto");
+        });
+      }
 
       if (!payload.counts) {
         throw new Error("Failed to load votes.");
@@ -258,11 +305,42 @@ export default function ThreadArena({
       refreshInFlightRef.current = false;
       setRefreshing(false);
     }
-  }, [threadId]);
+  }, [scrollMessagesToBottom, threadId]);
 
   useEffect(() => {
     void refreshThreadData();
   }, [refreshThreadData]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      const visible = document.visibilityState === "visible";
+      setIsPageVisible(visible);
+
+      if (visible) {
+        void refreshThreadData();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshThreadData]);
+
+  useEffect(() => {
+    if (!isPageVisible) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshThreadData();
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isPageVisible, refreshThreadData]);
 
   async function onSendMessage() {
     if (sending || !draft.trim()) {
@@ -289,6 +367,7 @@ export default function ThreadArena({
 
       setDraft("");
       await refreshThreadData();
+      scrollMessagesToBottom("smooth");
     } catch (error) {
       setMessagesError(error instanceof Error ? error.message : "Unknown send error");
     } finally {
@@ -405,14 +484,14 @@ export default function ThreadArena({
             </button>
           </div>
 
-          <div className="mt-4 max-h-80 space-y-3 overflow-auto pr-1">
+          <div ref={messagesContainerRef} className="mt-4 max-h-80 space-y-3 overflow-auto pr-1">
             {loadingMessages ? <p className="text-sm text-zinc-600">Loading messages...</p> : null}
             {!loadingMessages && messages.length === 0 ? (
               <p className="text-sm text-zinc-600">No messages yet.</p>
             ) : null}
             {messages.map((message) => (
               <article key={message.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-                <p className="text-xs text-zinc-600">{message.user_id}</p>
+                <p className="text-xs text-zinc-600">{getAuthorLabel(message.user_id)}</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-900">{message.content}</p>
                 <p className="mt-2 text-[11px] text-zinc-500">{formatDateLabel(message.created_at)}</p>
               </article>

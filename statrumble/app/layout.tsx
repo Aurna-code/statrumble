@@ -1,21 +1,10 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import HeaderNavLinks from "@/app/components/HeaderNavLinks";
 import WorkspaceSwitcher from "@/app/components/WorkspaceSwitcher";
 import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "StatRumble",
@@ -51,7 +40,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className="antialiased font-sans">
         <div className="min-h-screen bg-zinc-50 text-zinc-900">
           <header className="border-b border-zinc-200 bg-white">
             <nav className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3 text-sm md:px-8">

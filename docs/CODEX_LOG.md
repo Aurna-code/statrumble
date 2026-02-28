@@ -4148,3 +4148,33 @@ Goal
 - [ ] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone: blocked at the same build step before Supabase smoke stage.
 #### Commit Link
 - TODO
+
+### Prompt ID: Remove remote font fetch and harden offline preflight (commit: TODO)
+#### Original Prompt
+```text
+[Prompt] Remove next/font/google build-time fetch (system fonts or local) + make contest-preflight pass offline + add regression check
+```
+#### Change Summary
+- Removed remote Google font usage from the app shell:
+  - `statrumble/app/layout.tsx` no longer imports font loaders and now uses `className="antialiased font-sans"`.
+  - `statrumble/app/globals.css` now defines `--font-sans` and `--font-mono` as system stacks and applies `font-family: var(--font-sans)` on `body`.
+- Added `scripts/verify-no-remote-fonts.mjs` to scan tracked files and fail on remote web-font patterns.
+- Wired remote-font regression check into `statrumble/package.json` `test` script.
+- Updated `scripts/contest-preflight.sh` to run `node scripts/verify-no-remote-fonts.mjs` before build and set `NEXT_TELEMETRY_DISABLED=1` for the build step.
+- Updated `README.md` to note that system fonts are used so production builds do not depend on remote font downloads.
+#### Manual Checklist
+- [x] Build-time remote font dependency removed from app layout/theme.
+- [x] Added regression check to prevent remote font patterns from reappearing.
+- [x] Wired regression check into `pnpm -C statrumble test`.
+- [x] Wired regression check + telemetry-disable into contest preflight build path.
+- [x] Confirmed no remaining Geist CSS variable references.
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [x] `./scripts/contest-preflight.sh` (current workspace) fails at clean-tree gate as designed.
+- [x] `./scripts/contest-preflight.sh` in temporary clean clone passes end-to-end, including build and migration checks.
+- [x] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone reaches optional stage and fails with `Docker is required` in this environment.
+#### Commit Link
+- TODO

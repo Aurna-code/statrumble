@@ -74,3 +74,4 @@ Use `statrumble/.env.local` and never commit real keys.
 - App code lives in `statrumble/`.
 - Verification script: `scripts/verify.sh`.
 - Prompt-by-prompt history is logged in `docs/CODEX_LOG.md`.
+- The app uses system font stacks, so `next build` does not require remote font downloads.

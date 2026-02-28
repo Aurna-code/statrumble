@@ -73,7 +73,12 @@ echo "Running pnpm -C statrumble test"
 pnpm -C statrumble test
 echo "test: OK"
 
+echo "Running node scripts/verify-no-remote-fonts.mjs"
+node scripts/verify-no-remote-fonts.mjs
+echo "verify-no-remote-fonts: OK"
+
 echo "Running pnpm -C statrumble build"
+export NEXT_TELEMETRY_DISABLED=1
 pnpm -C statrumble build
 echo "build: OK"
 

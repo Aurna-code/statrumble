@@ -23,6 +23,8 @@ type ValidationIssue = {
 };
 
 const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+const AI_MODE_INLINE_LABEL = SHOW_DEMO_BADGE ? "(demo)" : "(API)";
+const AI_MODE_HELPER_TEXT = SHOW_DEMO_BADGE ? "No API calls." : "May incur costs.";
 
 function normalizeIssues(payload: ProposeTransformApiResponse | null): ValidationIssue[] {
   const issuesRaw = payload?.details?.issues;
@@ -154,7 +156,7 @@ export default function TransformProposalForkForm({ importId, parentThreadId }: 
               disabled={submitting || !importId.trim()}
               className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Creating..." : "Create Fork"}
+              {submitting ? "Creating..." : `Create Fork ${AI_MODE_INLINE_LABEL}`}
             </button>
             <button
               type="button"
@@ -165,6 +167,7 @@ export default function TransformProposalForkForm({ importId, parentThreadId }: 
               Cancel
             </button>
           </div>
+          <p className="text-xs text-zinc-500">{AI_MODE_HELPER_TEXT}</p>
 
           {error ? <p className="text-xs text-red-600">{error}</p> : null}
           {issues.length > 0 ? (

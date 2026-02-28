@@ -4430,3 +4430,57 @@ Goals
 - [ ] Manual UI check for `NEXT_PUBLIC_DEMO_MODE=1` badge visibility
 #### Commit Link
 - TODO
+
+### Prompt ID: Label AI actions as demo vs API/cost (commit: TODO)
+#### Prompt
+```text
+[Prompt] Add clear cost/API indicators for Run Referee + Transform actions (demo vs real), keep UX lightweight
+
+Context
+- Re-run already has a confirm: "may incur costs".
+- Run Referee currently has no explicit cost/API indicator, which can mislead users.
+- Demo mode exists and UI shows a "Demo mode" badge only when NEXT_PUBLIC_DEMO_MODE=1.
+- We want consistent, clear labeling for AI actions:
+  - demo: no API calls
+  - real: API call may incur costs
+
+Goals
+1) ThreadArena:
+   - For Run Referee button, show a small inline indicator next to the label:
+     - If NEXT_PUBLIC_DEMO_MODE=1: "(demo)" and helper text "No API calls."
+     - Else: "(API)" and helper text "May incur costs."
+   - Keep Re-run confirm as-is, but align the label:
+     - "Re-run (API)" or "Re-run (may incur costs)" (pick one consistent style)
+2) TransformProposalCreateForm + TransformProposalForkForm:
+   - Add the same style near "Create Proposal" / "Create Fork":
+     - demo: "(demo)" + "No API calls."
+     - real: "(API)" + "May incur costs."
+3) Make sure helper text is subtle:
+   - text-xs text-zinc-500
+4) No new deps, English-only.
+
+Implementation details
+- Do NOT rely on server-side isDemoMode() in client.
+- Use NEXT_PUBLIC_DEMO_MODE only for the demo branch indicator (already used).
+- For real mode indicator, show it when NEXT_PUBLIC_DEMO_MODE !== "1" (assume real).
+  (Even if key missing, server will run demo fallback; that’s fine—worst case label says API but response includes demo_note which is already displayed.)
+```
+#### Result
+- Updated `ThreadArena` AI action labels to include inline mode suffixes:
+  - `Run Referee (demo|API)`
+  - `Re-run (demo|API)`
+- Kept the existing re-run confirm dialog unchanged.
+- Added subtle helper text under the referee action row:
+  - `No API calls.` in demo label mode
+  - `May incur costs.` in API label mode
+- Updated `TransformProposalCreateForm` submit CTA to `Create Proposal (demo|API)` plus subtle helper text.
+- Updated `TransformProposalForkForm` submit CTA to `Create Fork (demo|API)` plus subtle helper text.
+- Added one README note that AI buttons show `(demo)` or `(API)` to indicate expected request-cost behavior.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build` (required escalated run due sandbox Turbopack port-binding restriction)
+- [ ] Manual UI check: labels/helper text visible for both demo and non-demo env toggles
+#### Commit Link
+- TODO

@@ -45,6 +45,7 @@ Use `statrumble/.env.local` and never commit real keys.
 - `NEXT_PUBLIC_DEV_PASSWORD_LOGIN` (optional toggle to show password login UI)
 
 If `OPENAI_API_KEY` is set and `DEMO_MODE` is not `1`, server routes use real AI. For contest reviewers, demo mode runs the full collaboration flow without API keys.
+AI action buttons show `(demo)` or `(API)` in the UI to indicate expected request-cost behavior.
 
 Password login only works for accounts that already have an email+password set in Supabase Auth. This repo does not include password sign-up or password-setting flows. For first-time demos, prefer email OTP (magic link) login.
 

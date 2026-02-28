@@ -69,6 +69,8 @@ type ThreadArenaProps = {
 
 const POLL_INTERVAL_MS = 4000;
 const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+const AI_MODE_INLINE_LABEL = SHOW_DEMO_BADGE ? "(demo)" : "(API)";
+const AI_MODE_HELPER_TEXT = SHOW_DEMO_BADGE ? "No API calls." : "May incur costs.";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -586,7 +588,7 @@ export default function ThreadArena({
                 disabled={judging}
                 className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {judging ? "Running Referee..." : "Run Referee"}
+                {judging ? "Running Referee..." : `Run Referee ${AI_MODE_INLINE_LABEL}`}
               </button>
               <button
                 type="button"
@@ -604,7 +606,7 @@ export default function ThreadArena({
                 disabled={judging}
                 className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {judging ? "Re-running..." : "Re-run (costs)"}
+                {judging ? "Re-running..." : `Re-run ${AI_MODE_INLINE_LABEL}`}
               </button>
               {refereeReused ? (
                 <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
@@ -617,6 +619,7 @@ export default function ThreadArena({
                 </span>
               ) : null}
             </div>
+            <p className="mt-2 text-xs text-zinc-500">{AI_MODE_HELPER_TEXT}</p>
             {judgeError ? <p className="mt-2 text-sm text-red-600">{judgeError}</p> : null}
           </div>
 

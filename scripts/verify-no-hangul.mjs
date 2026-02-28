@@ -3,6 +3,9 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
+const HANGUL_REGEX = /[\u3131-\u318E\uAC00-\uD7A3]/u;
+const MAX_LINES_PER_FILE = 5;
+
 function listTrackedFiles() {
   try {
     return execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
@@ -16,22 +19,9 @@ function listTrackedFiles() {
   }
 }
 
-const trackedFiles = listTrackedFiles();
-const excludedFiles = new Set(["docs/CODEX_LOG.md"]);
-
-const rules = [
-  { name: "next-font-google", regex: /next\/font\/google/ },
-  { name: "fonts-googleapis", regex: /fonts\.googleapis\.com/ },
-  { name: "css-import-google-font", regex: /@import\s+url\(["']https:\/\/fonts\.googleapis\.com/ },
-];
-
 const findings = [];
 
-for (const filePath of trackedFiles) {
-  if (excludedFiles.has(filePath)) {
-    continue;
-  }
-
+for (const filePath of listTrackedFiles()) {
   let raw;
   try {
     raw = readFileSync(filePath);
@@ -47,26 +37,34 @@ for (const filePath of trackedFiles) {
   }
 
   const lines = raw.toString("utf8").split(/\r?\n/);
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-    for (const rule of rules) {
-      if (rule.regex.test(line)) {
-        findings.push({
-          filePath,
-          line: i + 1,
-          match: rule.name,
-        });
+  const matchedLines = [];
+  let totalMatches = 0;
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    if (HANGUL_REGEX.test(lines[lineIndex])) {
+      totalMatches += 1;
+      if (matchedLines.length < MAX_LINES_PER_FILE) {
+        matchedLines.push(lineIndex + 1);
       }
     }
+  }
+
+  if (totalMatches > 0) {
+    findings.push({
+      filePath,
+      matchedLines,
+      remainingCount: Math.max(0, totalMatches - matchedLines.length),
+    });
   }
 }
 
 if (findings.length > 0) {
-  console.error("verify-no-remote-fonts: FAIL");
+  console.error("verify-no-hangul: FAIL");
   for (const finding of findings) {
-    console.error(`${finding.filePath}:${finding.line}: ${finding.match}`);
+    const suffix = finding.remainingCount > 0 ? ` (+${finding.remainingCount} more)` : "";
+    console.error(`${finding.filePath}: lines ${finding.matchedLines.join(", ")}${suffix}`);
   }
   process.exit(1);
 }
 
-console.log("verify-no-remote-fonts: OK");
+console.log("verify-no-hangul: OK");

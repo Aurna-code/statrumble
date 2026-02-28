@@ -64,6 +64,10 @@ else
 fi
 echo "Secret scan: OK"
 
+echo "Running node scripts/verify-no-hangul.mjs"
+node scripts/verify-no-hangul.mjs
+echo "verify-no-hangul: OK"
+
 section "3) Dependency + checks"
 echo "Running npm run verify"
 npm run verify

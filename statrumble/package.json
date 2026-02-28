@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-snapshot.mjs && node ../scripts/verify-no-remote-fonts.mjs",
+    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-snapshot.mjs && node ../scripts/verify-no-remote-fonts.mjs && node ../scripts/verify-no-hangul.mjs",
     "verify": "../scripts/verify.sh"
   },
   "dependencies": {

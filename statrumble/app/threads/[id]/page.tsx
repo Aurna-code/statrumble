@@ -8,6 +8,7 @@ import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
 import { extractSelectedSeries } from "@/lib/snapshot";
 import { formatMetricLabel, shortId } from "@/lib/threadLabel";
 
@@ -175,10 +176,7 @@ function formatSignedNumber(value: number | null | undefined, digits = 2) {
     return "-";
   }
 
-  const formatted = value.toLocaleString("ko-KR", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+  const formatted = formatNumberLabel(value, digits);
 
   return value > 0 ? `+${formatted}` : formatted;
 }
@@ -189,7 +187,7 @@ function formatSignedCount(value: number | null | undefined) {
   }
 
   const rounded = Math.round(value);
-  const formatted = rounded.toLocaleString("ko-KR");
+  const formatted = formatCountLabel(rounded);
 
   return rounded > 0 ? `+${formatted}` : formatted;
 }
@@ -204,10 +202,7 @@ function formatNumber(value: number | null | undefined, digits = 2) {
     return "-";
   }
 
-  return value.toLocaleString("ko-KR", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
+  return formatNumberLabel(value, digits);
 }
 
 function formatCount(value: number | null | undefined) {
@@ -215,7 +210,7 @@ function formatCount(value: number | null | undefined) {
     return "-";
   }
 
-  return Math.round(value).toLocaleString("ko-KR");
+  return formatCountLabel(Math.round(value));
 }
 
 function asSearchValue(value: string | string[] | undefined): string | null {

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatDateTimeLabel } from "@/lib/formatDate";
+import { formatCount, formatNumber } from "@/lib/formatNumber";
 import type { SnapshotPoint } from "@/lib/snapshot";
 
 type ThreadSnapshotChartProps = {
@@ -18,7 +19,7 @@ function formatTimestamp(value: string | number): string {
       return formatDateTimeLabel(asDate.toISOString());
     }
 
-    return value.toLocaleString("ko-KR");
+    return formatCount(value);
   }
 
   const formatted = formatDateTimeLabel(value);
@@ -26,9 +27,7 @@ function formatTimestamp(value: string | number): string {
 }
 
 function formatMetricValue(value: number): string {
-  return value.toLocaleString("ko-KR", {
-    maximumFractionDigits: 6,
-  });
+  return formatNumber(value, 6);
 }
 
 export default function ThreadSnapshotChart({ points, metricLabel }: ThreadSnapshotChartProps) {

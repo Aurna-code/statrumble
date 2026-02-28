@@ -1,26 +1,16 @@
 type DateInput = string | null | undefined;
 
-type DatePartKey = "year" | "month" | "day" | "hour" | "minute" | "second" | "dayPeriod";
+type DatePartKey = "year" | "month" | "day" | "hour" | "minute" | "second";
 
 type DateParts = Partial<Record<DatePartKey, string>>;
 
 const ISO_WITH_TIME = /^\d{4}-\d{2}-\d{2}T/;
 const HAS_TIMEZONE = /(Z|[+\-]\d{2}:\d{2})$/;
+const APP_TIMEZONE = process.env.NEXT_PUBLIC_APP_TIMEZONE ?? "America/Los_Angeles";
+const LOCALE = "en-US";
 
-const DATE_TIME_PARTS_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
-  year: "numeric",
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-  hourCycle: "h23",
-});
-
-const DATE_TIME_24_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
+const DATE_TIME_PARTS_FORMATTER = new Intl.DateTimeFormat(LOCALE, {
+  timeZone: APP_TIMEZONE,
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
@@ -31,11 +21,11 @@ const DATE_TIME_24_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
   hourCycle: "h23",
 });
 
-const DATE_ONLY_FORMATTER = new Intl.DateTimeFormat("ko-KR", {
-  timeZone: "Asia/Seoul",
+const DATE_ONLY_FORMATTER = new Intl.DateTimeFormat(LOCALE, {
+  timeZone: APP_TIMEZONE,
   year: "numeric",
-  month: "numeric",
-  day: "numeric",
+  month: "2-digit",
+  day: "2-digit",
 });
 
 export function parseDate(value: string): Date | null {
@@ -77,7 +67,7 @@ function formatDateParts(parts: DateParts): string | null {
     return null;
   }
 
-  return `${parts.year}. ${parts.month}. ${parts.day}.`;
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function formatDateTimeUiParts(parts: DateParts): string | null {
@@ -92,25 +82,8 @@ function formatDateTimeUiParts(parts: DateParts): string | null {
     return null;
   }
 
-  const hourRaw = Number(parts.hour);
-  if (!Number.isFinite(hourRaw)) {
-    return null;
-  }
-
-  const hour24 = hourRaw === 24 ? 0 : hourRaw;
-  const dayPeriod = hour24 < 12 ? "오전" : "오후";
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
-
-  return `${parts.year}. ${parts.month}. ${parts.day}. ${dayPeriod} ${hour12}:${parts.minute}:${parts.second}`;
-}
-
-function formatDateTime24Parts(parts: DateParts): string | null {
-  if (!parts.year || !parts.month || !parts.day || !parts.hour || !parts.minute || !parts.second) {
-    return null;
-  }
-
   const hour = parts.hour === "24" ? "00" : parts.hour;
-  return `${parts.year}.${parts.month}.${parts.day} ${hour}:${parts.minute}:${parts.second}`;
+  return `${parts.year}-${parts.month}-${parts.day} ${hour}:${parts.minute}:${parts.second}`;
 }
 
 export function formatDateLabel(value: DateInput): string {
@@ -144,16 +117,5 @@ export function formatDateTimeLabel(value: DateInput): string {
 }
 
 export function formatDateTimeLabel24(value: DateInput): string {
-  if (value === null || value === undefined) {
-    return "-";
-  }
-
-  const parsed = parseDate(value);
-
-  if (!parsed) {
-    return value;
-  }
-
-  const parts = extractParts(DATE_TIME_24_FORMATTER, parsed);
-  return formatDateTime24Parts(parts) ?? DATE_TIME_24_FORMATTER.format(parsed);
+  return formatDateTimeLabel(value);
 }

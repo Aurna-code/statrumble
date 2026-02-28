@@ -4107,3 +4107,44 @@ Goal
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Contest preflight checks + README run instructions (commit: TODO)
+#### Original Prompt
+```text
+[Prompt] Contest preflight: add one-command checks (secrets, verify/build, migrations, local supabase smoke) + README run instructions
+```
+#### Change Summary
+- Added `scripts/contest-preflight.sh` with sectioned checks for:
+  - clean git working tree,
+  - tracked `.env*` guard (excluding `.env.example`) and secret scan,
+  - `npm run verify`, `pnpm -C statrumble test`, `pnpm -C statrumble build`,
+  - local migration checks (`000_*` and `022_*`) plus optional remote migration listing,
+  - optional local Supabase smoke flow via `--with-local-supabase`.
+- Added `scripts/secret-scan.mjs` (dependency-free Node helper) to scan tracked files for likely real secrets while allowing placeholder values.
+- Updated `statrumble/.gitignore` with `!.env.example` so the placeholder env file is tracked.
+- Rewrote root `README.md` in English with contest-focused sections:
+  - what was built,
+  - concrete Codex usage,
+  - local run commands,
+  - environment variable list,
+  - two-user demo script,
+  - screenshot placeholders,
+  - preflight command usage.
+- Added `statrumble/.env.example` with placeholder-only local values.
+#### Manual Checklist
+- [x] Added one-command contest preflight script.
+- [x] Added secret scan helper with no new dependencies.
+- [x] Added `--with-local-supabase` option to preflight script.
+- [x] Updated README with required runbook and Codex usage explanation.
+- [x] Added `statrumble/.env.example` placeholders only.
+- [x] No real keys added to repository.
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [x] `./scripts/contest-preflight.sh` (current working tree): fails at clean-tree gate as designed.
+- [x] `./scripts/contest-preflight.sh --with-local-supabase` (current working tree): fails at clean-tree gate as designed.
+- [ ] `./scripts/contest-preflight.sh` in temporary clean clone: blocked at `pnpm -C statrumble build` due offline Google Fonts fetch in this environment.
+- [ ] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone: blocked at the same build step before Supabase smoke stage.
+#### Commit Link
+- TODO

@@ -5,11 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import InviteCodeCopyButton from "@/app/components/InviteCodeCopyButton";
 import WorkspacePublicPortalControls from "@/app/components/WorkspacePublicPortalControls";
-import WorkspaceVoteSettings from "@/app/components/WorkspaceVoteSettings";
 import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
 import type { MemberWorkspaceRow, WorkspaceMemberRow, WorkspacePublicProfile } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatJoinedAt } from "@/lib/formatDate";
-import type { VoteProfileConfig } from "@/lib/voteProfile";
 
 type WorkspacesHubProps = {
   workspaces: MemberWorkspaceRow[];
@@ -18,7 +16,6 @@ type WorkspacesHubProps = {
   membersWorkspaceId: string | null;
   membersError: string | null;
   workspacePublicProfile: WorkspacePublicProfile | null;
-  workspaceVoteProfile: VoteProfileConfig | null;
 };
 
 type SetActiveWorkspaceResponse = {
@@ -46,7 +43,6 @@ export default function WorkspacesHub({
   membersWorkspaceId,
   membersError,
   workspacePublicProfile,
-  workspaceVoteProfile,
 }: WorkspacesHubProps) {
   const router = useRouter();
   const [memberships, setMemberships] = useState(workspaces);
@@ -259,14 +255,6 @@ export default function WorkspacesHub({
             />
           </div>
         </div>
-      ) : null}
-
-      {activeWorkspace ? (
-        <WorkspaceVoteSettings
-          workspaceId={activeWorkspace.id}
-          isOwner={isActiveOwner}
-          initialConfig={workspaceVoteProfile}
-        />
       ) : null}
 
       <div className="rounded-lg border border-zinc-200 bg-white p-5">

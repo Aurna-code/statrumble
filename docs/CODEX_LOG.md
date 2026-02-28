@@ -2990,3 +2990,190 @@ Requirements:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests (commit: TODO)
+#### Prompt
+```text
+[Prompt] Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests
+
+Context
+- Public routes exist: /portal and /p/* are accessible without login (see statrumble/proxy.ts).
+- Header nav currently always shows app navigation (Arena/Threads/Decisions/Workspaces/Join), which is confusing on public pages for anonymous visitors.
+- layout metadata still says "StatRumble MVP scaffolding".
+- Thread lists and thread pages currently surface raw UUIDs in titles like "Thread #<uuid>" which feels unfinished.
+- There is no custom app/not-found.tsx or app/error.tsx yet.
+
+Constraints
+- No new dependencies.
+- UI copy must be English only (Hangul 0).
+- Keep styling consistent with existing Tailwind cards (bg-zinc-50, bg-white, border-zinc-200, shadow-sm).
+- Keep verify green: npm run lint, npm run typecheck, ./scripts/verify.sh.
+
+Goals
+1) Header nav for public pages:
+   - If pathname is a public route (/portal, /portal/*, /p/*) AND user is NOT authenticated:
+     - show only a single left-nav link: "Portal" -> /portal
+     - do NOT show Arena/Threads/Decisions/Workspaces/Join
+   - If user IS authenticated:
+     - show normal app nav
+     - on public routes, prepend "Portal" link as first nav item
+   - Ensure "Join" never appears for unauthenticated users.
+
+2) Replace UUID-heavy thread titles with meaningful display:
+   - In Home thread list (statrumble/app/page.tsx), Threads page (statrumble/app/threads/page.tsx), and Thread detail page (statrumble/app/threads/[id]/page.tsx):
+     - Stop rendering "Thread #<uuid>" as the primary title.
+     - Use:
+       - Primary: metric label = "<metric.name> (<unit>)" if unit exists, else "<metric.name>", else "Thread"
+       - Secondary: "Range: <start> → <end>" using existing formatDateTimeLabel
+       - Small ID label: "ID: <shortId>" where shortId = first 8 chars of uuid
+     - Keep the "Proposal" badge for transform_proposal threads.
+
+3) Add custom Not Found and Error pages
+   - Add statrumble/app/not-found.tsx:
+     - A friendly card: "Not found" + short explanation + actions:
+       - Back to Portal (/portal)
+       - Back to Arena (/#chart)
+       - Back to Threads (/threads) (only show if authenticated; otherwise omit)
+   - Add statrumble/app/error.tsx (client component):
+     - "Something went wrong" + error message (small) + buttons:
+       - Try again (reset)
+       - Back to Portal (/portal)
+       - Back to Arena (/#chart)
+     - Use the same card styling.
+
+4) Remove MVP scaffolding traces
+   - Update statrumble/app/layout.tsx metadata.description to a product-like line (no "MVP", no "scaffolding").
+     Example: "Debate and decide with metric snapshots."
+   - Ensure no UI copy mentions "scaffolding", "placeholder", or "Prompt 00".
+
+Implementation details
+
+A) Introduce a pure nav model helper + tests (no Next/React dependency in tests)
+1) Create a new pure helper module:
+   - statrumble/lib/nav.ts
+   - Export:
+     - type NavItem = { href: string; label: string; isActive: (pathname: string) => boolean }
+     - function isPublicPathname(pathname: string): boolean
+     - function getHeaderNavItems(opts: { pathname: string; isAuthenticated: boolean; showJoin: boolean }): NavItem[]
+   - Rules:
+     - public route = /portal or /portal/* or /p/* (exact matching + prefix)
+     - portalNavItem:
+       - href: "/portal"
+       - label: "Portal"
+       - active when pathname startsWith("/portal") OR startsWith("/p/")
+     - app nav items:
+       - Arena (/)
+       - Threads (/threads)
+       - Decisions (/decisions)
+       - Workspaces (/workspaces)
+       - Join (/join) only when showJoin===true
+     - If isPublic && !isAuthenticated => return [portalNavItem]
+     - If isPublic && isAuthenticated => return [portalNavItem, ...appNavItems]
+     - Else => return appNavItems
+
+2) Refactor statrumble/app/components/HeaderNavLinks.tsx to use the helper:
+   - Add props: isAuthenticated: boolean; showJoin?: boolean
+   - Use usePathname() and call getHeaderNavItems({ pathname, isAuthenticated, showJoin })
+   - Render as before (active styling uses item.isActive(pathname))
+
+3) Update statrumble/app/layout.tsx:
+   - Fix showJoin:
+     - showJoin = Boolean(user) && workspaceSelection.workspaces.length === 0 && !workspaceSelection.activeWorkspaceId
+   - Pass isAuthenticated={Boolean(user)} into HeaderNavLinks
+   - Update metadata.description
+
+4) Add a minimal node test script to prevent regressions:
+   - Create scripts/verify-nav.mjs (root-level scripts/)
+     - Use node:assert/strict
+     - Import { getHeaderNavItems } from "../statrumble/lib/nav.ts"
+     - Test cases (compare href/label only):
+       - pathname "/portal", isAuthenticated false => only ["Portal"]
+       - pathname "/p/decisions/abc", isAuthenticated false => only ["Portal"]
+       - pathname "/", isAuthenticated true, showJoin false => includes Arena/Threads/Decisions/Workspaces (no Join)
+       - pathname "/", isAuthenticated true, showJoin true => includes Join
+     - console.log("verify-nav: OK") on success
+
+5) Wire test execution:
+   - Update statrumble/package.json test script from echo to:
+     - node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs
+   - Keep it dependency-free.
+
+B) Thread title polish helper (optional but preferred for consistency)
+1) Create statrumble/lib/threadLabel.ts (pure):
+   - export function shortId(id: string): string (first 8 chars, fallback "-")
+   - export function formatMetricLabel(metric: { name?: string | null; unit?: string | null } | null): string
+   - export function formatThreadPrimaryTitle(thread: { id: string; metric: { name: string; unit: string | null } | null }): string
+   - (Do NOT call Next/React; keep it pure.)
+
+2) Update:
+   - statrumble/app/page.tsx: replace "Thread #..." rendering in Threads section with:
+     - Primary line: metric label + proposal badge + small "ID: abcdef12"
+     - Secondary: Range: start_ts → end_ts (use formatDateTimeLabel)
+   - statrumble/app/threads/page.tsx: same change
+   - statrumble/app/threads/[id]/page.tsx:
+     - Replace H1 "Thread #<id>" with metric label as H1
+     - Show range + short ID as subtitle text
+
+C) Custom not-found and error pages
+1) Add statrumble/app/not-found.tsx:
+   - Use <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+   - Card container: rounded-xl border bg-white shadow-sm p-6
+   - Links: Portal, Arena, Threads (Threads should be shown only if authenticated; if not feasible without auth, omit Threads link)
+   - Keep copy short and calm.
+
+2) Add statrumble/app/error.tsx:
+   - "use client"
+   - function Error({ error, reset })
+   - Similar card layout + buttons.
+   - Log to console in useEffect.
+
+D) Docs
+- Append an entry to docs/CODEX_LOG.md:
+  - Prompt text
+  - Summary of the 4 polish areas
+  - Verification results
+  - Manual checklist:
+    - Visit /portal logged out: header shows only Portal + Login on the right
+    - Visit /p/decisions/<publicId> logged out: header shows only Portal + Login
+    - Logged in: header shows full nav; Join only when no membership
+    - Home/Threads: thread list no longer shows raw UUID as primary title
+    - Trigger 404 on a random route: custom not-found renders
+    - Force an error (temporary throw in a page, then revert): error page renders
+
+Verification
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+
+Output format
+- Changed files list
+- Key diff summary (nav gating, thread title changes, new error/not-found pages, metadata change)
+- verify results
+- Suggested commit: chore(ui): polish nav + thread titles + custom error pages
+```
+#### Result
+- Added pure navigation model in `statrumble/lib/nav.ts` and refactored `statrumble/app/components/HeaderNavLinks.tsx` to derive links from `pathname + auth + showJoin`.
+- Updated `statrumble/app/layout.tsx` to pass `isAuthenticated`, compute `showJoin` with membership rules, and changed metadata description to: `Debate and decide with metric snapshots.`
+- Added `scripts/verify-nav.mjs` and wired `statrumble/package.json` `test` script to run it with the existing TS strip loader.
+- Added pure thread label helper `statrumble/lib/threadLabel.ts` and updated thread rendering on:
+  - `statrumble/app/page.tsx`
+  - `statrumble/app/threads/page.tsx` (new route)
+  - `statrumble/app/threads/[id]/page.tsx`
+  using metric-first primary title, `Range: start → end`, and `ID: <shortId>` while preserving the Proposal badge.
+- Added custom error surfaces:
+  - `statrumble/app/not-found.tsx` with Portal/Arena actions and conditional Threads action when authenticated.
+  - `statrumble/app/error.tsx` client boundary with `Try again`, `Back to Portal`, `Back to Arena`, and console logging via `useEffect`.
+- Removed MVP scaffolding copy from home/layout UI text (`Prompt 00`, `scaffolding`, upload placeholder copy).
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Manual Checklist
+- [ ] Visit `/portal` logged out: header shows only Portal + Login on the right
+- [ ] Visit `/p/decisions/<publicId>` logged out: header shows only Portal + Login
+- [ ] Logged in: header shows full nav; Join only when no membership
+- [ ] Home/Threads: thread list no longer shows raw UUID as primary title
+- [ ] Trigger 404 on a random route: custom not-found renders
+- [ ] Force an error (temporary throw in a page, then revert): error page renders
+#### Commit Link
+- TODO

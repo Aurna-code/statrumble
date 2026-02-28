@@ -5,10 +5,11 @@ import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import UploadCsvForm from "@/app/components/UploadCsvForm";
 import ImportChart from "@/app/components/ImportChart";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { formatThreadPrimaryTitle, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
 
-function formatMetricLabel(row: MetricImportRow) {
+function formatImportMetricLabel(row: MetricImportRow) {
   const metric = Array.isArray(row.metrics) ? row.metrics[0] : row.metrics;
 
   if (!metric) {
@@ -31,7 +32,7 @@ export default async function Home() {
   if (!hasMembership) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-        <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
+        <h1 className="text-2xl font-semibold">Arena</h1>
         <p className="mt-2 text-sm text-zinc-600">Join a workspace first to start data debate.</p>
         <OnboardingCard />
       </main>
@@ -57,14 +58,12 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
-      <p className="mt-2 text-sm text-zinc-600">
-        Prompt 00 scaffolding page. Functional logic will be implemented in later prompts.
-      </p>
+      <h1 className="text-2xl font-semibold">Arena</h1>
+      <p className="mt-2 text-sm text-zinc-600">Upload data, inspect ranges, and start discussion threads.</p>
 
       <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
         <h2 className="font-medium">CSV Upload</h2>
-        <p className="mt-1 text-sm text-zinc-600">Upload UI placeholder</p>
+        <p className="mt-1 text-sm text-zinc-600">Upload CSV data to create imports and metrics.</p>
         <UploadCsvForm />
       </section>
 
@@ -94,7 +93,7 @@ export default async function Home() {
               <li key={thread.id} className="rounded border border-zinc-200 px-3 py-2">
                 <p className="font-medium">
                   <Link href={`/threads/${thread.id}`} className="hover:underline">
-                    Thread #{thread.id}
+                    {formatThreadPrimaryTitle(thread)}
                   </Link>
                   {thread.kind === "transform_proposal" ? (
                     <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
@@ -103,9 +102,9 @@ export default async function Home() {
                   ) : null}
                 </p>
                 <p className="mt-1 text-xs text-zinc-600">
-                  metric: {thread.metric?.name ?? "-"} {thread.metric?.unit ? `(${thread.metric.unit})` : ""}
+                  Range: {formatDateLabel(thread.start_ts)} &rarr; {formatDateLabel(thread.end_ts)}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">{formatDateLabel(thread.created_at)}</p>
+                <p className="mt-1 text-xs text-zinc-500">ID: {shortId(thread.id)}</p>
               </li>
             ))}
           </ul>
@@ -150,7 +149,7 @@ export default async function Home() {
                 <li key={item.id} className="rounded border border-zinc-200 px-3 py-2">
                   <p className="font-medium">{item.file_name ?? "(no file name)"}</p>
                   <p className="mt-1 text-xs text-zinc-600">rows: {item.row_count}</p>
-                  <p className="mt-1 text-xs text-zinc-600">metric: {formatMetricLabel(item)}</p>
+                  <p className="mt-1 text-xs text-zinc-600">metric: {formatImportMetricLabel(item)}</p>
                   <p className="mt-1 text-xs text-zinc-500">{formatDateLabel(item.created_at)}</p>
                 </li>
               ))}

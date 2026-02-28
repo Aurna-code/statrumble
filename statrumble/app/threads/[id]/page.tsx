@@ -6,6 +6,7 @@ import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { formatMetricLabel, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
 
@@ -278,7 +279,8 @@ export default async function Page({ params }: ThreadPageProps) {
   } catch (error) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-        <h1 className="text-2xl font-semibold">Thread #{id}</h1>
+        <h1 className="text-2xl font-semibold">Thread</h1>
+        <p className="mt-1 text-xs text-zinc-500">ID: {shortId(id)}</p>
         <p className="mt-2 text-sm text-red-600">
           Load failed: {error instanceof Error ? error.message : "Unknown error"}
         </p>
@@ -308,6 +310,7 @@ export default async function Page({ params }: ThreadPageProps) {
   const deltaRel = snapshot.delta?.rel ?? null;
   const rangeStart = snapshot.range?.start_ts ?? thread.start_ts;
   const rangeEnd = snapshot.range?.end_ts ?? thread.end_ts;
+  const primaryTitle = formatMetricLabel(thread.metric ?? snapshot.metric ?? null);
   const isTransformProposal = thread.kind === "transform_proposal";
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
@@ -355,7 +358,11 @@ export default async function Page({ params }: ThreadPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <h1 className="text-2xl font-semibold">Thread #{id}</h1>
+      <h1 className="text-2xl font-semibold">{primaryTitle}</h1>
+      <p className="mt-1 text-sm text-zinc-600">
+        Range: {formatDateLabel(rangeStart ?? thread.start_ts)} &rarr; {formatDateLabel(rangeEnd ?? thread.end_ts)}
+      </p>
+      <p className="mt-1 text-xs text-zinc-500">ID: {shortId(thread.id)}</p>
       <p className="mt-2 text-sm text-zinc-600">Discussion and voting are based on the snapshot captured at creation time.</p>
 
       {isTransformProposal ? (

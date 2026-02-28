@@ -2,50 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { getHeaderNavItems } from "@/lib/nav";
 
-type NavLink = {
-  href: string;
-  label: string;
-  isActive: (pathname: string) => boolean;
+type HeaderNavLinksProps = {
+  isAuthenticated: boolean;
+  showJoin?: boolean;
 };
 
-const NAV_LINKS: NavLink[] = [
-  {
-    href: "/",
-    label: "StatRumble",
-    isActive: (pathname) => pathname === "/",
-  },
-  {
-    href: "/decisions",
-    label: "Decisions",
-    isActive: (pathname) => pathname.startsWith("/decisions"),
-  },
-  {
-    href: "/workspaces",
-    label: "Workspaces",
-    isActive: (pathname) => pathname.startsWith("/workspaces") || pathname.startsWith("/workspace"),
-  },
-  {
-    href: "/join",
-    label: "Join",
-    isActive: (pathname) => pathname.startsWith("/join"),
-  },
-];
-
-export default function HeaderNavLinks() {
-  const pathname = usePathname();
+export default function HeaderNavLinks({ isAuthenticated, showJoin = false }: HeaderNavLinksProps) {
+  const pathname = usePathname() ?? "/";
+  const navItems = getHeaderNavItems({ pathname, isAuthenticated, showJoin });
 
   return (
     <>
-      {NAV_LINKS.map((link) => {
-        const active = link.isActive(pathname);
+      {navItems.map((item) => {
+        const active = item.isActive(pathname);
         const className = active
           ? "font-semibold text-zinc-900"
           : "text-zinc-600 hover:text-zinc-900";
 
         return (
-          <Link key={link.href} href={link.href} className={className}>
-            {link.label}
+          <Link key={item.href} href={item.href} className={className}>
+            {item.label}
           </Link>
         );
       })}

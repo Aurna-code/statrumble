@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests configured\"",
+    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs",
     "verify": "../scripts/verify.sh"
   },
   "dependencies": {

@@ -19,6 +19,7 @@ type ImportOption = {
   id: string;
   file_name: string | null;
   created_at: string;
+  display_name?: string | null;
 };
 
 type ImportChartProps = {
@@ -266,7 +267,7 @@ export default function ImportChart({ imports }: ImportChartProps) {
   }
 
   if (imports.length === 0) {
-    return <p className="mt-2 text-sm text-zinc-600">아직 import가 없습니다. CSV를 먼저 업로드하세요.</p>;
+    return <p className="mt-2 text-sm text-zinc-600">No imports yet. Upload a CSV first.</p>;
   }
 
   return (
@@ -283,17 +284,17 @@ export default function ImportChart({ imports }: ImportChartProps) {
         >
           {imports.map((item) => (
             <option key={item.id} value={item.id}>
-              {(item.file_name ?? "(no file name)")} - {formatDateLabel(item.created_at)}
+              {item.display_name?.trim() || `${item.file_name ?? "(no file name)"} - ${formatDateLabel(item.created_at)}`}
             </option>
           ))}
         </select>
       </div>
 
-      {isPointsLoading ? <p className="text-sm text-zinc-600">포인트 로딩 중...</p> : null}
-      {pointsError ? <p className="text-sm text-red-600">조회 실패: {pointsError}</p> : null}
+      {isPointsLoading ? <p className="text-sm text-zinc-600">Loading points...</p> : null}
+      {pointsError ? <p className="text-sm text-red-600">Failed to load points: {pointsError}</p> : null}
 
       {!isPointsLoading && !pointsError && points.length === 0 ? (
-        <p className="text-sm text-zinc-600">선택한 import에 표시할 포인트가 없습니다.</p>
+        <p className="text-sm text-zinc-600">No points available for the selected import.</p>
       ) : null}
 
       {points.length > 0 ? (
@@ -332,18 +333,18 @@ export default function ImportChart({ imports }: ImportChartProps) {
           </div>
 
           <p className="text-xs text-zinc-600">
-            표시 포인트: {points.length}
-            {totalPoints !== null ? ` / 전체 ${totalPoints}` : ""}
+            Displayed points: {points.length}
+            {totalPoints !== null ? ` / Total ${totalPoints}` : ""}
             {sampled ? " (sampled)" : ""}
           </p>
 
           {selectedRange ? (
             <p className="text-sm text-zinc-700">
-              선택 구간: {formatDateLabel(selectedRange.startTs)} ~ {formatDateLabel(selectedRange.endTs)}
+              Selected range: {formatDateLabel(selectedRange.startTs)} → {formatDateLabel(selectedRange.endTs)}
             </p>
           ) : null}
 
-          <div className="flex flex-wrap items-start gap-2">
+          <div className="mt-3 flex flex-wrap items-start gap-2 border-t border-zinc-200 pt-3">
             <button
               type="button"
               disabled={!canCreateThread}
@@ -355,7 +356,7 @@ export default function ImportChart({ imports }: ImportChartProps) {
             <TransformProposalCreateForm importId={selectedImportId} disabled={!selectedImportId} />
           </div>
 
-          {threadError ? <p className="text-sm text-red-600">스레드 생성 실패: {threadError}</p> : null}
+          {threadError ? <p className="text-sm text-red-600">Failed to create thread: {threadError}</p> : null}
         </div>
       ) : null}
     </div>

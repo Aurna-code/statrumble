@@ -4,18 +4,33 @@ import { listImports, listMetrics, listThreads, type MetricImportRow } from "@/l
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import UploadCsvForm from "@/app/components/UploadCsvForm";
 import ImportChart from "@/app/components/ImportChart";
-import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { formatDateTimeLabel } from "@/lib/formatDate";
+import { formatMetricLabel, formatThreadPrimaryTitle, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
 
-function formatMetricLabel(row: MetricImportRow) {
+function getImportMetric(row: MetricImportRow) {
   const metric = Array.isArray(row.metrics) ? row.metrics[0] : row.metrics;
 
   if (!metric) {
-    return "-";
+    return null;
   }
 
-  return metric.unit ? `${metric.name} (${metric.unit})` : metric.name;
+  return {
+    name: metric.name,
+    unit: metric.unit,
+  };
+}
+
+function formatImportMetricLabel(row: MetricImportRow) {
+  return formatMetricLabel(getImportMetric(row));
+}
+
+function formatImportDisplayName(row: MetricImportRow) {
+  const metricLabel = formatImportMetricLabel(row);
+  const fileLabel = row.file_name?.trim() ? row.file_name.trim() : "no file name";
+  const createdLabel = formatDateTimeLabel(row.created_at);
+  return `${metricLabel} • ${fileLabel} • ${createdLabel}`;
 }
 
 export default async function Home() {
@@ -30,10 +45,15 @@ export default async function Home() {
 
   if (!hasMembership) {
     return (
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-        <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
-        <p className="mt-2 text-sm text-zinc-600">데이터 토론을 시작하려면 워크스페이스에 먼저 참여하세요.</p>
-        <OnboardingCard />
+      <main className="min-h-screen bg-zinc-50">
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+          <h1 className="text-2xl font-semibold">Arena</h1>
+          <p className="mt-2 text-sm text-zinc-600">Join a workspace to start debating metric snapshots.</p>
+          <OnboardingCard
+            title="You are not in a workspace yet."
+            description="Use an invite code or create a new workspace to get started."
+          />
+        </div>
       </main>
     );
   }
@@ -50,114 +70,133 @@ export default async function Home() {
     id: item.id,
     file_name: item.file_name,
     created_at: item.created_at,
+    display_name: formatImportDisplayName(item),
   }));
   const metricsError = metricsResult.status === "rejected" ? metricsResult.reason : null;
   const importsError = importsResult.status === "rejected" ? importsResult.reason : null;
   const threadsError = threadsResult.status === "rejected" ? threadsResult.reason : null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <h1 className="text-2xl font-semibold">StatRumble MVP</h1>
-      <p className="mt-2 text-sm text-zinc-600">
-        Prompt 00 scaffolding page. Functional logic will be implemented in later prompts.
-      </p>
+    <main className="min-h-screen bg-zinc-50">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Arena</h1>
+        <p className="mt-2 text-sm text-zinc-600">Upload data, choose a range, and launch a thread for review.</p>
 
-      <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="font-medium">CSV 업로드</h2>
-        <p className="mt-1 text-sm text-zinc-600">업로드 UI 자리표시</p>
-        <UploadCsvForm />
-      </section>
-
-      <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="font-medium">차트</h2>
-        <p className="mt-1 text-sm text-zinc-600">Import를 선택하고 구간을 지정해 Arena Thread를 생성합니다.</p>
-        {importsError ? (
-          <p className="mt-2 text-sm text-red-600">
-            조회 실패: {importsError instanceof Error ? importsError.message : "Unknown error"}
-          </p>
-        ) : (
-          <ImportChart imports={importsForChart} />
-        )}
-      </section>
-
-      <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="font-medium">스레드 목록</h2>
-        {threadsError ? (
-          <p className="mt-2 text-sm text-red-600">
-            조회 실패: {threadsError instanceof Error ? threadsError.message : "Unknown error"}
-          </p>
-        ) : threads.length === 0 ? (
-          <p className="mt-2 text-sm text-zinc-600">아직 없음</p>
-        ) : (
-          <ul className="mt-3 space-y-2 text-sm">
-            {threads.map((thread) => (
-              <li key={thread.id} className="rounded border border-zinc-200 px-3 py-2">
-                <p className="font-medium">
-                  <Link href={`/threads/${thread.id}`} className="hover:underline">
-                    Thread #{thread.id}
-                  </Link>
-                  {thread.kind === "transform_proposal" ? (
-                    <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                      Proposal
-                    </span>
-                  ) : null}
+        <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="space-y-4">
+            <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <h2 className="font-medium">Chart</h2>
+              <p className="mt-1 text-sm text-zinc-600">Select an import and range to create a thread.</p>
+              {importsError ? (
+                <p className="mt-2 text-sm text-red-600">
+                  Failed to load: {importsError instanceof Error ? importsError.message : "Unknown error"}
                 </p>
-                <p className="mt-1 text-xs text-zinc-600">
-                  metric: {thread.metric?.name ?? "-"} {thread.metric?.unit ? `(${thread.metric.unit})` : ""}
+              ) : (
+                <ImportChart imports={importsForChart} />
+              )}
+            </section>
+
+            <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <details open={imports.length === 0}>
+                <summary className="cursor-pointer select-none text-sm font-medium">Data</summary>
+                <div className="mt-4 space-y-6">
+                  <div>
+                    <h3 className="font-medium">CSV Upload</h3>
+                    <p className="mt-1 text-sm text-zinc-600">Upload a CSV and map the metric fields.</p>
+                    <UploadCsvForm />
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium">Metrics</h3>
+                    {metricsError ? (
+                      <p className="mt-2 text-sm text-red-600">
+                        Failed to load: {metricsError instanceof Error ? metricsError.message : "Unknown error"}
+                      </p>
+                    ) : metrics.length === 0 ? (
+                      <p className="mt-2 text-sm text-zinc-600">No metrics yet.</p>
+                    ) : (
+                      <ul className="mt-3 space-y-2 text-sm">
+                        {metrics.map((metric) => (
+                          <li key={metric.id} className="rounded border border-zinc-200 px-3 py-2">
+                            <p className="font-medium">
+                              {metric.name}
+                              {metric.unit ? ` (${metric.unit})` : ""}
+                            </p>
+                            <p className="mt-1 text-xs text-zinc-500">{formatDateTimeLabel(metric.created_at)}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="font-medium">Imports (Latest 10)</h3>
+                    {importsError ? (
+                      <p className="mt-2 text-sm text-red-600">
+                        Failed to load: {importsError instanceof Error ? importsError.message : "Unknown error"}
+                      </p>
+                    ) : imports.length === 0 ? (
+                      <p className="mt-2 text-sm text-zinc-600">No imports yet.</p>
+                    ) : (
+                      <ul className="mt-3 space-y-2 text-sm">
+                        {imports.map((item) => (
+                          <li key={item.id} className="rounded border border-zinc-200 px-3 py-2">
+                            <p className="font-medium">{item.file_name ?? "(no file name)"}</p>
+                            <p className="mt-1 text-xs text-zinc-600">Rows: {item.row_count}</p>
+                            <p className="mt-1 text-xs text-zinc-600">Metric: {formatImportMetricLabel(item)}</p>
+                            <p className="mt-1 text-xs text-zinc-500">{formatDateTimeLabel(item.created_at)}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </details>
+            </section>
+          </div>
+
+          <aside className="space-y-4">
+            <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-medium">Recent threads</h2>
+                <Link href="/threads" className="text-xs font-medium text-zinc-700 hover:underline">
+                  View all
+                </Link>
+              </div>
+              {threadsError ? (
+                <p className="mt-2 text-sm text-red-600">
+                  Failed to load: {threadsError instanceof Error ? threadsError.message : "Unknown error"}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500">{formatDateLabel(thread.created_at)}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="mt-8 grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="font-medium">Metrics</h2>
-          {metricsError ? (
-            <p className="mt-2 text-sm text-red-600">
-              조회 실패: {metricsError instanceof Error ? metricsError.message : "Unknown error"}
-            </p>
-          ) : metrics.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">아직 없음</p>
-          ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {metrics.map((metric) => (
-                <li key={metric.id} className="rounded border border-zinc-200 px-3 py-2">
-                  <p className="font-medium">
-                    {metric.name}
-                    {metric.unit ? ` (${metric.unit})` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">{formatDateLabel(metric.created_at)}</p>
-                </li>
-              ))}
-            </ul>
-          )}
+              ) : threads.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-600">No threads yet. Create one from the chart.</p>
+              ) : (
+                <ul className="mt-3 space-y-2 text-sm">
+                  {threads.map((thread) => (
+                    <li key={thread.id} className="rounded border border-zinc-200 px-3 py-2">
+                      <p className="font-medium">
+                        <Link href={`/threads/${thread.id}`} className="hover:underline">
+                          {formatThreadPrimaryTitle(thread)}
+                        </Link>
+                        {thread.kind === "transform_proposal" ? (
+                          <span className="ml-2 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+                            Proposal
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-600">
+                        Range: {formatDateTimeLabel(thread.start_ts)} → {formatDateTimeLabel(thread.end_ts)}
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-500">
+                        ID: {shortId(thread.id)} • {formatDateTimeLabel(thread.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </aside>
         </div>
-
-        <div className="rounded-lg border border-zinc-200 bg-white p-5">
-          <h2 className="font-medium">Imports (최신 10개)</h2>
-          {importsError ? (
-            <p className="mt-2 text-sm text-red-600">
-              조회 실패: {importsError instanceof Error ? importsError.message : "Unknown error"}
-            </p>
-          ) : imports.length === 0 ? (
-            <p className="mt-2 text-sm text-zinc-600">아직 없음</p>
-          ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {imports.map((item) => (
-                <li key={item.id} className="rounded border border-zinc-200 px-3 py-2">
-                  <p className="font-medium">{item.file_name ?? "(no file name)"}</p>
-                  <p className="mt-1 text-xs text-zinc-600">rows: {item.row_count}</p>
-                  <p className="mt-1 text-xs text-zinc-600">metric: {formatMetricLabel(item)}</p>
-                  <p className="mt-1 text-xs text-zinc-500">{formatDateLabel(item.created_at)}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+      </div>
     </main>
   );
 }

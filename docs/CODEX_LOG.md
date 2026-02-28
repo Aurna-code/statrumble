@@ -3813,3 +3813,150 @@ fix(ui): remove unsafe performance.measure instrumentation
 - [ ] Manual quick check: open `/threads/<id>` and confirm no runtime TypeError
 #### Commit Link
 - TODO
+
+### Prompt ID: Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests (commit: TODO)
+#### Prompt
+```text
+[Prompt] Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests
+
+Context
+- Public routes exist: /portal and /p/* are accessible without login (see statrumble/proxy.ts).
+- Header nav currently always shows app navigation (Arena/Threads/Decisions/Workspaces/Join), which is confusing on public pages for anonymous visitors.
+- layout metadata still says "StatRumble MVP scaffolding".
+- Thread lists and thread pages currently surface raw UUIDs in titles like "Thread #<uuid>" which feels unfinished.
+- There is no custom app/not-found.tsx or app/error.tsx yet.
+
+Constraints
+- No new dependencies.
+- UI copy must be English only (Hangul 0).
+- Keep styling consistent with existing Tailwind cards (bg-zinc-50, bg-white, border-zinc-200, shadow-sm).
+- Keep verify green: npm run lint, npm run typecheck, ./scripts/verify.sh.
+
+Goals
+1) Header nav for public pages
+2) Replace UUID-heavy thread titles with meaningful display
+3) Add custom Not Found and Error pages
+4) Remove MVP scaffolding traces
+
+Implementation details
+A) Introduce a pure nav model helper + tests (no Next/React dependency in tests)
+B) Thread title polish helper (optional but preferred for consistency)
+C) Custom not-found and error pages
+D) Docs
+
+Verification
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+```
+#### Result
+- Added pure nav model helper in `statrumble/lib/nav.ts` with `isPublicPathname` and `getHeaderNavItems`, then refactored `HeaderNavLinks` to consume it via props (`isAuthenticated`, `showJoin`).
+- Updated `statrumble/app/layout.tsx` to compute and pass `showJoin` correctly, pass auth state into nav links, and replaced metadata description with product copy.
+- Added dependency-free nav regression test script at `scripts/verify-nav.mjs` and wired `statrumble/package.json` `test` script to run it with the existing TS strip loader.
+- Added `statrumble/lib/threadLabel.ts` (`shortId`, `formatMetricLabel`, `formatThreadPrimaryTitle`) and applied metric-first thread titles + range subtitle + short ID in `app/page.tsx`, new `app/threads/page.tsx`, and `app/threads/[id]/page.tsx` (keeping transform proposal badge).
+- Added `statrumble/app/not-found.tsx` and client `statrumble/app/error.tsx` with requested actions and card styling.
+- Removed scaffold/MVP copy in touched surfaces and updated home copy to product-oriented English.
+- While verifying, route-type generation had stale `.next` references to deleted routes; regenerated cleanly using `pnpm -C statrumble exec next typegen` after clearing `.next`.
+#### Manual Checklist
+- [ ] Visit /portal logged out: header shows only Portal + Login on the right
+- [ ] Visit /p/decisions/<publicId> logged out: header shows only Portal + Login
+- [ ] Logged in: header shows full nav; Join only when no membership
+- [ ] Home/Threads: thread list no longer shows raw UUID as primary title
+- [ ] Trigger 404 on a random route: custom not-found renders
+- [ ] Force an error (temporary throw in a page, then revert): error page renders
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Fix flaky typecheck: deterministic Next route typegen (commit: TODO)
+#### Prompt
+```text
+[Prompt] Fix flaky typecheck: ensure Next route types are regenerated (next typegen) + clear stale .next types/cache + integrate into verify
+
+Problem
+- `pnpm -C statrumble typecheck` intermittently fails because `.next/types` route definitions get stale.
+- Manual workaround was clearing `.next` and running `next typegen`.
+- We want this to be deterministic and automatic.
+
+Goals
+1) Make `typecheck` always regenerate route types first.
+2) Make `./scripts/verify.sh` robust: clean stale `.next` type artifacts before typecheck, then run lint/typecheck/test.
+3) Keep it dependency-free.
+4) Add a minimal regression check to ensure the typegen step actually ran (optional but recommended).
+
+Tasks
+A) Update statrumble/package.json scripts
+- Add `typegen`: `next typegen`
+- Update `typecheck` to run `next typegen && tsc --noEmit`
+- Keep `test` script unchanged
+
+B) Harden scripts/verify.sh
+- Ensure `set -euo pipefail`
+- Clear stale `.next` artifacts before typecheck
+- Run lint -> typecheck -> test
+
+C) Optional sanity check
+- Add `scripts/verify-next-types.mjs`
+- Wire it in after typecheck in verify script
+
+D) Docs
+- Log that typecheck now regenerates Next route types and verify clears stale `.next` artifacts.
+```
+#### Result
+- Updated `statrumble/package.json` scripts:
+  - Added `typegen` as `next typegen`.
+  - Updated `typecheck` to `next typegen && tsc --noEmit`.
+  - Kept `test` unchanged (`verify-nav`).
+- Hardened `scripts/verify.sh`:
+  - Retained `set -euo pipefail`.
+  - Added deterministic cleanup of `statrumble/.next/types`, `statrumble/.next/dev/types`, and `statrumble/.next/cache` before typecheck.
+  - Added post-typecheck sanity check via `node scripts/verify-next-types.mjs`.
+  - Preserved lint -> typecheck -> test ordering in both pnpm and npm branches.
+- Added `scripts/verify-next-types.mjs` to fail fast when neither Next type output directory exists after typecheck.
+#### Manual Checklist
+- [ ] Re-run `pnpm -C statrumble typecheck` repeatedly; stale route-type failures do not recur.
+- [ ] Confirm `./scripts/verify.sh` removes stale `.next` type/cache artifacts before typecheck.
+- [ ] Confirm verify fails clearly if Next type output directories are missing after typecheck.
+#### Commit Link
+- TODO
+
+### Prompt ID: Arena UX layout: chart-primary + data secondary accordion (commit: TODO)
+#### Prompt
+```text
+[Prompt] Arena UX layout: make Chart primary, move Recent Threads sidebar, collapse Data (CSV/Metrics/Imports), improve import option labels
+
+Goals
+1) Make Chart the main focus.
+2) Place Recent Threads next to Chart (right sidebar on desktop).
+3) Move CSV Upload + Metrics + Imports into a secondary Data area (collapsed by default when imports exist).
+4) Improve Import dropdown labels to include metric name/unit + file name + date.
+5) Keep Create Thread / Propose Transform actions visually clear.
+```
+#### Result
+- Restructured `statrumble/app/page.tsx` into a chart-first two-column layout:
+  - Left column: `Chart` card (primary) and `Data` card (secondary `<details>` accordion).
+  - Right sidebar: `Recent threads` card with `View all` link to `/threads`.
+- Moved CSV upload, metrics list, and latest imports list under `Data`.
+- Set `Data` accordion default state to `open={imports.length === 0}`.
+- Updated card styling on Arena surfaces to `rounded-xl border border-zinc-200 bg-white shadow-sm p-5`, and kept page background `bg-zinc-50`.
+- Removed duplicate standalone threads section from the main column.
+- Added richer import option labels in `importsForChart` as:
+  - `<metricLabel> • <file_name> • <created_at>`
+  - with safe fallbacks when metric/file values are missing.
+- Extended `ImportChart` option type with optional `display_name` and used it as primary option text fallbacking to previous format.
+- Added action-area visual separator in `ImportChart` button row: `border-t border-zinc-200 pt-3`.
+- Updated touched UI strings to English-only in the modified areas.
+#### Manual Checklist
+- [ ] Arena shows Chart + Recent threads side-by-side on desktop.
+- [ ] Data section is collapsed when imports exist and open when there are no imports.
+- [ ] Import dropdown options show metric + file + date.
+- [ ] Create Thread / Propose Transform actions still work.
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

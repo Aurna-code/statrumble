@@ -5,6 +5,7 @@ import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { formatMetricLabel, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
 
@@ -222,10 +223,8 @@ export default async function Page({ params }: ThreadPageProps) {
   } catch (error) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-        <h1 className="text-2xl font-semibold">Thread #{id}</h1>
-        <p className="mt-2 text-sm text-red-600">
-          조회 실패: {error instanceof Error ? error.message : "Unknown error"}
-        </p>
+        <h1 className="text-2xl font-semibold">Thread</h1>
+        <p className="mt-2 text-sm text-red-600">Failed to load: {error instanceof Error ? error.message : "Unknown error"}</p>
       </main>
     );
   }
@@ -242,8 +241,9 @@ export default async function Page({ params }: ThreadPageProps) {
   }
 
   const snapshot = (thread.snapshot ?? {}) as ThreadSnapshot;
-  const metricName = thread.metric?.name ?? snapshot.metric?.name ?? "-";
+  const metricName = thread.metric?.name ?? snapshot.metric?.name ?? null;
   const metricUnit = thread.metric?.unit ?? snapshot.metric?.unit ?? null;
+  const metricLabel = formatMetricLabel({ name: metricName, unit: metricUnit });
   const selectedAvg = snapshot.selected?.avg ?? null;
   const selectedN = snapshot.selected?.n ?? null;
   const beforeAvg = snapshot.before?.avg ?? null;
@@ -252,6 +252,8 @@ export default async function Page({ params }: ThreadPageProps) {
   const deltaRel = snapshot.delta?.rel ?? null;
   const rangeStart = snapshot.range?.start_ts ?? thread.start_ts;
   const rangeEnd = snapshot.range?.end_ts ?? thread.end_ts;
+  const rangeLabel = `Range: ${formatDateLabel(rangeStart)} → ${formatDateLabel(rangeEnd)}`;
+  const threadShortId = shortId(thread.id);
   const isTransformProposal = thread.kind === "transform_proposal";
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
@@ -274,8 +276,16 @@ export default async function Page({ params }: ThreadPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <h1 className="text-2xl font-semibold">Thread #{id}</h1>
-      <p className="mt-2 text-sm text-zinc-600">생성 시점 snapshot 기준으로 토론과 투표를 진행합니다.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-2xl font-semibold">{metricLabel}</h1>
+        {isTransformProposal ? (
+          <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
+            Proposal
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-2 text-sm text-zinc-600">{rangeLabel}</p>
+      <p className="mt-1 text-xs text-zinc-500">ID: {threadShortId}</p>
 
       {isTransformProposal ? (
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50/50 p-5">
@@ -363,38 +373,35 @@ export default async function Page({ params }: ThreadPageProps) {
         </div>
       ) : null}
 
-      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
-        <h2 className="text-base font-semibold">Snapshot 요약</h2>
+      <div className="mt-6 rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold">Snapshot Summary</h2>
         <div className="mt-3 grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
             <p className="text-xs text-zinc-500">Metric</p>
-            <p className="mt-1 font-medium">
-              {metricName}
-              {metricUnit ? ` (${metricUnit})` : ""}
-            </p>
+            <p className="mt-1 font-medium">{metricLabel}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">선택 구간 평균 / n</p>
+            <p className="text-xs text-zinc-500">Selected Avg / n</p>
             <p className="mt-1 font-medium">
               {formatNumber(selectedAvg)} / {formatCount(selectedN)}
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">직전 구간 평균 / n</p>
+            <p className="text-xs text-zinc-500">Previous Avg / n</p>
             <p className="mt-1 font-medium">
               {formatNumber(beforeAvg)} / {formatCount(beforeN)}
             </p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">변화량 (abs)</p>
+            <p className="text-xs text-zinc-500">Delta (abs)</p>
             <p className="mt-1 font-medium">{formatNumber(deltaAbs)}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">변화율 (rel %)</p>
+            <p className="text-xs text-zinc-500">Delta (rel %)</p>
             <p className="mt-1 font-medium">{deltaRel === null ? "-" : `${formatNumber(deltaRel * 100)}%`}</p>
           </div>
           <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <p className="text-xs text-zinc-500">생성 시각</p>
+            <p className="text-xs text-zinc-500">Created</p>
             <p className="mt-1 font-medium">{formatDateLabel(thread.created_at)}</p>
           </div>
         </div>

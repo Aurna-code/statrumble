@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
-import { getWorkspaceVoteProfile } from "@/lib/db/voteProfile";
 import { createClient } from "@/lib/supabase/server";
-import { resolveVoteProfileConfig } from "@/lib/voteProfile";
 
 type CreateThreadRequest = {
   import_id?: string;
@@ -60,15 +58,6 @@ export async function POST(request: NextRequest) {
     }
 
     const activeWorkspaceId = await getRequiredActiveWorkspaceId();
-    let workspaceVoteProfile = null;
-
-    try {
-      workspaceVoteProfile = await getWorkspaceVoteProfile(activeWorkspaceId);
-    } catch {
-      workspaceVoteProfile = null;
-    }
-
-    const voteConfig = resolveVoteProfileConfig(workspaceVoteProfile).discussion;
 
     const { data: metricImport, error: importError } = await supabase
       .from("metric_imports")
@@ -100,14 +89,11 @@ export async function POST(request: NextRequest) {
       .insert({
         workspace_id: metricImport.workspace_id,
         visibility: "workspace",
-        kind: "discussion",
         metric_id: metricImport.metric_id,
         import_id: importId,
         start_ts: startTs,
         end_ts: endTs,
         snapshot,
-        vote_prompt: voteConfig.prompt,
-        vote_labels: voteConfig.labels,
       })
       .select("id")
       .single();

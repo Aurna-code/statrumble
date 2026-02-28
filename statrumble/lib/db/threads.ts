@@ -29,8 +29,6 @@ type ThreadRow = {
   start_ts: string;
   end_ts: string;
   snapshot: unknown;
-  vote_prompt: string;
-  vote_labels: unknown;
   referee_report: unknown;
   referee_report_updated_at: string | null;
   transform_prompt: string | null;

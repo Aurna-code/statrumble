@@ -40,27 +40,6 @@ function asNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-export function parseVoteLabels(value: unknown): VoteLabels | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const labelsRecord = value as Record<string, unknown>;
-  const labelA = asNonEmptyString(labelsRecord.A);
-  const labelB = asNonEmptyString(labelsRecord.B);
-  const labelC = asNonEmptyString(labelsRecord.C);
-
-  if (!labelA || !labelB || !labelC) {
-    return null;
-  }
-
-  return {
-    A: labelA,
-    B: labelB,
-    C: labelC,
-  };
-}
-
 export function cloneVoteProfileConfig(config: VoteProfileConfig): VoteProfileConfig {
   return {
     discussion: {
@@ -99,15 +78,28 @@ export function parseVoteProfileConfig(value: unknown): VoteProfileConfig | null
 
     const sectionRecord = section as Record<string, unknown>;
     const prompt = asNonEmptyString(sectionRecord.prompt);
-    const labels = parseVoteLabels(sectionRecord.labels);
+    const labels = sectionRecord.labels;
 
-    if (!prompt || !labels) {
+    if (!prompt || !labels || typeof labels !== "object" || Array.isArray(labels)) {
+      return null;
+    }
+
+    const labelsRecord = labels as Record<string, unknown>;
+    const labelA = asNonEmptyString(labelsRecord.A);
+    const labelB = asNonEmptyString(labelsRecord.B);
+    const labelC = asNonEmptyString(labelsRecord.C);
+
+    if (!labelA || !labelB || !labelC) {
       return null;
     }
 
     normalized[kind] = {
       prompt,
-      labels,
+      labels: {
+        A: labelA,
+        B: labelB,
+        C: labelC,
+      },
     };
   }
 
@@ -127,31 +119,4 @@ export function assertVoteProfileConfig(value: unknown): VoteProfileConfig {
 export function resolveVoteProfileConfig(value: unknown): VoteProfileConfig {
   const parsed = parseVoteProfileConfig(value);
   return cloneVoteProfileConfig(parsed ?? DEFAULT_VOTE_PROFILE_CONFIG);
-}
-
-export function resolveThreadVoteConfig(
-  threadPrompt: unknown,
-  threadLabels: unknown,
-  workspaceConfig: { prompt: string; labels: VoteLabels },
-): { prompt: string; labels: VoteLabels; source: "thread" | "workspace" } {
-  const parsedThreadPrompt = asNonEmptyString(threadPrompt);
-  const parsedThreadLabels = parseVoteLabels(threadLabels);
-
-  if (parsedThreadPrompt && parsedThreadLabels) {
-    return {
-      prompt: parsedThreadPrompt,
-      labels: parsedThreadLabels,
-      source: "thread",
-    };
-  }
-
-  return {
-    prompt: workspaceConfig.prompt,
-    labels: {
-      A: workspaceConfig.labels.A,
-      B: workspaceConfig.labels.B,
-      C: workspaceConfig.labels.C,
-    },
-    source: "workspace",
-  };
 }

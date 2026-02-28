@@ -1,10 +1,8 @@
 import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
-import { getWorkspaceVoteProfile } from "@/lib/db/voteProfile";
 import { createMessage } from "@/lib/db/messages";
 import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
-import { resolveVoteProfileConfig } from "@/lib/voteProfile";
 import {
   TransformSpecSchema,
   applyTransform,
@@ -761,15 +759,6 @@ export async function POST(request: NextRequest) {
     }
 
     const activeWorkspaceId = await getRequiredActiveWorkspaceId();
-    let workspaceVoteProfile = null;
-
-    try {
-      workspaceVoteProfile = await getWorkspaceVoteProfile(activeWorkspaceId);
-    } catch {
-      workspaceVoteProfile = null;
-    }
-
-    const voteConfig = resolveVoteProfileConfig(workspaceVoteProfile).transform_proposal;
 
     const { data: metricImport, error: importError } = await supabase
       .from("metric_imports")
@@ -938,8 +927,6 @@ export async function POST(request: NextRequest) {
         start_ts: startTs,
         end_ts: endTs,
         snapshot,
-        vote_prompt: voteConfig.prompt,
-        vote_labels: voteConfig.labels,
       })
       .select("id")
       .single();

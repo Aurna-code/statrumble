@@ -46,7 +46,6 @@ export default async function RootLayout({
       };
     }
   }
-  const showJoin = workspaceSelection.workspaces.length === 0 && !workspaceSelection.activeWorkspaceId;
 
   return (
     <html lang="en">
@@ -54,7 +53,7 @@ export default async function RootLayout({
         <div className="min-h-screen bg-zinc-50 text-zinc-900">
           <header className="border-b border-zinc-200 bg-white">
             <nav className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3 text-sm md:px-8">
-              <HeaderNavLinks showJoin={showJoin} />
+              <HeaderNavLinks />
               <div className="ml-auto flex items-center gap-3">
                 {workspaceSelection.activeWorkspaceId ? (
                   <WorkspaceSwitcher

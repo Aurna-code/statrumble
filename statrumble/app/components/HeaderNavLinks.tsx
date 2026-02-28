@@ -9,20 +9,11 @@ type NavLink = {
   isActive: (pathname: string) => boolean;
 };
 
-type HeaderNavLinksProps = {
-  showJoin?: boolean;
-};
-
-const BASE_NAV_LINKS: NavLink[] = [
+const NAV_LINKS: NavLink[] = [
   {
     href: "/",
-    label: "Arena",
+    label: "StatRumble",
     isActive: (pathname) => pathname === "/",
-  },
-  {
-    href: "/threads",
-    label: "Threads",
-    isActive: (pathname) => pathname.startsWith("/threads"),
   },
   {
     href: "/decisions",
@@ -34,21 +25,19 @@ const BASE_NAV_LINKS: NavLink[] = [
     label: "Workspaces",
     isActive: (pathname) => pathname.startsWith("/workspaces") || pathname.startsWith("/workspace"),
   },
+  {
+    href: "/join",
+    label: "Join",
+    isActive: (pathname) => pathname.startsWith("/join"),
+  },
 ];
 
-const JOIN_NAV_LINK: NavLink = {
-  href: "/join",
-  label: "Join",
-  isActive: (pathname) => pathname.startsWith("/join"),
-};
-
-export default function HeaderNavLinks({ showJoin = true }: HeaderNavLinksProps) {
+export default function HeaderNavLinks() {
   const pathname = usePathname();
-  const navLinks = showJoin ? [...BASE_NAV_LINKS, JOIN_NAV_LINK] : BASE_NAV_LINKS;
 
   return (
     <>
-      {navLinks.map((link) => {
+      {NAV_LINKS.map((link) => {
         const active = link.isActive(pathname);
         const className = active
           ? "font-semibold text-zinc-900"

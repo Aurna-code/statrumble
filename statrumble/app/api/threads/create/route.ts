@@ -15,6 +15,31 @@ type PointRow = {
   value: number;
 };
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function asNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function buildDiscussionThreadTitle(snapshot: unknown, startTs: string, endTs: string): string {
+  const snapshotRecord = asRecord(snapshot);
+  const metricRecord = asRecord(snapshotRecord?.metric);
+  const metricName = asNonEmptyString(metricRecord?.name) ?? "Thread";
+
+  return `${metricName} (${startTs} → ${endTs})`;
+}
+
 function parseDate(value: string | undefined) {
   if (!value) {
     return null;
@@ -124,6 +149,7 @@ export async function POST(request: NextRequest) {
       value: point.value,
     }));
     const snapshotWithSeries = mergeSelectedSeriesIntoSnapshot(snapshot, selectedPoints);
+    const title = buildDiscussionThreadTitle(snapshotWithSeries, startTs, endTs);
 
     const { data: insertedThread, error: insertError } = await supabase
       .from("arena_threads")
@@ -138,6 +164,7 @@ export async function POST(request: NextRequest) {
         snapshot: snapshotWithSeries,
         vote_prompt: voteProfile.prompt,
         vote_labels: voteProfile.labels,
+        title,
       })
       .select("id")
       .single();

@@ -5,6 +5,7 @@ type MetricLike = {
 
 type ThreadLike = {
   id: string;
+  title?: string | null;
   metric: {
     name: string;
     unit: string | null;
@@ -33,5 +34,11 @@ export function formatMetricLabel(metric: MetricLike | null): string {
 }
 
 export function formatThreadPrimaryTitle(thread: ThreadLike): string {
+  const title = thread.title?.trim();
+
+  if (title) {
+    return title;
+  }
+
   return formatMetricLabel(thread.metric);
 }

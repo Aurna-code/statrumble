@@ -215,11 +215,9 @@ export default function ImportChart({ imports }: ImportChartProps) {
     };
   }, [brushRange.endIndex, brushRange.startIndex, points]);
 
-  const canCreateThread = Boolean(selectedImportId) && Boolean(selectedRange) && !isCreatingThread;
-
-  async function onCreateThread() {
-    if (!selectedImportId || !selectedRange) {
-      return;
+  const selectedWindow = useMemo(() => {
+    if (!selectedRange) {
+      return null;
     }
 
     const startTs = selectedRange.startTs;
@@ -230,11 +228,23 @@ export default function ImportChart({ imports }: ImportChartProps) {
       const parsedEnd = new Date(selectedRange.endTs);
 
       if (Number.isNaN(parsedEnd.getTime())) {
-        setThreadError("Invalid selected end timestamp.");
-        return;
+        return null;
       }
 
       endTs = new Date(parsedEnd.getTime() + 1).toISOString();
+    }
+
+    return {
+      startTs,
+      endTs,
+    };
+  }, [points, selectedRange]);
+
+  const canCreateThread = Boolean(selectedImportId) && Boolean(selectedWindow) && !isCreatingThread;
+
+  async function onCreateThread() {
+    if (!selectedImportId || !selectedWindow) {
+      return;
     }
 
     setIsCreatingThread(true);
@@ -248,8 +258,8 @@ export default function ImportChart({ imports }: ImportChartProps) {
         },
         body: JSON.stringify({
           import_id: selectedImportId,
-          start_ts: startTs,
-          end_ts: endTs,
+          start_ts: selectedWindow.startTs,
+          end_ts: selectedWindow.endTs,
         }),
       });
       const payload = (await response.json()) as CreateThreadApiResponse;
@@ -353,7 +363,12 @@ export default function ImportChart({ imports }: ImportChartProps) {
             >
               {isCreatingThread ? "Creating..." : "Create Thread"}
             </button>
-            <TransformProposalCreateForm importId={selectedImportId} disabled={!selectedImportId} />
+            <TransformProposalCreateForm
+              importId={selectedImportId}
+              startTs={selectedWindow?.startTs ?? null}
+              endTs={selectedWindow?.endTs ?? null}
+              disabled={!selectedImportId}
+            />
           </div>
 
           {threadError ? <p className="text-sm text-red-600">Failed to create thread: {threadError}</p> : null}

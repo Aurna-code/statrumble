@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { extractSelectedSeries } from "../statrumble/lib/snapshot.ts";
+import { extractSelectedSeries, mergeSelectedSeriesIntoSnapshot } from "../statrumble/lib/snapshot.ts";
 
 const selectedPointsShape = extractSelectedSeries({
   selected_points: [
@@ -34,6 +34,36 @@ const selectedShape = extractSelectedSeries({
 
 assert.ok(selectedShape && selectedShape.length === 2, "selected.points shape should parse and filter invalid points");
 assert.equal(typeof selectedShape?.[0]?.ts, "number");
+
+const selectedSeriesShape = extractSelectedSeries({
+  selected_series: [
+    { timestamp: "2026-02-28T04:00:00Z", y: 8.5 },
+    { timestamp: "2026-02-28T05:00:00Z", y: 8.8 },
+  ],
+});
+
+assert.ok(selectedSeriesShape && selectedSeriesShape.length === 2, "selected_series shape should parse");
+
+const mergedSnapshot = mergeSelectedSeriesIntoSnapshot(
+  {
+    range: {
+      start_ts: "2026-02-28T00:00:00Z",
+      end_ts: "2026-02-28T06:00:00Z",
+    },
+    selected: {
+      n: 3,
+      avg: 2.91,
+    },
+  },
+  [
+    { ts: "2026-02-28T00:00:00Z", value: 2.5 },
+    { ts: "2026-02-28T01:00:00Z", value: 2.8 },
+    { ts: "2026-02-28T02:00:00Z", value: 3.43 },
+  ],
+);
+const mergedSeries = extractSelectedSeries(mergedSnapshot);
+
+assert.ok(mergedSeries && mergedSeries.length === 3, "merged snapshot shape should preserve selected series");
 
 const invalidShape = extractSelectedSeries({
   selected: {

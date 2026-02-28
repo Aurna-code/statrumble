@@ -4007,3 +4007,103 @@ Goal
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Fix migration drift 019-021 + non-null vote profile + thread UX polish (commit: TODO)
+#### Prompt
+```text
+[Prompt] Fix migration drift (019-021) + Create Thread vote_prompt NOT NULL + apply UX polish (Back to Threads, formatting consistency, snapshot parser hardening)
+```
+#### Result
+- Migration drift alignment:
+  - Confirmed local `statrumble/supabase/migrations` previously stopped at `018`.
+  - Added missing migration files:
+    - `019_public_decision_detail_rpc.sql`
+    - `020_workspace_vote_profiles.sql`
+    - `021_thread_vote_profile_snapshot.sql`
+  - `019`: added `public.get_public_decision_detail(p_public_id uuid)` RPC with thread transform fields and execute grants to `anon`, `authenticated`.
+  - `020`: added `public.workspace_vote_profiles`, RLS read policy for members, and RPCs:
+    - `public.get_workspace_vote_profile(p_workspace_id uuid)`
+    - `public.set_workspace_vote_profile(p_workspace_id uuid, p_config jsonb)`
+  - `021`: added `arena_threads.vote_prompt`/`vote_labels`, backfilled from workspace profiles with kind-based defaults, enforced NOT NULL + labels check, and added owner-only RPC:
+    - `public.set_thread_vote_profile(p_thread_id uuid, p_vote_prompt text, p_vote_labels jsonb, p_reset_votes boolean default false)`
+- Create Thread / Propose Transform null-vote fix:
+  - Added `statrumble/lib/voteProfile.ts` for profile parsing/defaults/validation.
+  - Updated `app/api/threads/create/route.ts` and `app/api/threads/propose-transform/route.ts` to:
+    - call `get_workspace_vote_profile` RPC,
+    - resolve fallback defaults when config is null/invalid,
+    - return 500 with `Vote profile resolution failed` on resolution errors,
+    - always insert non-null `vote_prompt` and `vote_labels`.
+  - `create` route now inserts `kind: "discussion"` explicitly.
+- Snapshot/chart consistency hardening:
+  - Extended `lib/snapshot.ts` parser candidates (`selected_series`, `range.points`, `snapshot_points`, `points`, etc.).
+  - Added `mergeSelectedSeriesIntoSnapshot` helper and used it in both create/propose routes so snapshots persist selected series at thread creation.
+  - Updated `ThreadSnapshotChart` timestamp/number formatting to app-consistent style.
+  - Added parser fixtures in `scripts/verify-snapshot.mjs` for hardened shapes and merged snapshot shape.
+- Thread share polish:
+  - Updated `ThreadShareActions` to add `Back to Threads`.
+  - Added clipboard fallback prompt (`window.prompt("Copy to clipboard:", text)`) when Clipboard API fails while keeping inline error feedback.
+- Model/type alignment:
+  - Updated `lib/db/threads.ts` thread types to include `vote_prompt` and `vote_labels`.
+#### Manual Checklist
+- [ ] `statrumble/supabase/migrations` contains `019`, `020`, `021` files locally.
+- [ ] Arena Create Thread succeeds without `vote_prompt` NOT NULL errors.
+- [ ] Transform proposal thread creation succeeds with vote profile fields set.
+- [ ] Thread page actions include both `Back to Arena` and `Back to Threads`.
+- [ ] Copy link / Copy ID works, and prompt fallback appears if clipboard access is blocked.
+- [ ] Snapshot chart renders from stored snapshot series on newly created threads.
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO
+
+### Prompt ID: Stabilize + polish: vote profile, selected range, share actions, persisted titles (commit: TODO)
+#### Prompt
+```text
+[Prompt] Stabilize + polish: (1) ensure vote_prompt/vote_labels always set, (2) preserve selected range for propose-transform, (3) ThreadShareActions Back to Threads + clipboard fallback, (4) add thread title (create default + edit)
+```
+#### Result
+- Ensured non-null vote profile fields in thread creation paths:
+  - `app/api/threads/create/route.ts` uses workspace vote profile RPC + fallback defaults, inserts `kind: "discussion"`, `vote_prompt`, `vote_labels`.
+  - `app/api/threads/propose-transform/route.ts` uses transform proposal vote profile resolution and inserts `vote_prompt`, `vote_labels`.
+- Preserved selected range for propose-transform:
+  - `ImportChart` now computes selected window (`start_ts`, exclusive `end_ts`) once and passes it into `TransformProposalCreateForm`.
+  - `TransformProposalCreateForm` includes optional `start_ts`/`end_ts` in `/api/threads/propose-transform` request.
+  - Propose-transform API accepts optional range, validates and clamps to import bounds, and applies it to:
+    - `compute_snapshot`
+    - thread `start_ts`/`end_ts`
+    - proposal/model/stat computation series
+    - stored snapshot selected series.
+- Share actions polish:
+  - `ThreadShareActions` includes `Back to Threads`.
+  - Clipboard fallback uses `window.prompt("Copy:", value)` and keeps inline error feedback.
+- Persisted thread titles:
+  - Added migration `022_thread_titles.sql`:
+    - adds `arena_threads.title`
+    - backfills default title from snapshot metric/range (fallback to thread timestamps)
+    - enforces `title NOT NULL`.
+  - Creation routes now set `title`:
+    - discussion: metric + selected range title from snapshot/range
+    - transform proposal: model proposal title fallbacking to `Transform proposal: <metric>`.
+  - Updated `lib/db/threads.ts` to select/return `title` for single thread and thread list.
+  - Updated `lib/threadLabel.ts` to prefer persisted `thread.title` before metric-derived fallback.
+  - Added title edit API route: `app/api/threads/[id]/title/route.ts` with auth/workspace/title validation.
+  - Added client UI component `ThreadTitleEditor` and wired into `app/threads/[id]/page.tsx` so H1 uses persisted title and supports inline Edit/Save/Cancel.
+- Copy cleanup:
+  - Replaced touched Korean text in `TransformProposalCreateForm` with English copy.
+#### Manual Checklist
+- [ ] Create discussion thread from Arena: succeeds with no `vote_prompt`/`vote_labels` null errors.
+- [ ] Create transform proposal from Arena after brush selection: resulting thread reflects selected range (not full import).
+- [ ] Thread page action row includes Back to Arena + Back to Threads.
+- [ ] Copy link/ID works; prompt fallback appears when Clipboard API is blocked.
+- [ ] Thread page H1 shows persisted title and can be edited inline.
+- [ ] Thread lists display persisted title.
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

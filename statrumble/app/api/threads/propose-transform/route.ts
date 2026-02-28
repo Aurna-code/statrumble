@@ -18,6 +18,8 @@ type ProposeTransformRequest = {
   import_id?: string;
   prompt?: string;
   parent_thread_id?: string | null;
+  start_ts?: string;
+  end_ts?: string;
 };
 
 type ImportRow = {
@@ -547,6 +549,19 @@ function parseTimestampMs(ts: string | number) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function buildTransformProposalTitle(title: string, snapshot: unknown): string {
+  const normalizedTitle = title.trim();
+
+  if (normalizedTitle.length > 0) {
+    return normalizedTitle;
+  }
+
+  const snapshotRecord = asRecord(snapshot);
+  const metricRecord = asRecord(snapshotRecord?.metric);
+  const metricName = asNonEmptyString(metricRecord?.name) ?? "Thread";
+  return `Transform proposal: ${metricName}`;
+}
+
 function sampleSeriesForModel(series: TransformSeriesPoint[]) {
   if (series.length <= MAX_MODEL_POINTS) {
     return series;
@@ -717,6 +732,10 @@ export async function POST(request: NextRequest) {
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   const parentThreadIdRaw = typeof body?.parent_thread_id === "string" ? body.parent_thread_id.trim() : "";
   const parentThreadId = parentThreadIdRaw || null;
+  const requestedStartTsRaw = typeof body?.start_ts === "string" ? body.start_ts.trim() : "";
+  const requestedEndTsRaw = typeof body?.end_ts === "string" ? body.end_ts.trim() : "";
+  const hasRequestedStart = requestedStartTsRaw.length > 0;
+  const hasRequestedEnd = requestedEndTsRaw.length > 0;
 
   if (!importId) {
     return NextResponse.json({ ok: false, error: "import_id is required." }, { status: 400 });
@@ -732,6 +751,10 @@ export async function POST(request: NextRequest) {
 
   if (parentThreadId && !UUID_PATTERN.test(parentThreadId)) {
     return NextResponse.json({ ok: false, error: "parent_thread_id must be a valid UUID." }, { status: 400 });
+  }
+
+  if (hasRequestedStart !== hasRequestedEnd) {
+    return NextResponse.json({ ok: false, error: "start_ts and end_ts must be provided together." }, { status: 400 });
   }
 
   const configuredModel = process.env.CODEX_MODEL?.trim() ?? "";
@@ -839,8 +862,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Import points contain invalid timestamps." }, { status: 500 });
     }
 
-    const startTs = new Date(firstTsMs).toISOString();
-    const endTs = new Date(lastTsMs + 1).toISOString();
+    const defaultStartMs = firstTsMs;
+    const defaultEndMs = lastTsMs + 1;
+    let resolvedStartMs = defaultStartMs;
+    let resolvedEndMs = defaultEndMs;
+
+    if (hasRequestedStart && hasRequestedEnd) {
+      const requestedStartMs = parseTimestampMs(requestedStartTsRaw);
+      const requestedEndMs = parseTimestampMs(requestedEndTsRaw);
+
+      if (requestedStartMs === null || requestedEndMs === null) {
+        return NextResponse.json({ ok: false, error: "start_ts and end_ts must be valid timestamps." }, { status: 400 });
+      }
+
+      if (requestedStartMs >= requestedEndMs) {
+        return NextResponse.json({ ok: false, error: "start_ts must be less than end_ts." }, { status: 400 });
+      }
+
+      resolvedStartMs = Math.max(requestedStartMs, defaultStartMs);
+      resolvedEndMs = Math.min(requestedEndMs, defaultEndMs);
+
+      if (resolvedStartMs >= resolvedEndMs) {
+        return NextResponse.json({ ok: false, error: "Selected range is outside import bounds." }, { status: 400 });
+      }
+    }
+
+    const selectedSeries = series.filter((point) => {
+      const pointMs = parseTimestampMs(point.ts);
+
+      if (pointMs === null) {
+        return false;
+      }
+
+      return pointMs >= resolvedStartMs && pointMs < resolvedEndMs;
+    });
+
+    if (selectedSeries.length === 0) {
+      return NextResponse.json({ ok: false, error: "No points in selected range." }, { status: 400 });
+    }
+
+    const startTs = new Date(resolvedStartMs).toISOString();
+    const endTs = new Date(resolvedEndMs).toISOString();
 
     const { data: snapshot, error: snapshotError } = await supabase.rpc("compute_snapshot", {
       p_import_id: importId,
@@ -871,7 +933,7 @@ export async function POST(request: NextRequest) {
     if (!isVoteProfile(voteProfile)) {
       return NextResponse.json({ ok: false, error: "Vote profile resolution failed" }, { status: 500 });
     }
-    const snapshotWithSeries = mergeSelectedSeriesIntoSnapshot(snapshot, series);
+    const snapshotWithSeries = mergeSelectedSeriesIntoSnapshot(snapshot, selectedSeries);
 
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -886,16 +948,16 @@ export async function POST(request: NextRequest) {
       userPrompt: prompt,
       importId,
       parentThreadId,
-      series,
+      series: selectedSeries,
     });
-    const transformed = applyTransform(proposal.transformSpec, series);
+    const transformed = applyTransform(proposal.transformSpec, selectedSeries);
     const childStats = transformed.stats;
     const baseline = applyTransform(
       {
         version: 1,
         ops: [{ op: "moving_average", window: 1 }],
       },
-      series,
+      selectedSeries,
     );
     const statsPayload = {
       transformed: childStats,
@@ -948,6 +1010,7 @@ export async function POST(request: NextRequest) {
         snapshot: snapshotWithSeries,
         vote_prompt: voteProfile.prompt,
         vote_labels: voteProfile.labels,
+        title: buildTransformProposalTitle(proposal.title, snapshotWithSeries),
       })
       .select("id")
       .single();

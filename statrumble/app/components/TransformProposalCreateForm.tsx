@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 type TransformProposalCreateFormProps = {
   importId: string;
+  startTs?: string | null;
+  endTs?: string | null;
   disabled?: boolean;
 };
 
@@ -42,7 +44,12 @@ function normalizeIssues(payload: ProposeTransformApiResponse | null): Validatio
     .filter((issue) => issue.message.length > 0);
 }
 
-export default function TransformProposalCreateForm({ importId, disabled = false }: TransformProposalCreateFormProps) {
+export default function TransformProposalCreateForm({
+  importId,
+  startTs = null,
+  endTs = null,
+  disabled = false,
+}: TransformProposalCreateFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -83,6 +90,8 @@ export default function TransformProposalCreateForm({ importId, disabled = false
           import_id: normalizedImportId,
           prompt: normalizedPrompt,
           parent_thread_id: null,
+          ...(startTs ? { start_ts: startTs } : {}),
+          ...(endTs ? { end_ts: endTs } : {}),
         }),
       });
 
@@ -153,7 +162,7 @@ export default function TransformProposalCreateForm({ importId, disabled = false
           />
 
           <p className="text-xs text-zinc-500">
-            예시: IQR 기준으로 extreme outlier를 clip하고 추세를 유지해줘. / 7-point moving average를 적용하고 변화 요약을 보여줘.
+            Example: Clip extreme outliers using IQR while preserving trend, then summarize expected changes.
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -174,7 +183,7 @@ export default function TransformProposalCreateForm({ importId, disabled = false
             </button>
           </div>
 
-          {error ? <p className="text-xs text-red-600">제안 생성 실패: {error}</p> : null}
+          {error ? <p className="text-xs text-red-600">Failed to create proposal: {error}</p> : null}
           {issues.length > 0 ? (
             <ul className="space-y-1 text-xs text-red-600">
               {issues.map((issue) => (

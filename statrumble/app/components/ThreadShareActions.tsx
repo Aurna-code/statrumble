@@ -25,7 +25,7 @@ export default function ThreadShareActions({ threadId, backHref }: ThreadShareAc
       }, 1500);
     } catch {
       try {
-        window.prompt("Copy to clipboard:", value);
+        window.prompt("Copy:", value);
       } catch {
         // no-op: keep inline error message below
       }

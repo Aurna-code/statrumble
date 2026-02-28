@@ -41,6 +41,7 @@ type ThreadRow = {
   transform_sql_preview: string | null;
   transform_stats: unknown | null;
   transform_diff_report: unknown | null;
+  title: string;
   vote_prompt: string;
   vote_labels: unknown;
   created_at: string;
@@ -62,6 +63,7 @@ type ThreadListRow = {
   visibility: "workspace" | "invite" | "public";
   kind: string;
   parent_thread_id: string | null;
+  title: string;
   metrics: ThreadMetricMeta | ThreadMetricMeta[] | null;
 };
 
@@ -112,7 +114,7 @@ export async function listThreads(limit = 20): Promise<ArenaThreadListItem[]> {
   const workspaceId = await getRequiredActiveWorkspaceId();
   const { data, error } = await supabase
     .from("arena_threads")
-    .select("id, created_at, start_ts, end_ts, metric_id, visibility, kind, parent_thread_id, metrics(name, unit)")
+    .select("id, title, created_at, start_ts, end_ts, metric_id, visibility, kind, parent_thread_id, metrics(name, unit)")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(limit);

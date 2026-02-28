@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ThreadShareActions from "@/app/components/ThreadShareActions";
 import ThreadSnapshotChart from "@/app/components/ThreadSnapshotChart";
+import ThreadTitleEditor from "@/app/components/ThreadTitleEditor";
 import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
@@ -319,16 +320,16 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-semibold">{metricLabel}</h1>
-        {isTransformProposal ? (
+      <ThreadTitleEditor threadId={thread.id} initialTitle={thread.title} />
+      {isTransformProposal ? (
+        <p className="mt-2">
           <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
             Proposal
           </span>
-        ) : null}
-      </div>
+        </p>
+      ) : null}
       <p className="mt-2 text-sm text-zinc-600">
-        {rangeLabel} • ID: {threadShortId}
+        Metric: {metricLabel} • {rangeLabel} • ID: {threadShortId}
       </p>
       <ThreadShareActions threadId={thread.id} backHref={backToArenaHref} />
 

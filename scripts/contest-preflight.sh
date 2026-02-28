@@ -118,7 +118,8 @@ rm -f "$REMOTE_LIST_OUTPUT_FILE"
 if [ "$WITH_LOCAL_SUPABASE" -eq 1 ]; then
   section "5) Optional local Supabase smoke"
   if ! docker info >/dev/null 2>&1; then
-    die "Docker is required for --with-local-supabase."
+    echo "WARN: Docker unavailable; skipping local Supabase smoke."
+    exit 0
   fi
 
   pnpm -C statrumble exec supabase stop || true

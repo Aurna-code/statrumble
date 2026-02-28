@@ -17,6 +17,7 @@ function listTrackedFiles() {
 }
 
 const trackedFiles = listTrackedFiles();
+const excludedFiles = new Set(["docs/CODEX_LOG.md"]);
 
 const rules = [
   { name: "next-font-google", regex: /next\/font\/google/ },
@@ -27,6 +28,10 @@ const rules = [
 const findings = [];
 
 for (const filePath of trackedFiles) {
+  if (excludedFiles.has(filePath)) {
+    continue;
+  }
+
   const raw = readFileSync(filePath);
   if (raw.includes(0)) {
     continue;

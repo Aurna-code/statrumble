@@ -55,6 +55,8 @@ Use `statrumble/.env.local` and never commit real keys.
 ./scripts/contest-preflight.sh --with-local-supabase
 ```
 
+`--with-local-supabase` requires Docker; if unavailable, the smoke step is skipped with a warning.
+
 ## Demo Script (Two Users)
 1. User A signs in and creates a workspace.
 2. User A copies the workspace invite code.

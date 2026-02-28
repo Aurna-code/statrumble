@@ -4178,3 +4178,22 @@ Goal
 - [x] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone reaches optional stage and fails with `Docker is required` in this environment.
 #### Commit Link
 - TODO
+
+### Prompt ID: Preflight UX polish Docker skip (commit: TODO)
+#### Original Prompt
+```text
+[Prompt] Preflight UX polish: if Docker unavailable, skip --with-local-supabase stage with WARN (do not fail)
+```
+#### Change Summary
+- Updated `scripts/contest-preflight.sh` optional `--with-local-supabase` block:
+  - if Docker is unavailable, it now prints `WARN: Docker unavailable; skipping local Supabase smoke.` and exits successfully (`0`).
+- Updated `README.md` preflight section with one-line behavior note for Docker-unavailable environments.
+- Updated `scripts/verify-no-remote-fonts.mjs` to exclude `docs/CODEX_LOG.md` from scan to avoid prompt-text false positives.
+#### Manual Checklist
+- [x] Docker check in optional stage no longer fails whole preflight.
+- [x] Warning message matches requested wording.
+- [x] README includes Docker skip note for `--with-local-supabase`.
+#### Verification
+- [x] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone (no Docker): warns and exits `0`.
+#### Commit Link
+- TODO

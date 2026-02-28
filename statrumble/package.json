@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs",
+    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-snapshot.mjs",
     "verify": "../scripts/verify.sh"
   },
   "dependencies": {

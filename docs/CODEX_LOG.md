@@ -3960,3 +3960,50 @@ Goals
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - TODO
+
+### Prompt ID: Thread UX polish v0: snapshot chart + sharing affordances (commit: TODO)
+#### Prompt
+```text
+[Prompt] Thread UX polish v0: add snapshot chart to thread page + small sharing affordances
+
+Goal
+- On /threads/[id], render a read-only chart of the original selected range used to create the thread.
+- Keep it strictly based on the stored snapshot (no re-query of source series).
+- Add “Back to Arena”, “Copy link”, and “Copy ID” affordances.
+- No new deps. Tailwind only. English copy only.
+```
+#### Result
+- Added `statrumble/lib/snapshot.ts` with:
+  - `SnapshotPoint` type (`{ ts: string | number; value: number }`).
+  - `extractSelectedSeries(snapshot)` parser supporting:
+    - `snapshot.selected_points`
+    - `snapshot.selectedRange.points`
+    - `snapshot.selected.points`
+  - Validation/coercion for `ts`/`value`, filtering invalid points while preserving order.
+- Added `statrumble/app/components/ThreadSnapshotChart.tsx` (client):
+  - Read-only compact line chart using Recharts.
+  - Tooltip + axis formatting for snapshot points.
+  - Card styling: `rounded-xl border border-zinc-200 bg-white shadow-sm p-5`.
+  - Empty fallback: `No snapshot series available.`
+- Added `statrumble/app/components/ThreadShareActions.tsx` (client):
+  - `Back to Arena` link.
+  - `Copy link` (current URL) and `Copy ID` (`thread.id`) via `navigator.clipboard`.
+- Updated `statrumble/app/threads/[id]/page.tsx`:
+  - Computes `metricLabel` and `selectedPoints = extractSelectedSeries(thread.snapshot)`.
+  - Subtitle now includes both range and short ID.
+  - Action row rendered under subtitle.
+  - Snapshot chart rendered before existing transform/snapshot summary/thread arena sections.
+  - Back-link context preservation for `import`, `start`, `end` from `searchParams`, fallback to `/#chart`.
+- Added `id="chart"` to the Arena chart section in `statrumble/app/page.tsx` for anchor targeting.
+- Added `scripts/verify-snapshot.mjs` regression check and wired it into `statrumble/package.json` `test` script after `verify-nav`.
+#### Manual Checklist
+- [ ] Open a thread created from Arena: snapshot chart renders and matches selected range.
+- [ ] Open a transform proposal thread: snapshot chart renders from original snapshot series.
+- [ ] Back to Arena link returns to chart and preserves `import/start/end` query when present.
+- [ ] Copy link and Copy ID buttons work.
+#### Verification
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+#### Commit Link
+- TODO

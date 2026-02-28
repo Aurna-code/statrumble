@@ -1,16 +1,20 @@
 import { notFound } from "next/navigation";
+import ThreadShareActions from "@/app/components/ThreadShareActions";
+import ThreadSnapshotChart from "@/app/components/ThreadSnapshotChart";
 import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { extractSelectedSeries } from "@/lib/snapshot";
 import { formatMetricLabel, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
 
 interface ThreadPageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
 type SnapshotMetric = {
@@ -213,8 +217,41 @@ function formatCount(value: number | null | undefined) {
   return Math.round(value).toLocaleString("ko-KR");
 }
 
-export default async function Page({ params }: ThreadPageProps) {
+function asSearchValue(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) {
+    return asSearchValue(value[0]);
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function buildBackToArenaHref(input: { importId: string | null; start: string | null; end: string | null }): string {
+  const query = new URLSearchParams();
+
+  if (input.importId) {
+    query.set("import", input.importId);
+  }
+
+  if (input.start) {
+    query.set("start", input.start);
+  }
+
+  if (input.end) {
+    query.set("end", input.end);
+  }
+
+  const queryString = query.toString();
+  return queryString.length > 0 ? `/?${queryString}#chart` : "/#chart";
+}
+
+export default async function Page({ params, searchParams }: ThreadPageProps) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   let thread = null;
   let initialDecisionId: string | null = null;
 
@@ -244,6 +281,7 @@ export default async function Page({ params }: ThreadPageProps) {
   const metricName = thread.metric?.name ?? snapshot.metric?.name ?? null;
   const metricUnit = thread.metric?.unit ?? snapshot.metric?.unit ?? null;
   const metricLabel = formatMetricLabel({ name: metricName, unit: metricUnit });
+  const selectedPoints = extractSelectedSeries(thread.snapshot) ?? [];
   const selectedAvg = snapshot.selected?.avg ?? null;
   const selectedN = snapshot.selected?.n ?? null;
   const beforeAvg = snapshot.before?.avg ?? null;
@@ -254,6 +292,11 @@ export default async function Page({ params }: ThreadPageProps) {
   const rangeEnd = snapshot.range?.end_ts ?? thread.end_ts;
   const rangeLabel = `Range: ${formatDateLabel(rangeStart)} → ${formatDateLabel(rangeEnd)}`;
   const threadShortId = shortId(thread.id);
+  const backToArenaHref = buildBackToArenaHref({
+    importId: asSearchValue(resolvedSearchParams.import),
+    start: asSearchValue(resolvedSearchParams.start),
+    end: asSearchValue(resolvedSearchParams.end),
+  });
   const isTransformProposal = thread.kind === "transform_proposal";
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
@@ -284,8 +327,12 @@ export default async function Page({ params }: ThreadPageProps) {
           </span>
         ) : null}
       </div>
-      <p className="mt-2 text-sm text-zinc-600">{rangeLabel}</p>
-      <p className="mt-1 text-xs text-zinc-500">ID: {threadShortId}</p>
+      <p className="mt-2 text-sm text-zinc-600">
+        {rangeLabel} • ID: {threadShortId}
+      </p>
+      <ThreadShareActions threadId={thread.id} backHref={backToArenaHref} />
+
+      <ThreadSnapshotChart points={selectedPoints} metricLabel={metricLabel} />
 
       {isTransformProposal ? (
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50/50 p-5">

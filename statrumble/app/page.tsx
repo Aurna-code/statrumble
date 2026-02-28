@@ -84,7 +84,7 @@ export default async function Home() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-4">
-            <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+            <section id="chart" className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
               <h2 className="font-medium">Chart</h2>
               <p className="mt-1 text-sm text-zinc-600">Select an import and range to create a thread.</p>
               {importsError ? (

@@ -4241,3 +4241,52 @@ Goal
 - [x] `./scripts/contest-preflight.sh --with-local-supabase` (run in temporary clean copy; Docker unavailable, WARN+skip)
 #### Commit Link
 - TODO
+
+### Prompt ID: Workspace delete owner-only flow + safe RPC/API/UI/RLS (commit: TODO)
+#### Prompt
+```text
+[Prompt] Workspace delete: make deletion owner-only + safe RPC + API route + UI control + lock down RLS
+
+Context
+- Current UX/API has leave, join, create, but no workspace delete flow.
+- DB policy appears to allow members to delete workspaces (policy name like workspaces_delete_member).
+- We need a safe, explicit delete flow:
+  - owner-only
+  - confirmation UX
+  - uses SECURITY DEFINER RPC
+  - avoids accidental data loss
+
+Constraints
+- No new dependencies.
+- English-only UI copy.
+- Keep verify/preflight green.
+- Prefer idempotent SQL in new migrations.
+
+Goals
+1) Remove/disable any permissive workspace DELETE policy (member-delete) and ensure direct deletes are not possible.
+2) Add public.delete_workspace(p_workspace_id uuid, p_confirm_name text) SECURITY DEFINER RPC:
+   - owner-only
+   - checks confirmation name matches workspace.name
+   - deletes workspace row (FK cascades handle dependent data)
+3) Add API endpoint /api/workspaces/[id]/delete that calls RPC and maps errors to proper HTTP codes.
+4) Add UI in WorkspacesHub:
+   - owner sees "Delete workspace" action
+   - requires typing workspace name to confirm
+   - warns about irreversible deletion
+   - on success, refreshes workspace selection and routes user to /workspaces (or /)
+5) Add minimal regression checks and keep lint/typecheck/verify green.
+```
+#### Result
+- Added `statrumble/supabase/migrations/023_workspace_delete_owner_only.sql` to remove all direct `DELETE` policies on `public.workspaces` and to create/grant `public.delete_workspace(uuid, text)` as a `SECURITY DEFINER` owner-only delete RPC with explicit confirmation checks.
+- Added `statrumble/app/api/workspaces/[id]/delete/route.ts` (`POST`) with UUID/body validation, RPC execution, explicit error status mapping (`401/403/404/400/500`), and active workspace cookie fallback refresh after deletion.
+- Updated `statrumble/app/components/WorkspacesHub.tsx` to add owner-only delete controls, inline irreversible warning panel, typed workspace-name confirmation input, inline error display, pending-state locking, and post-delete refresh/redirect handling.
+- Updated `scripts/verify.sh` with a minimal guard that ensures migration `023_workspace_delete_owner_only.sql` exists, includes `delete_workspace`, and that `workspaces_delete_member` is not reintroduced outside `000_init.sql`.
+#### Manual Checklist
+- [x] Owner sees delete control; member does not
+- [x] Wrong confirm name returns mapped 400 error and inline message
+- [x] Owner delete route returns success path with active workspace fallback
+- [ ] Manual browser validation: deleted workspace disappears and invite/join code fails
+- [x] Migration-level lock removes direct `DELETE` policy from `public.workspaces`
+- [ ] `./scripts/contest-preflight.sh` (requires clean tree; run after commit)
+#### Commit Link
+- TODO

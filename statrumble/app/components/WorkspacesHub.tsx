@@ -36,6 +36,13 @@ type PromoteWorkspaceMemberResponse = {
   error?: string;
 };
 
+type DeleteWorkspaceResponse = {
+  ok: boolean;
+  workspace_id?: string;
+  active_workspace_id?: string | null;
+  error?: string;
+};
+
 export default function WorkspacesHub({
   workspaces,
   activeWorkspaceId,
@@ -50,6 +57,10 @@ export default function WorkspacesHub({
   const [switchingId, setSwitchingId] = useState<string | null>(null);
   const [leavingId, setLeavingId] = useState<string | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [members, setMembers] = useState(workspaceMembers);
 
@@ -69,6 +80,20 @@ export default function WorkspacesHub({
   useEffect(() => {
     setMembers(workspaceMembers);
   }, [workspaceMembers]);
+
+  useEffect(() => {
+    if (!deleteTargetId) {
+      return;
+    }
+
+    if (memberships.some((workspace) => workspace.id === deleteTargetId)) {
+      return;
+    }
+
+    setDeleteTargetId(null);
+    setDeleteConfirmName("");
+    setDeleteErrorMessage(null);
+  }, [deleteTargetId, memberships]);
 
   async function handleSwitch(workspaceId: string) {
     if (switchingId || workspaceId === selectedWorkspaceId) {
@@ -196,6 +221,74 @@ export default function WorkspacesHub({
     }
   }
 
+  function openDeletePanel(workspaceId: string) {
+    if (deletingId) {
+      return;
+    }
+
+    setDeleteTargetId(workspaceId);
+    setDeleteConfirmName("");
+    setDeleteErrorMessage(null);
+  }
+
+  function closeDeletePanel() {
+    if (deletingId) {
+      return;
+    }
+
+    setDeleteTargetId(null);
+    setDeleteConfirmName("");
+    setDeleteErrorMessage(null);
+  }
+
+  async function handleDelete(workspaceId: string) {
+    if (deletingId) {
+      return;
+    }
+
+    setDeletingId(workspaceId);
+    setDeleteErrorMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}/delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          confirmName: deleteConfirmName,
+        }),
+      });
+      const payload = (await response.json()) as DeleteWorkspaceResponse;
+
+      if (!response.ok || !payload.ok) {
+        setDeleteErrorMessage(payload.error ?? "Failed to delete workspace.");
+        return;
+      }
+
+      setMemberships((prev) => prev.filter((workspace) => workspace.id !== workspaceId));
+      const nextActiveWorkspaceId = payload.active_workspace_id ?? null;
+      setSelectedWorkspaceId(nextActiveWorkspaceId);
+
+      if (nextActiveWorkspaceId) {
+        window.localStorage.setItem(ACTIVE_WORKSPACE_STORAGE_KEY, nextActiveWorkspaceId);
+      } else {
+        window.localStorage.removeItem(ACTIVE_WORKSPACE_STORAGE_KEY);
+      }
+
+      setDeleteTargetId(null);
+      setDeleteConfirmName("");
+      setDeleteErrorMessage(null);
+      router.refresh();
+      router.push("/workspaces");
+    } catch {
+      setDeleteErrorMessage("Network error.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const canShowMembers = membersWorkspaceId !== null && membersWorkspaceId === selectedWorkspaceId;
   const isActiveOwner = activeWorkspace?.role === "owner";
 
@@ -271,8 +364,15 @@ export default function WorkspacesHub({
             const isActive = workspace.id === selectedWorkspaceId;
             const isSwitching = switchingId === workspace.id;
             const isLeaving = leavingId === workspace.id;
+            const isDeleting = deletingId === workspace.id;
+            const isDeletePanelOpen = deleteTargetId === workspace.id;
+            const canDeleteWorkspace = workspace.role === "owner";
+            const hasAnyPendingDelete = deletingId !== null;
             const isLastOwner = workspace.role === "owner" && workspace.owner_count === 1;
-            const isLeaveDisabled = isLeaving || isSwitching || isLastOwner;
+            const isSwitchDisabled = isActive || isSwitching || isLeaving || isDeleting || hasAnyPendingDelete;
+            const isLeaveDisabled = isLeaving || isSwitching || isDeleting || isLastOwner || hasAnyPendingDelete;
+            const isDeleteToggleDisabled = isSwitching || isLeaving || hasAnyPendingDelete;
+            const isDeleteSubmitDisabled = isDeleting;
 
             return (
               <li key={workspace.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
@@ -294,7 +394,7 @@ export default function WorkspacesHub({
                     <button
                       type="button"
                       onClick={() => void handleSwitch(workspace.id)}
-                      disabled={isActive || isSwitching || isLeaving}
+                      disabled={isSwitchDisabled}
                       className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {isSwitching ? "Switching..." : isActive ? "Active" : "Switch"}
@@ -307,12 +407,72 @@ export default function WorkspacesHub({
                     >
                       {isLeaving ? "Leaving..." : "Leave"}
                     </button>
+                    {canDeleteWorkspace ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isDeletePanelOpen) {
+                            closeDeletePanel();
+                            return;
+                          }
+
+                          openDeletePanel(workspace.id);
+                        }}
+                        disabled={isDeleteToggleDisabled}
+                        className="inline-flex items-center rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isDeletePanelOpen ? "Close delete" : "Delete"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
                 {isLastOwner ? (
                   <p className="mt-2 text-xs text-amber-700">
-                    You cannot leave as the last owner. Promote another owner or delete this workspace.
+                    You cannot leave as the last owner. Promote another owner, or use Delete for this workspace.
                   </p>
+                ) : null}
+                {isDeletePanelOpen ? (
+                  <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-semibold text-red-800">Delete workspace</p>
+                    <p className="mt-1 text-xs text-red-700">Type the workspace name to confirm deletion.</p>
+                    <p className="mt-1 text-xs text-red-700">
+                      This will permanently delete threads, imports, decisions, and memberships.
+                    </p>
+                    <label className="mt-3 block text-xs font-medium text-red-800">
+                      Workspace name
+                      <input
+                        type="text"
+                        value={deleteConfirmName}
+                        onChange={(event) => setDeleteConfirmName(event.target.value)}
+                        placeholder={workspace.name}
+                        disabled={isDeleting}
+                        className="mt-1 w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-red-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
+                      />
+                    </label>
+                    {deleteErrorMessage ? (
+                      <p className="mt-2 rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-700">
+                        {deleteErrorMessage}
+                      </p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={closeDeletePanel}
+                        disabled={isDeleting}
+                        className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(workspace.id)}
+                        disabled={isDeleteSubmitDisabled}
+                        className="inline-flex items-center rounded-md border border-red-200 bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isDeleting ? "Deleting..." : "Delete workspace"}
+                      </button>
+                    </div>
+                  </div>
                 ) : null}
 
                 <div className="mt-3 grid gap-2 text-xs text-zinc-600 md:grid-cols-2">

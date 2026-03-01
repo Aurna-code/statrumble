@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import DisplayNameEditor from "@/app/components/DisplayNameEditor";
 import InviteCodeCopyButton from "@/app/components/InviteCodeCopyButton";
 import MetaChipsRow from "@/app/components/MetaChipsRow";
+import WorkspaceVoteSettings from "@/app/components/WorkspaceVoteSettings";
 import WorkspacePublicPortalControls from "@/app/components/WorkspacePublicPortalControls";
 import type { MemberWorkspaceRow, WorkspaceMemberRow, WorkspacePublicProfile } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatJoinedAt } from "@/lib/formatDate";
@@ -22,6 +23,7 @@ type WorkspacesHubProps = {
   workspacePublicProfile: WorkspacePublicProfile | null;
   portalStatusByWorkspaceId: Record<string, boolean>;
   initialDisplayName: string | null;
+  initialWorkspaceVoteConfig: unknown | null;
 };
 
 type SetActiveWorkspaceResponse = {
@@ -58,6 +60,7 @@ export default function WorkspacesHub({
   workspacePublicProfile,
   portalStatusByWorkspaceId,
   initialDisplayName,
+  initialWorkspaceVoteConfig,
 }: WorkspacesHubProps) {
   const router = useRouter();
   const [memberships, setMemberships] = useState(workspaces);
@@ -392,6 +395,12 @@ export default function WorkspacesHub({
                     Only workspace owners can change portal visibility.
                   </div>
                 )}
+
+                <WorkspaceVoteSettings
+                  workspaceId={activeWorkspace.id}
+                  isOwner={isActiveOwner}
+                  initialConfig={initialWorkspaceVoteConfig}
+                />
               </div>
             ) : (
               <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4">

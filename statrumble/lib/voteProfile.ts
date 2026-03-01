@@ -46,7 +46,7 @@ function asNonEmptyString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function parseVoteLabels(value: unknown): VoteLabels | null {
+export function parseVoteLabels(value: unknown): VoteLabels | null {
   const record = asRecord(value);
 
   if (!record) {
@@ -146,4 +146,19 @@ export function resolveVoteProfileFromConfig(config: unknown, kind: VoteProfileK
   }
 
   return null;
+}
+
+export function coerceVoteProfileFromThreadFields(args: {
+  prompt: unknown;
+  labels: unknown;
+  kind: VoteProfileKind;
+}): VoteProfile {
+  const prompt = asNonEmptyString(args.prompt);
+  const labels = parseVoteLabels(args.labels);
+
+  if (prompt && labels) {
+    return { prompt, labels };
+  }
+
+  return getDefaultVoteProfile(args.kind);
 }

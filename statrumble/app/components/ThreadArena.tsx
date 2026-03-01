@@ -9,6 +9,7 @@ import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
 import { getRuntimeDemoMode } from "@/lib/runtimeMode";
 import { shortId } from "@/lib/userDisplay";
+import type { VoteLabels } from "@/lib/voteProfile";
 
 type VoteStance = "A" | "B" | "C";
 
@@ -62,6 +63,8 @@ type SnapshotSummary = {
 type ThreadArenaProps = {
   threadId: string;
   snapshot: unknown;
+  votePrompt: string;
+  voteLabels: VoteLabels;
   initialRefereeReport?: RefereeReport | null;
   initialDecisionId?: string | null;
   currentUserId?: string | null;
@@ -161,6 +164,8 @@ function buildVoteSignature(counts: VoteCounts, myStance: VoteStance | null) {
 export default function ThreadArena({
   threadId,
   snapshot,
+  votePrompt,
+  voteLabels,
   initialRefereeReport = null,
   initialDecisionId = null,
   currentUserId = null,
@@ -555,6 +560,7 @@ export default function ThreadArena({
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
           </div>
+          <p className="mt-2 text-sm text-zinc-700">{votePrompt}</p>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
             {(Object.keys(voteCounts) as VoteStance[]).map((stance) => {
@@ -573,14 +579,21 @@ export default function ThreadArena({
                   }`}
                 >
                   <span className="font-semibold">{stance}</span>
-                  <span className="ml-2 text-xs">({voteCounts[stance]})</span>
+                  <span className={`ml-2 text-xs ${selected ? "text-zinc-100" : "text-zinc-600"}`}>
+                    · {voteLabels[stance]}
+                  </span>
+                  <span className={`ml-2 text-xs ${selected ? "text-zinc-100" : ""}`}>({voteCounts[stance]})</span>
                 </button>
               );
             })}
           </div>
 
           <p className="mt-3 text-xs text-zinc-600">One person, one vote. Re-selecting updates your vote.</p>
-          {myStance ? <p className="mt-2 text-sm text-zinc-800">My vote: {myStance}</p> : null}
+          {myStance ? (
+            <p className="mt-2 text-sm text-zinc-800">
+              My vote: {myStance} · {voteLabels[myStance]}
+            </p>
+          ) : null}
           {votesError ? <p className="mt-2 text-sm text-red-600">{votesError}</p> : null}
 
           <div className="mt-4">

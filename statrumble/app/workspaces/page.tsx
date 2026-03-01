@@ -31,6 +31,7 @@ export default async function WorkspacesPage() {
   let membersWorkspaceId: string | null = null;
   let membersError: string | null = null;
   let workspacePublicProfile: WorkspacePublicProfile | null = null;
+  let activeWorkspaceVoteConfig: unknown | null = null;
   let workspacePortalStatuses: WorkspacePortalStatus[] = [];
   let viewerDisplayName: string | null = null;
 
@@ -63,6 +64,15 @@ export default async function WorkspacesPage() {
 
   if (!loadError && activeWorkspaceId) {
     const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+
+    try {
+      const { data: voteConfig, error: voteConfigError } = await supabase.rpc("get_workspace_vote_profile", {
+        p_workspace_id: activeWorkspaceId,
+      });
+      activeWorkspaceVoteConfig = voteConfigError ? null : (voteConfig ?? null);
+    } catch {
+      activeWorkspaceVoteConfig = null;
+    }
 
     try {
       workspaceMembers = await listWorkspaceMembers(activeWorkspaceId);
@@ -109,6 +119,7 @@ export default async function WorkspacesPage() {
             workspacePublicProfile={workspacePublicProfile}
             portalStatusByWorkspaceId={portalStatusByWorkspaceId}
             initialDisplayName={viewerDisplayName}
+            initialWorkspaceVoteConfig={activeWorkspaceVoteConfig}
           />
         )}
       </div>

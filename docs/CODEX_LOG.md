@@ -4954,3 +4954,223 @@ polish(ui): harden transform plan rendering
 - [ ] Manual browser smoke for malformed mixed-op plans
 #### Commit Link
 - TODO
+
+### Prompt ID: Implement vote label editing UI (workspace templates + thread snapshot display + optional thread override) (commit: TODO)
+#### Prompt
+```text
+[Prompt] Implement vote label editing UI (workspace templates + thread snapshot display + optional thread override)
+
+Repo status (as of current HEAD)
+- DB/RPC exists:
+  - public.workspace_vote_profiles + get_workspace_vote_profile / set_workspace_vote_profile (owner-only set)
+  - arena_threads has vote_prompt (text) + vote_labels (jsonb, A/B/C) NOT NULL
+  - public.set_thread_vote_profile(thread_id, vote_prompt, vote_labels, reset_votes) exists (owner-only, can reset votes)
+- Thread creation already snapshots vote_prompt/vote_labels by resolving workspace vote profile.
+- Missing pieces:
+  1) /workspaces UI has no vote settings editor.
+  2) Thread vote UI shows only A/B/C letters and ignores vote_prompt/vote_labels.
+  3) (Optional) No UI/API route to edit thread vote profile.
+
+Goal
+- Owners can set workspace-level vote templates (prompt + labels A/B/C) for:
+  - discussion
+  - transform_proposal
+- Thread vote UI displays:
+  - vote prompt
+  - buttons labeled "A · <label>" etc
+- Threads keep snapshotted semantics; workspace changes affect new threads only.
+- Add an owner-only thread-level override UI (optional but recommended) using set_thread_vote_profile with reset option.
+
+Constraints
+- No new dependencies.
+- English-only UI copy.
+- Keep lint/typecheck/tests/build/verify/preflight green.
+- Use existing styling conventions (rounded-xl, border-zinc-200, bg-white, shadow-sm).
+
+Part A) Workspace vote settings (templates)
+
+A1) Server: fetch initial vote config for active workspace
+- File: statrumble/app/workspaces/page.tsx
+- After activeWorkspaceId is resolved and user is authenticated:
+  - Call supabase.rpc("get_workspace_vote_profile", { p_workspace_id: activeWorkspaceId })
+  - Store result (unknown | null) as activeWorkspaceVoteConfig
+  - Pass it to WorkspacesHub as a new prop:
+    initialWorkspaceVoteConfig={activeWorkspaceVoteConfig}
+- If RPC errors, set it null and continue (UI can fall back to defaults).
+
+A2) API route to persist workspace vote config
+- Add: statrumble/app/api/workspaces/[id]/vote-profile/route.ts
+- GET:
+  - auth required
+  - call rpc get_workspace_vote_profile(p_workspace_id=id)
+  - return { ok:true, config } (config may be null)
+- POST:
+  - auth required
+  - body: { config: unknown }
+  - validate config is an object with:
+    - discussion: { prompt: string, labels: {A,B,C strings} }
+    - transform_proposal: { prompt: string, labels: {A,B,C strings} }
+  - call rpc set_workspace_vote_profile(p_workspace_id=id, p_config=config)
+  - map errors: Unauthorized 401, Forbidden 403, validation 400, else 500
+  - return { ok:true }
+
+A3) Client component: WorkspaceVoteSettings
+- Add: statrumble/app/components/WorkspaceVoteSettings.tsx ("use client")
+- Props:
+  - workspaceId: string
+  - isOwner: boolean
+  - initialConfig: unknown | null
+- Behavior:
+  - Resolve profiles using existing helper:
+    - from statrumble/lib/voteProfile.ts:
+      resolveVoteProfileFromConfig(initialConfig, kind) ?? getDefaultVoteProfile(kind)
+  - Render UI (use <details> to keep it tidy):
+    - <summary>Vote settings</summary>
+    - Section 1: Discussion threads
+      - Prompt input (text)
+      - Label inputs A/B/C (text)
+    - Section 2: Transform proposals
+      - Prompt input
+      - Label inputs A/B/C
+    - Save button
+  - If !isOwner:
+    - Inputs disabled
+    - Show note: "Only workspace owners can edit vote settings."
+  - On Save:
+    - POST /api/workspaces/{workspaceId}/vote-profile with config shaped as:
+      {
+        discussion: { prompt, labels:{A,B,C} },
+        transform_proposal: { prompt, labels:{A,B,C} }
+      }
+    - Show inline "Saved." on success; show error message otherwise.
+
+A4) Mount it in WorkspacesHub
+- File: statrumble/app/components/WorkspacesHub.tsx
+- Add a new prop:
+  initialWorkspaceVoteConfig: unknown | null
+- Determine isActiveOwner already exists:
+  const isActiveOwner = activeWorkspace?.role === "owner";
+- Inside Active workspace card, after Portal controls (or inside a <details> block), render:
+  <WorkspaceVoteSettings
+    workspaceId={activeWorkspace.id}
+    isOwner={isActiveOwner}
+    initialConfig={initialWorkspaceVoteConfig}
+  />
+
+Part B) Use vote prompt/labels in thread UI
+
+B1) Parse vote labels safely
+- Update statrumble/lib/voteProfile.ts:
+  - Export a helper (minimal change):
+    export function parseVoteLabels(value: unknown): VoteLabels | null
+    (You already have parseVoteLabels internally; make it exported.)
+  - Add:
+    export function coerceVoteProfileFromThreadFields(args: { prompt: unknown; labels: unknown; kind: VoteProfileKind }): VoteProfile
+    - if prompt is non-empty and parseVoteLabels(labels) succeeds -> return { prompt, labels }
+    - else return getDefaultVoteProfile(kind)
+
+B2) Thread page: pass vote info into ThreadArena
+- File: statrumble/app/threads/[id]/page.tsx
+- Determine kind:
+  const kind = thread.kind === "transform_proposal" ? "transform_proposal" : "discussion";
+- Compute:
+  const voteProfile = coerceVoteProfileFromThreadFields({ prompt: thread.vote_prompt, labels: thread.vote_labels, kind })
+- Update <ThreadArena ... /> call to include:
+  votePrompt={voteProfile.prompt}
+  voteLabels={voteProfile.labels}
+
+B3) ThreadArena: display prompt and labels
+- File: statrumble/app/components/ThreadArena.tsx
+- Update props type:
+  - Add votePrompt: string
+  - Add voteLabels: { A: string; B: string; C: string }
+- In Vote section UI:
+  - Show prompt under "Vote" header:
+    <p className="mt-2 text-sm text-zinc-700">{votePrompt}</p>
+  - For each stance button, show label:
+    - Primary: "A · <labelA>"
+    - Also keep count: "(n)"
+    Example inside button:
+      <span className="font-semibold">{stance}</span>
+      <span className="ml-2 text-xs text-zinc-600">· {voteLabels[stance]}</span>
+      <span className="ml-2 text-xs">({voteCounts[stance]})</span>
+  - My vote line should include label:
+    "My vote: A · Yes"
+- Keep existing vote submission logic unchanged.
+
+Part C) Optional: thread-level override UI (owner-only, reset votes)
+(This is the “as discussed” hybrid completion.)
+
+C1) API route for thread vote profile update
+- Add: statrumble/app/api/threads/[id]/vote-profile/route.ts
+- POST body:
+  { vote_prompt: string; vote_labels: {A,B,C}; reset_votes?: boolean }
+- Call rpc set_thread_vote_profile(p_thread_id=id, p_vote_prompt, p_vote_labels, p_reset_votes)
+- Map errors:
+  - Unauthorized -> 401
+  - Forbidden -> 403
+  - "Votes already exist..." -> 409
+  - validation -> 400
+  - else 500
+
+C2) Client component: ThreadVoteSettings
+- Add: statrumble/app/components/ThreadVoteSettings.tsx ("use client")
+- Props:
+  - threadId: string
+  - isOwner: boolean
+  - initialPrompt: string
+  - initialLabels: VoteLabels
+- UI:
+  - Title: "Thread vote settings"
+  - Explanation: "Thread vote settings are snapshotted at creation. Updating after votes exist requires reset."
+  - Inputs: prompt + labels A/B/C
+  - Checkbox: "Reset existing votes"
+  - Save button
+  - If !isOwner -> read-only, show note.
+- On Save -> POST /api/threads/{id}/vote-profile
+- If response is 409 -> show message prompting to enable reset checkbox.
+
+C3) Render it on thread page
+- File: statrumble/app/threads/[id]/page.tsx
+- Determine isOwner:
+  - Use listMemberWorkspaces() (server helper) and find workspace row for thread.workspace_id; role === "owner"
+  - Or query workspace_members directly if helper exists.
+- Render <ThreadVoteSettings .../> above ThreadArena.
+
+Docs + verification
+- Update docs/CODEX_LOG.md with entry.
+- Run:
+  npm run lint
+  npm run typecheck
+  pnpm -C statrumble test
+  pnpm -C statrumble build
+  ./scripts/verify.sh
+
+Manual checklist
+- Owner: /workspaces -> Vote settings -> save -> create new thread -> thread vote UI shows updated labels/prompt.
+- Member (non-owner): /workspaces -> Vote settings visible but read-only.
+- Thread vote UI shows prompt and labels (A · Label) instead of just A/B/C.
+- Optional: owner edits thread vote settings; if votes exist, without reset -> 409; with reset -> success and votes cleared.
+- No Hangul introduced.
+```
+#### Result
+- Added workspace vote-profile API route with auth, validation, and status mapping: `GET/POST /api/workspaces/[id]/vote-profile`.
+- Added `WorkspaceVoteSettings` UI and mounted it in active workspace card; owner can edit discussion/transform templates, non-owner sees read-only note.
+- Fetched active workspace vote config in `/workspaces` server page and passed into `WorkspacesHub` as `initialWorkspaceVoteConfig`.
+- Exported `parseVoteLabels` and added `coerceVoteProfileFromThreadFields` in `lib/voteProfile.ts`.
+- Updated thread page to derive snapshotted vote profile from `arena_threads.vote_prompt/vote_labels`, pass prompt+labels to `ThreadArena`, and determine owner role via workspace memberships.
+- Updated `ThreadArena` vote UI to show prompt, stance label text (`A · <label>`), and labeled "My vote".
+- Added thread vote-profile API route `POST /api/threads/[id]/vote-profile` with 409 mapping for existing votes and validation/error mapping.
+- Added `ThreadVoteSettings` client UI (owner editable with reset checkbox; non-owner read-only note), rendered above `ThreadArena`.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [x] `./scripts/verify.sh`
+- [ ] Manual UI check: owner edits workspace vote settings and new thread snapshots updated labels/prompt
+- [ ] Manual UI check: non-owner sees workspace vote settings as read-only
+- [ ] Manual UI check: thread vote UI shows prompt + labeled stances
+- [ ] Manual UI check: thread override 409 without reset, success with reset
+#### Commit Link
+- TODO

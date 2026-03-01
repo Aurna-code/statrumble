@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import ThreadShareActions from "@/app/components/ThreadShareActions";
 import ThreadSnapshotChart from "@/app/components/ThreadSnapshotChart";
 import ThreadTitleEditor from "@/app/components/ThreadTitleEditor";
+import ThreadVoteSettings from "@/app/components/ThreadVoteSettings";
 import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
+import { listMemberWorkspaces } from "@/lib/db/workspaces";
 import { isDemoMode } from "@/lib/demoMode";
 import { createClient } from "@/lib/supabase/server";
 import type { RefereeReport } from "@/lib/referee/schema";
@@ -14,6 +16,7 @@ import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } fr
 import { extractSelectedSeries } from "@/lib/snapshot";
 import { formatMetricLabel, shortId } from "@/lib/threadLabel";
 import { getDisplayNameFromUser } from "@/lib/userDisplay";
+import { coerceVoteProfileFromThreadFields } from "@/lib/voteProfile";
 
 export const dynamic = "force-dynamic";
 
@@ -388,6 +391,17 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
     notFound();
   }
 
+  let isThreadWorkspaceOwner = false;
+
+  try {
+    const memberships = await listMemberWorkspaces();
+    isThreadWorkspaceOwner = memberships.some(
+      (workspace) => workspace.id === thread.workspace_id && workspace.role === "owner",
+    );
+  } catch {
+    isThreadWorkspaceOwner = false;
+  }
+
   try {
     const decision = await getDecisionForThread(id);
     initialDecisionId = decision?.id ?? null;
@@ -416,6 +430,12 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
     end: asSearchValue(resolvedSearchParams.end),
   });
   const isTransformProposal = thread.kind === "transform_proposal";
+  const voteProfileKind = isTransformProposal ? "transform_proposal" : "discussion";
+  const voteProfile = coerceVoteProfileFromThreadFields({
+    prompt: thread.vote_prompt,
+    labels: thread.vote_labels,
+    kind: voteProfileKind,
+  });
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
   const transformPlan = readTransformPlanLines(thread.transform_spec);
@@ -621,9 +641,18 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
         </div>
       </div>
 
+      <ThreadVoteSettings
+        threadId={thread.id}
+        isOwner={isThreadWorkspaceOwner}
+        initialPrompt={voteProfile.prompt}
+        initialLabels={voteProfile.labels}
+      />
+
       <ThreadArena
         threadId={thread.id}
         snapshot={thread.snapshot}
+        votePrompt={voteProfile.prompt}
+        voteLabels={voteProfile.labels}
         initialRefereeReport={(thread.referee_report as RefereeReport | null) ?? null}
         initialDecisionId={initialDecisionId}
         currentUserId={currentUserId}

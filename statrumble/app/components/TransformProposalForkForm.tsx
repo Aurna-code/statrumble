@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getRuntimeDemoMode } from "@/lib/runtimeMode";
+import { PROMPT_EXAMPLES_FORK, TRANSFORM_OP_GUIDE } from "@/lib/transformGuidance";
 
 type TransformProposalForkFormProps = {
   importId: string;
@@ -122,6 +123,16 @@ export default function TransformProposalForkForm({
     setIssues([]);
   }
 
+  function onExampleClick(examplePrompt: string) {
+    if (submitting) {
+      return;
+    }
+
+    setPrompt(examplePrompt);
+    setError(null);
+    setIssues([]);
+  }
+
   return (
     <div className="w-full sm:w-auto">
       <div className="flex flex-wrap items-center gap-2">
@@ -154,6 +165,49 @@ export default function TransformProposalForkForm({
             className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
             placeholder="Describe how this child proposal should refine the parent transform."
           />
+          <p className="text-xs text-zinc-500">
+            This fork should refine the parent transform with a smaller, targeted adjustment.
+          </p>
+
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-zinc-500">Quick examples</p>
+            <div className="flex flex-wrap gap-1.5">
+              {PROMPT_EXAMPLES_FORK.map((examplePrompt) => (
+                <button
+                  key={examplePrompt}
+                  type="button"
+                  onClick={() => onExampleClick(examplePrompt)}
+                  disabled={submitting}
+                  className="rounded-full border border-zinc-300 bg-zinc-50 px-2.5 py-1 text-xs text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {examplePrompt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <details className="rounded-md border border-zinc-200 bg-zinc-50 p-2.5">
+            <summary className="cursor-pointer text-xs font-medium text-zinc-700">
+              Allowed transforms (Structured Outputs)
+            </summary>
+            <div className="mt-2 space-y-2">
+              {TRANSFORM_OP_GUIDE.map((item) => (
+                <div key={item.op} className="rounded-md border border-zinc-200 bg-white p-2">
+                  <p className="text-xs font-medium text-zinc-700">{item.op}</p>
+                  <p className="mt-0.5 text-xs text-zinc-600">{item.summary}</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-zinc-600">
+                    {item.params.map((param) => (
+                      <li key={`${item.op}-${param.name}`}>
+                        <span className="font-medium text-zinc-700">{param.name}</span>: {param.hint}
+                      </li>
+                    ))}
+                  </ul>
+                  {item.note ? <p className="mt-1 text-xs text-zinc-500">{item.note}</p> : null}
+                  <p className="mt-1 text-xs text-zinc-500">Example: {item.example}</p>
+                </div>
+              ))}
+            </div>
+          </details>
 
           <div className="flex flex-wrap items-center gap-2">
             <button

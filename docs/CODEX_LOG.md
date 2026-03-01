@@ -4794,3 +4794,117 @@ Output
 - [ ] Manual owner/member UX validation in browser
 #### Commit Link
 - TODO
+
+### Prompt ID: feat(ui): add TransformSpec guidance + show Transform Plan (commit: TODO)
+#### Prompt
+```text
+[Prompt] feat(ui): add TransformSpec guidance + show Transform Plan
+
+Repo: statrumble (Next.js App Router / TS / Tailwind)
+Goal:
+1) Users should understand what “Structured Outputs (json_schema strict)” expects and what transforms are allowed.
+2) Transform proposal threads should visibly show the underlying transform_spec as a readable “plan”, plus raw JSON for power users.
+3) Improve model prompt so Codex is less likely to fight the strict nullable schema and produces cleaner specs.
+
+Context / Current:
+- Transform proposal create: statrumble/app/components/TransformProposalCreateForm.tsx
+- Transform proposal fork: statrumble/app/components/TransformProposalForkForm.tsx
+- Transform proposal thread view: statrumble/app/threads/[id]/page.tsx (shows Prompt/SQL Preview/Stats/Compare but NOT transform_spec)
+- Model call: statrumble/app/api/threads/propose-transform/route.ts (Responses API with text.format json_schema strict, nullable required fields, pruneNullsDeep + normalizeTransformSpecFromModel + TransformSpecSchema.safeParse)
+
+Tasks:
+
+A) Add a shared guidance “SSOT” module (no heavy deps; safe for client import)
+1) Create: statrumble/lib/transformGuidance.ts
+   Export:
+   - TRANSFORM_OPS: readonly ["filter_outliers","moving_average"]
+   - TRANSFORM_OP_GUIDE: array of objects describing each op, intended params, and short examples.
+     * filter_outliers:
+       - method: "iqr" | "zscore"
+       - mode: "clip" | "remove"
+       - k (iqr only), z (zscore only)
+       - user-level note: clip keeps row count; remove drops points
+     * moving_average:
+       - window: positive int
+       - center: boolean (optional)
+       - outputColumn: optional identifier (explain “value” default)
+   - PROMPT_EXAMPLES_CREATE: 3~5 short example prompts (e.g. IQR clip, zscore remove, moving average window=7)
+   - PROMPT_EXAMPLES_FORK: 3~5 prompts phrased as refinement (e.g. “switch clip->remove”, “increase window”, “try zscore z=3”)
+   - MODEL_GUIDANCE_BULLETS: string[] (or one string) that explains strict-schema rules:
+     - All keys must exist; use null for non-applicable fields.
+     - filter_outliers: if method=iqr => k is number, z must be null; if zscore => z is number, k must be null.
+     - moving_average: window must be integer >=1; center/outputColumn can be null.
+     - Prefer <=3 ops; propose the smallest practical change.
+     - explanation should reference baseline_stats impact (count/mean/std/slope) in plain terms.
+
+B) UI: Create/Fork forms show “Allowed transforms” and clickable example prompts
+2) Update statrumble/app/components/TransformProposalCreateForm.tsx
+   - Import { TRANSFORM_OP_GUIDE, PROMPT_EXAMPLES_CREATE } from "@/lib/transformGuidance"
+   - Add a small “Quick examples” row (buttons/chips). Clicking fills the textarea with that prompt and clears error/issues.
+   - Add a collapsible guidance section using <details>/<summary> titled:
+     “Allowed transforms (Structured Outputs)”
+     Inside: list each op + parameter hints from TRANSFORM_OP_GUIDE.
+   - Keep styling consistent with current Tailwind (small text, subtle borders). No new UI libs.
+
+3) Update statrumble/app/components/TransformProposalForkForm.tsx
+   - Import { TRANSFORM_OP_GUIDE, PROMPT_EXAMPLES_FORK } from "@/lib/transformGuidance"
+   - Same pattern: quick example buttons + collapsible “Allowed transforms” section.
+   - Make the fork helper text explicitly say it refines the parent (keep existing placeholder, just add guidance UI).
+
+C) Thread UI: show Transform Plan (human-readable) + raw transform_spec JSON
+4) Update statrumble/app/threads/[id]/page.tsx
+   - In transform proposal card (where Prompt/SQL Preview/Stats live), add a new section between Prompt and SQL Preview:
+     “Transform Plan”
+   - Parse thread.transform_spec safely:
+     - If it’s an object with ops array, iterate ops and render one line per op:
+       * filter_outliers -> “filter_outliers(method=iqr, mode=clip, k=1.5)” or “...(method=zscore, z=3)”
+       * moving_average -> “moving_average(window=7, center=false, outputColumn=value)” (if outputColumn missing, show value)
+     - If missing/invalid, show “No transform spec recorded.”
+   - Under the human-readable plan, add <details> “Raw transform_spec JSON” with <pre><code>{JSON.stringify(..., null, 2)}</code></pre>.
+   - Keep it compact; avoid blowing up the page.
+
+D) Server: improve model prompt for strict nullable schema behavior
+5) Update statrumble/app/api/threads/propose-transform/route.ts
+   - Import { MODEL_GUIDANCE_BULLETS, TRANSFORM_OPS } from "@/lib/transformGuidance"
+   - In requestProposalFromModel(), extend the userContent JSON:
+     - Add a field like "schema_notes": MODEL_GUIDANCE_BULLETS
+     - Update constraints to explicitly remind about nulls for unused keys and <=3 ops.
+     - Also include an "allowed_ops": TRANSFORM_OPS so the model sees the explicit list.
+   - Slightly strengthen system message:
+     - “Output ONLY valid JSON (no markdown), matching the schema. Use null for non-applicable fields.”
+   - Do NOT change the Structured Outputs schema object shape (keep strict json_schema schema as-is).
+   - Keep request free of text.verbosity / sampling params (preserve existing compatibility comment).
+
+E) (Optional but recommended) README clarity
+6) Update README.md (root)
+   - Under “How Codex Is Used”, add 1–2 lines:
+     - “Transform proposals are generated as TransformSpec JSON via Structured Outputs (json_schema strict) and validated server-side.”
+
+Verification (DoD):
+- pnpm -C statrumble lint
+- pnpm -C statrumble typecheck
+- ./scripts/verify.sh
+- Manual smoke:
+  - Open main page, open “Propose Transform (AI)” form -> see examples + allowed transforms.
+  - Open a transform proposal thread -> see “Transform Plan” + raw JSON details.
+  - Fork form also shows examples/guidance.
+
+Output:
+- Patch diff
+- Short note describing the added guidance and why (Structured Outputs strict + transform_spec visibility).
+Suggested commit message:
+feat(ui): add transform guidance panel + show transform plan in proposal threads
+```
+#### Result
+- Added a shared guidance SSOT module at `statrumble/lib/transformGuidance.ts` with allowed ops, per-op parameter guidance, create/fork prompt examples, and model-facing strict-schema guidance bullets.
+- Updated both transform proposal forms to show quick example chips and an “Allowed transforms (Structured Outputs)” `<details>` panel; clicking an example fills the prompt and clears current error/issue state.
+- Updated transform proposal thread UI to show a human-readable “Transform Plan” rendered from `transform_spec.ops`, plus compact raw JSON under `<details>` for power users.
+- Updated propose-transform route prompt payload to include `allowed_ops`, `schema_notes`, and stronger constraints around nullable keys and <=3 ops; strengthened system instruction to require JSON-only strict-schema output with nulls for non-applicable fields.
+- Added README clarification under “How Codex Is Used” about strict Structured Outputs and server-side validation.
+#### Manual Checklist
+- [x] `pnpm -C statrumble lint`
+- [x] `pnpm -C statrumble typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual smoke in browser (create/fork guidance panels and thread transform plan visibility)
+#### Commit Link
+- TODO

@@ -14,6 +14,7 @@ import {
   type TransformWarning,
   type TransformStats,
 } from "@/lib/transforms";
+import { MODEL_GUIDANCE_BULLETS, TRANSFORM_OPS } from "@/lib/transformGuidance";
 import { getDefaultVoteProfile, isVoteProfile, resolveVoteProfileFromConfig } from "@/lib/voteProfile";
 
 type ProposeTransformRequest = {
@@ -618,9 +619,14 @@ async function requestProposalFromModel(params: {
       task: "Create a safe transform proposal for a timeseries debate thread.",
       constraints: [
         "Use only allowed TransformSpec ops.",
+        "Set null for non-applicable schema fields in each op object.",
+        "Keep transform_spec to 3 ops or fewer.",
+        "Propose the smallest practical change that addresses the user request.",
         "Keep transform_spec practical for the provided data profile.",
         "sql_preview is illustrative text only; it will not be executed.",
       ],
+      allowed_ops: TRANSFORM_OPS,
+      schema_notes: MODEL_GUIDANCE_BULLETS,
       input: {
         import_id: importId,
         parent_thread_id: parentThreadId,
@@ -638,7 +644,7 @@ async function requestProposalFromModel(params: {
     {
       role: "system" as const,
       content:
-        "You generate transform proposals for a chart review workflow. Output must be valid JSON matching the provided schema.",
+        "You generate transform proposals for a chart review workflow. Output ONLY valid JSON (no markdown), matching the schema. Use null for non-applicable fields.",
     },
     {
       role: "user" as const,

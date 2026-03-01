@@ -89,6 +89,10 @@ function asNullableFiniteNumber(value: unknown): number | null | undefined {
   return asFiniteNumber(value) ?? undefined;
 }
 
+function asBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
 function extractComparableStats(value: unknown): ComparableStats | null {
   const direct = extractComparableStatsFromRecord(asRecord(value));
 
@@ -248,6 +252,73 @@ function buildBackToArenaHref(input: { importId: string | null; start: string | 
   return queryString.length > 0 ? `/?${queryString}#chart` : "/#chart";
 }
 
+function readTransformPlanLines(spec: unknown): string[] | null {
+  const specRecord = asRecord(spec);
+  const opsRaw = specRecord?.ops;
+
+  if (!Array.isArray(opsRaw) || opsRaw.length === 0) {
+    return null;
+  }
+
+  const lines: string[] = [];
+
+  for (const opRaw of opsRaw) {
+    const op = asRecord(opRaw);
+
+    if (!op) {
+      return null;
+    }
+
+    const opName = asNonEmptyString(op.op);
+
+    if (opName === "filter_outliers") {
+      const method = op.method;
+      const mode = op.mode;
+
+      if ((method !== "iqr" && method !== "zscore") || (mode !== "clip" && mode !== "remove")) {
+        return null;
+      }
+
+      if (method === "zscore") {
+        const z = asFiniteNumber(op.z) ?? 3;
+        lines.push(`filter_outliers(method=zscore, mode=${mode}, z=${z})`);
+        continue;
+      }
+
+      const k = asFiniteNumber(op.k) ?? 1.5;
+      lines.push(`filter_outliers(method=iqr, mode=${mode}, k=${k})`);
+      continue;
+    }
+
+    if (opName === "moving_average") {
+      const windowRaw = asFiniteNumber(op.window);
+      const window = windowRaw !== null && Number.isInteger(windowRaw) && windowRaw >= 1 ? windowRaw : null;
+
+      if (window === null) {
+        return null;
+      }
+
+      const center = asBoolean(op.center) ?? false;
+      const outputColumn = asNonEmptyString(op.outputColumn) ?? "value";
+      lines.push(`moving_average(window=${window}, center=${center}, outputColumn=${outputColumn})`);
+      continue;
+    }
+
+    return null;
+  }
+
+  return lines.length > 0 ? lines : null;
+}
+
+function toPrettyJson(value: unknown): string {
+  try {
+    const serialized = JSON.stringify(value ?? null, null, 2);
+    return typeof serialized === "string" ? serialized : "null";
+  } catch {
+    return '"[unserializable transform_spec]"';
+  }
+}
+
 export default async function Page({ params, searchParams }: ThreadPageProps) {
   const demoMode = isDemoMode();
   const { id } = await params;
@@ -318,6 +389,8 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   const isTransformProposal = thread.kind === "transform_proposal";
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
+  const transformPlanLines = readTransformPlanLines(thread.transform_spec);
+  const rawTransformSpecJson = toPrettyJson(thread.transform_spec);
   const sqlPreview = asNonEmptyString(thread.transform_sql_preview);
   const proposalStatsRecord = asRecord(thread.transform_stats);
   const proposalStats = extractComparableStats(thread.transform_stats);
@@ -379,6 +452,30 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
               <p className="mt-1 rounded-md border border-zinc-200 bg-white p-3 text-zinc-800">
                 {proposalPrompt ?? "No prompt recorded."}
               </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-zinc-500">Transform Plan</p>
+              <div className="mt-1 rounded-md border border-zinc-200 bg-white p-3">
+                {transformPlanLines ? (
+                  <ul className="space-y-1 text-xs text-zinc-800">
+                    {transformPlanLines.map((line, index) => (
+                      <li key={`${line}-${index}`} className="font-mono">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-zinc-600">No transform spec recorded.</p>
+                )}
+
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-medium text-zinc-500">Raw transform_spec JSON</summary>
+                  <pre className="mt-1 max-h-64 overflow-auto rounded-md border border-zinc-200 bg-zinc-50 p-2 text-[11px] text-zinc-800">
+                    <code>{rawTransformSpecJson}</code>
+                  </pre>
+                </details>
+              </div>
             </div>
 
             <div>

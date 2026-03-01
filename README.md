@@ -6,6 +6,8 @@ The product scope is intentionally narrow: upload -> chart -> segment select -> 
 
 ## How Codex Is Used
 - Transform proposals: users can propose transformed series, and Codex produces structured outputs that become candidate threads.
+- Transform proposals are generated as `TransformSpec` JSON via Structured Outputs (`json_schema` strict) and validated server-side.
+- Proposal threads surface both a readable transform plan and the raw `transform_spec` JSON for review/debugging.
 - Diff summaries: transform proposal threads include parent-vs-child summary data to show what changed and why it matters.
 - Referee/Judge: the thread judge route calls the OpenAI Responses API on the server and stores a referee report and decision outcome.
 

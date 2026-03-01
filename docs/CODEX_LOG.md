@@ -5371,3 +5371,55 @@ README main-page polish: move “Future plans / Roadmap” into GitHub README (N
 - [x] No Hangul introduced
 #### Commit Link
 - TODO
+
+### Prompt ID: Local-run README pitfalls (commit: TODO)
+#### Prompt
+```text
+You are Codex working at the repo root of `statrumble`.
+
+GOAL: Reduce submission risk by fixing the two most common local-run pitfalls in the README (missing Supabase anon key, confusion about where OTP/magic-link emails appear). Make **documentation-only** changes. **All changes must be in English.** Do not modify any code or logic.
+
+REQUIREMENTS (English-only):
+- Every newly added/modified line of documentation must be written in English.
+- If any existing non-English text is touched, convert it to English (but avoid unnecessary rewrites).
+- Do not add Korean (or any other language) anywhere.
+
+TASKS:
+1) Locate the README(s).
+   - First check `README.md` at the repo root and find the section that explains local development (e.g., “Run Locally”, “Getting Started”, “Local Setup”).
+   - If there is also `statrumble/README.md` and it contains the primary local-run instructions, update that file too.
+   - Avoid duplicating the same content in multiple places unless the repo already does so; prefer a single authoritative spot.
+
+2) Add a very short “quick pitfalls” block immediately under the local-run instructions.
+   - Use a compact Markdown block (blockquote or similar) with **exactly 5 lines** (excluding blank lines).
+   - It must include:
+     (a) After `supabase start`, use `supabase status` and copy the anon key into `.env.local` as `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+     (b) OTP/magic-link emails are visible via the local inbox URL shown by `supabase status` (e.g., Inbucket).
+     (c) Before submitting, run `./scripts/contest-preflight.sh` for a final check.
+     (d) A realistic warning: “the app may boot but auth/DB can fail silently” if the anon key is not set (keep it factual, not dramatic).
+   - Keep it extremely concise. No long explanations, no extra subsections.
+
+3) Do not change any code. Only README/docs.
+
+4) Sanity check after editing by running ONE of:
+   - `./scripts/contest-preflight.sh`
+   - OR `pnpm -C statrumble lint && pnpm -C statrumble typecheck && pnpm -C statrumble build`
+
+5) Output:
+   - Show `git diff`.
+   - Create a commit with message:
+     `docs: add local Supabase quickstart (anon key + OTP inbox)`
+
+Start now.
+```
+#### Result
+- Added a 5-line `Quick pitfalls` block directly under `Run Locally (Fresh Clone)` in `README.md`.
+- The block now explicitly covers anon key setup via `supabase status`, local OTP/magic-link inbox location, silent auth/DB failure risk when anon key is missing, and final pre-submission preflight.
+- Kept changes documentation-only and English-only.
+#### Manual Checklist
+- [ ] `./scripts/contest-preflight.sh` (blocked in dirty tree: `Working tree is not clean. Commit or stash changes.`)
+- [x] `pnpm -C statrumble lint`
+- [x] `pnpm -C statrumble typecheck`
+- [x] `pnpm -C statrumble build`
+#### Commit Link
+- TODO

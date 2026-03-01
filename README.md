@@ -37,6 +37,12 @@ cp statrumble/.env.example statrumble/.env.local
 pnpm -C statrumble dev
 ```
 
+> Quick pitfalls:
+> After `supabase start`, run `pnpm -C statrumble exec supabase status` and set `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `statrumble/.env.local`.
+> OTP/magic-link emails appear in the local inbox URL shown by `supabase status` (for example, Inbucket).
+> If the anon key is missing, the app may boot but auth/DB can fail silently.
+> Before submitting, run `./scripts/contest-preflight.sh` for a final check.
+
 Equivalent from inside `statrumble/`: `cp .env.example .env.local` (or set env vars directly).
 This flow starts in demo mode by default when `OPENAI_API_KEY` is not set.
 

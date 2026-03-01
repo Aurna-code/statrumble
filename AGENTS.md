@@ -1,7 +1,7 @@
 # StatRumble Agent Rules
 
 ## Goal
-- Build and iterate StatRumble as a 1-week MVP.
+- Build and iterate StatRumble as a hackathon prototype (built in ~1 week).
 - Keep scope focused on the single loop: upload -> chart -> segment select -> arena thread -> referee -> decision.
 
 ## Stack

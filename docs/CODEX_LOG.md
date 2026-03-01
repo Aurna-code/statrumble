@@ -1,18 +1,8 @@
 # CODEX_LOG
 
-## Entry Template
-### Prompt ID: <prompt-id> (commit: TODO)
-#### Prompt
-```text
-<original prompt>
-```
-#### Result
-- <what changed>
-- <verification summary>
-#### Commit Link
-- TODO
+Chronological log of Codex-assisted changes in this repository. Each entry records prompt intent, key changes, and verification when available.
 
-### Prompt ID: Normalize transform_spec + show validation issues (commit: TODO)
+### Prompt ID: Normalize transform_spec + show validation issues
 #### Prompt
 ```text
 We are getting UI error: "Invalid transform_spec from model."
@@ -86,10 +76,8 @@ fix(ai): normalize model transform_spec + show validation issues in proposal for
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual UI test: invalid proposals show issue paths/messages; typical prompts succeed
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix codex-mini verbosity 400 (commit: TODO)
+### Prompt ID: Fix codex-mini verbosity 400
 #### Prompt
 ```text
 Fix 400 error:
@@ -131,10 +119,8 @@ fix(ai): remove text.verbosity for codex-mini compatibility
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual test: create proposal no longer fails on unsupported verbosity
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix strict required rule for transform proposal schema (commit: TODO)
+### Prompt ID: Fix strict required rule for transform proposal schema
 #### Prompt
 ```text
 Fix OpenAI Structured Outputs schema error:
@@ -201,10 +187,8 @@ fix(ai): satisfy strict required rule for transform proposal schema
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual UI test: Create Proposal no longer returns schema 400
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix transform proposal schema oneOf 400 (commit: TODO)
+### Prompt ID: Fix transform proposal schema oneOf 400
 #### Prompt
 ```text
 Fix the 400 error when creating transform proposals:
@@ -303,10 +287,8 @@ fix(ai): remove oneOf from structured output schema for transform proposals
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual UI test: create proposal no longer returns 400 for schema
-#### Commit Link
-- TODO
 
-### Prompt ID: Main page transform proposal UI entrypoint (commit: TODO)
+### Prompt ID: Main page transform proposal UI entrypoint
 #### Prompt
 ```text
 Add an obvious UI entrypoint to create a transform proposal thread (transform_proposal) without using curl.
@@ -363,10 +345,8 @@ feat(ui): add entrypoint to create transform proposals
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Open main chart section, create proposal from new button, confirm redirect to created thread
-#### Commit Link
-- TODO
 
-### Prompt ID: Demo smoke test script for transform proposals (commit: TODO)
+### Prompt ID: Demo smoke test script for transform proposals
 #### Prompt
 ```text
 Create a minimal demo smoke test script for StatRumble.
@@ -401,10 +381,8 @@ Include instructions in comments on how to run it.
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Run smoke script against local app with valid `COOKIE`, `IMPORT_ID`, and Supabase envs
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 01 (commit: TODO)
+### Prompt ID: Prompt 01
 #### Prompt
 ```text
 [Prompt 01] Supabase   + RLS + snapshot RPC (statrumble/  , idempotent)
@@ -546,7 +524,6 @@ Include instructions in comments on how to run it.
 - README.md “migration  ”  :
   - Supabase Dashboard SQL Editor 000_init.sql 
   - () supabase CLI     
-- docs/CODEX_LOG.md Prompt 01  (  ,  , , commit: TODO)
 
 DoD:
 - 000_init.sql  
@@ -570,12 +547,10 @@ DoD:
 - [x] `npm run lint` 
 - [x] `npm run typecheck` 
 - [x] `npm run verify` 
-#### Commit Link
-- TODO
 
-## Entries
+## Archived Entries
 
-### Prompt ID: Prompt 00 (commit: TODO)
+### Prompt ID: Prompt 00
 #### Prompt
 ```text
 [Prompt 00]   +    
@@ -623,10 +598,8 @@ DoD:
 - [x] `npm run lint`  
 - [x] `npm run typecheck`  
 - [x] `npm run verify`  
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 02 (commit: TODO)
+### Prompt ID: Prompt 02
 #### Prompt
 ```text
 [Prompt 02] Supabase SSR  + / +   (statrumble/ )
@@ -671,7 +644,6 @@ DoD:
 
 :
 - README “Supabase Auth (OTP )” env (statrumble/.env.local)  
-- docs/CODEX_LOG.md Prompt 02 (///(commit: TODO))
 
  :
 - "feat: supabase ssr auth and protected routes"
@@ -692,10 +664,8 @@ DoD:
 - [x] `npm run lint` 
 - [x] `npm run typecheck` 
 - [x] `./scripts/verify.sh` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 03 (commit: TODO)
+### Prompt ID: Prompt 03
 #### Prompt
 ```text
 [Prompt 03] DB   +  CSV +     (statrumble/ , pnpm workspace)
@@ -742,7 +712,6 @@ DoD:
 -      listMetrics/listImports  ,
     server action  . (     )
 
-4) docs/CODEX_LOG.md Prompt 03  (///(commit: TODO))
 
 DoD:
 - pnpm -C statrumble lint / typecheck / verify 
@@ -762,10 +731,8 @@ DoD:
 - [x] `pnpm -C statrumble verify` 
 - [x] `docs/sample.csv` 
 - [x] `/`  Metrics/Imports   
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 04 (commit: TODO)
+### Prompt ID: Prompt 04
 #### Prompt
 ```text
 [Prompt 04] CSV    (server action + FormData, statrumble/ )
@@ -826,7 +793,6 @@ DoD:
   -    ( /)  
 
 4) 
-- docs/CODEX_LOG.md Prompt 04  (///(commit: TODO))
 
 DoD:
 -   /  CSV  
@@ -846,10 +812,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix 04a (commit: TODO)
+### Prompt ID: Hotfix 04a
 #### Prompt
 ```text
 [Hotfix 04a] Fix server action export rule + React hook rename + ensure list refresh
@@ -908,10 +872,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix 04b (commit: TODO)
+### Prompt ID: Hotfix 04b
 #### Prompt
 ```text
 [Hotfix 04b] Fix server action placement + split types/state + useActionState
@@ -969,10 +931,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix 04c (commit: TODO)
+### Prompt ID: Hotfix 04c
 #### Prompt
 ```text
 [Hotfix 04c] Remove encType/method from Server Action form
@@ -993,10 +953,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix 04d (commit: TODO)
+### Prompt ID: Hotfix 04d
 #### Prompt
 ```text
 [Hotfix 04d] Remove npm usage from verify script; standardize on pnpm workspace
@@ -1040,10 +998,8 @@ DoD:
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
 - [x] `pnpm -C statrumble verify`  npm warn   
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 05 (commit: TODO)
+### Prompt ID: Prompt 05
 #### Prompt
 ```text
 [Prompt 05]  +   + Arena   (snapshot ) — statrumble/ 
@@ -1136,7 +1092,6 @@ DoD:
 (/ Prompt 06 )
 
 6) /
-- docs/CODEX_LOG.md Prompt 05  (///(commit: TODO))
 - pnpm -C statrumble lint/typecheck/verify 
 
 DoD:
@@ -1160,10 +1115,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 06 (commit: TODO)
+### Prompt ID: Prompt 06
 #### Prompt
 ```text
 [Prompt 06] Arena : //Quote stats (statrumble/ )
@@ -1257,7 +1210,6 @@ DoD:
 -     fetch cache:"no-store" 
 
  E) /
-12) docs/CODEX_LOG.md Prompt 06  (///(commit: TODO))
 13) pnpm -C statrumble lint/typecheck/verify 
 
 DoD:
@@ -1283,10 +1235,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 07 (commit: TODO)
+### Prompt ID: Prompt 07
 #### Prompt
 ```text
 [Prompt 07] Referee : OpenAI Responses + Structured Outputs(JSON Schema) + DB  + UI 
@@ -1417,7 +1367,6 @@ OpenAI :
 - statrumble/.env.local OPENAI_API_KEY 
 - () OPENAI_REFEREE_MODEL   
 
-7) docs/CODEX_LOG.md Prompt 07  (///(commit: TODO))
 
 DoD:
 -   Referee   →    report /
@@ -1442,10 +1391,8 @@ DoD:
 - [x] `pnpm -C statrumble lint` 
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix 07a (commit: TODO)
+### Prompt ID: Hotfix 07a
 #### Prompt
 ```text
 [Hotfix 07a] Fix 400: remove unsupported temperature for gpt-5-mini (Responses API)
@@ -1485,10 +1432,8 @@ DoD:
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
 - [ ] Run Referee 400   report //  
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix 07b (commit: TODO)
+### Prompt ID: Hotfix 07b
 #### Prompt
 ```text
 [Hotfix 07b] Make Referee JSON parsing robust + minimize reasoning noise
@@ -1554,10 +1499,8 @@ DoD:
 - [x] `pnpm -C statrumble typecheck` 
 - [x] `pnpm -C statrumble verify` 
 - [ ] Run Referee (//)  
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt Hotfix (commit: TODO)
+### Prompt ID: Prompt Hotfix
 #### Prompt
 ```text
 [Hotfix] Fix "Maximum update depth exceeded" right after OTP login
@@ -1576,10 +1519,8 @@ OTP    "Maximum update depth exceeded" .      .
 - [x] `pnpm -C statrumble lint`
 - [x] `pnpm -C statrumble typecheck`
 - [x] `bash scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Follow-up Hotfix (commit: TODO)
+### Prompt ID: Follow-up Hotfix
 #### Prompt
 ```text
 [Follow-up Hotfix] Validate max update-depth fix + enable reproduction
@@ -1614,10 +1555,8 @@ OTP    "Maximum update depth exceeded" .      .
 - [x] `ImportChart`/`ThreadArena` deps/prev-next  
 - [x] env-gated render loop detector 
 - [ ]  OTP  (  )
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt Auth Rate Limit UX (commit: TODO)
+### Prompt ID: Prompt Auth Rate Limit UX
 #### Prompt
 ```text
 Auth email rate limit  UX :
@@ -1637,10 +1576,8 @@ Auth email rate limit  UX :
 - [x] `npm run lint` 
 - [x] `npm run typecheck` 
 - [x] `./scripts/verify.sh` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt Dev Auth Unblock (commit: TODO)
+### Prompt ID: Prompt Dev Auth Unblock
 #### Prompt
 ```text
 [Dev Auth Unblock] Add password login for development only
@@ -1680,10 +1617,8 @@ Auth email rate limit  UX :
 - [x] `npm run lint` 
 - [x] `npm run typecheck` 
 - [x] `./scripts/verify.sh` 
-#### Commit Link
-- TODO
 
-### Prompt ID: Bugfix 2026-02-22-01 (commit: TODO)
+### Prompt ID: Bugfix 2026-02-22-01
 #### Prompt
 ```text
 [Bugfix] votes fetch loop after clicking vote (ThreadArena initiator)
@@ -1748,10 +1683,8 @@ Steps:
 - [x] `npm run lint` executed
 - [x] `npm run typecheck` executed
 - [x] `./scripts/verify.sh` executed
-#### Commit Link
-- TODO
 
-### Prompt ID: Plan-2026-02-22-Phase-1 (commit: TODO)
+### Prompt ID: Plan-2026-02-22-Phase-1
 #### Prompt
 ```text
 PHASE 1) SECURITY HOTFIX: enforce workspace membership (block URL access)
@@ -1804,10 +1737,8 @@ Expected: denied (404/permission) and cannot write.
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Chrome normal/incognito multi-user repro (blocked in sandbox; pending manual)
-#### Commit Link
-- TODO
 
-### Prompt ID: Plan-2026-02-22-Phase-2 (commit: TODO)
+### Prompt ID: Plan-2026-02-22-Phase-2
 #### Prompt
 ```text
 PHASE 2) SCHEMA PREP (NO BEHAVIOR CHANGE): thread visibility flag
@@ -1847,10 +1778,8 @@ Tasks:
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Plan-2026-02-22-Phase-3 (commit: TODO)
+### Prompt ID: Plan-2026-02-22-Phase-3
 #### Prompt
 ```text
 PHASE 3) COLLAB MVP: workspace invite_code + /join flow
@@ -1901,10 +1830,8 @@ DoD:
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Real browser multi-user A/B/C repro (blocked in sandbox; pending manual)
-#### Commit Link
-- TODO
 
-### Prompt ID: Next-2026-02-22-Workspace-Auth-Active-Onboarding (commit: TODO)
+### Prompt ID: Next-2026-02-22-Workspace-Auth-Active-Onboarding
 #### Prompt
 ```text
 [Next] Fix workspace page auth + add active-workspace selection
@@ -1959,9 +1886,8 @@ Commit(s) separated:
 #### Commit Link
 - 9740066 (`fix(workspace): restrict workspace page to members`)
 - 8001d02 (`feat(workspace): active workspace selector`)
-- TODO (`feat(onboarding): create personal workspace when none`)
 
-### Prompt ID: UX-Onboarding-2026-02-22 (commit: TODO)
+### Prompt ID: UX-Onboarding-2026-02-22
 #### Prompt
 ```text
 [UX/Onboarding] Make "no workspace membership" non-scary + add Create Workspace
@@ -2028,9 +1954,8 @@ Commit separation:
 - [x] `./scripts/verify.sh`
 #### Commit Link
 - 3c5c5f4 (`fix(ux): gate dashboard when no workspace membership`)
-- TODO (`feat(workspace): create workspace bootstrap flow`)
 
-### Prompt ID: Onboarding-Unblock-2026-02-22 (commit: TODO)
+### Prompt ID: Onboarding-Unblock-2026-02-22
 #### Prompt
 ```text
 [Unblock onboarding] Make new users land in a workspace after Join/Create
@@ -2100,9 +2025,8 @@ Commits:
 #### Commit Link
 - a8cd242 (`fix(workspace): restore create_workspace RPC and align rpc arg names`)
 - f0d1ded (`fix(onboarding): after join/create, user lands in a workspace (no dead-end)`)
-- TODO (`fix(ux): gate dashboard when no membership`)
 
-### Prompt ID: Workspaces-Hub-2026-02-23 (commit: TODO)
+### Prompt ID: Workspaces-Hub-2026-02-23
 #### Prompt
 ```text
 [Codex Prompt] Add /workspaces hub page UI and redirect /workspace -> /workspaces (UI-only)
@@ -2143,10 +2067,8 @@ Commits:
 - [x] `pnpm run lint`
 - [x] `pnpm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Leave-RPC-2026-02-23 (commit: TODO)
+### Prompt ID: Leave-RPC-2026-02-23
 #### Prompt
 ```text
 [Codex Prompt] Refactor leave flow to use leave_workspace RPC; remove/limit self-delete RLS policy
@@ -2175,10 +2097,8 @@ Commits:
 - [x] `pnpm run lint`
 - [x] `pnpm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix-Workspace-Create-2026-02-23 (commit: TODO)
+### Prompt ID: Fix-Workspace-Create-2026-02-23
 #### Prompt
 ```text
 Fix app/api/workspaces/create/route.ts:
@@ -2195,10 +2115,8 @@ Keep lint/typecheck passing.
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Disable-Last-Owner-Leave-2026-02-23 (commit: TODO)
+### Prompt ID: Disable-Last-Owner-Leave-2026-02-23
 #### Prompt
 ```text
 [Codex Prompt] Disable "Leave workspace" when user is last owner; show helpful message
@@ -2220,10 +2138,8 @@ Implementation:
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Promote-Workspace-Owner-2026-02-23 (commit: TODO)
+### Prompt ID: Promote-Workspace-Owner-2026-02-23
 #### Prompt
 ```text
 [Codex Prompt] Add minimal member role management (promote to owner) for workspace
@@ -2248,10 +2164,8 @@ UI:
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix-Workspace-Members-Ambiguous-User-Id-2026-02-24 (commit: TODO)
+### Prompt ID: Fix-Workspace-Members-Ambiguous-User-Id-2026-02-24
 #### Prompt
 ```text
 [Codex Prompt] Fix "column reference user_id is ambiguous" in workspace members listing
@@ -2285,10 +2199,8 @@ After:
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Retest Members section loads without errors
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix-07c-2026-02-24 (commit: TODO)
+### Prompt ID: Hotfix-07c-2026-02-24
 #### Prompt
 ```text
 [Hotfix 07c] Refresh semantics  + Referee report /(force) 
@@ -2360,10 +2272,8 @@ After:
 - [x] `pnpm -C statrumble run lint`
 - [x] `pnpm -C statrumble run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt-B-2026-02-24 (commit: TODO)
+### Prompt ID: Prompt-B-2026-02-24
 #### Prompt
 ```text
 [Prompt B] Promote to Decision + /decisions Ledger (MVP)
@@ -2482,10 +2392,8 @@ E)  ()
 - [x] `./scripts/verify.sh`
 - [ ] `pnpm exec supabase db push --dry-run` (failed: supabase CLI not found)
 - [ ] `pnpm exec supabase db push` (failed: supabase CLI not found)
-#### Commit Link
-- TODO
 
-### Prompt ID: UI-Nav-Active-2026-02-24 (commit: TODO)
+### Prompt ID: UI-Nav-Active-2026-02-24
 #### Prompt
 ```text
 [UI polish] Header nav active link highlight
@@ -2511,10 +2419,8 @@ Task:
 - [x] `pnpm -C statrumble run lint`
 - [x] `pnpm -C statrumble run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt-C-2026-02-24 (commit: TODO)
+### Prompt ID: Prompt-C-2026-02-24
 #### Prompt
 ```text
 [Prompt C] Public Portal Skeleton (read-only) for Decision Cards
@@ -2623,10 +2529,8 @@ F) QA
 - [x] `./scripts/verify.sh`
 - [ ] `pnpm exec supabase db push --dry-run` (failed: supabase CLI not found)
 - [ ] `pnpm exec supabase db push` (failed: supabase CLI not found)
-#### Commit Link
-- TODO
 
-### Prompt ID: 2026-02-25-Hydration-01 (commit: TODO)
+### Prompt ID: 2026-02-25-Hydration-01
 #### Prompt
 ```text
  statrumble(Next.js App Router)  Hydration mismatch   .
@@ -2665,10 +2569,8 @@ F) QA
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: 2026-02-25-Date-Format-02 (commit: TODO)
+### Prompt ID: 2026-02-25-Date-Format-02
 #### Prompt
 ```text
  statrumble(Next.js App Router)  “  (deteministic) +  ” follow-up  .
@@ -2760,10 +2662,8 @@ F) QA
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: 2026-02-25-Date-Format-03 (commit: TODO)
+### Prompt ID: 2026-02-25-Date-Format-03
 #### Prompt
 ```text
  statrumble(Next.js App Router)  “  (deterministic) +  ”    .
@@ -2798,10 +2698,8 @@ F) QA
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt D (commit: TODO)
+### Prompt ID: Prompt D
 #### Prompt
 ```text
 [Prompt D] Public Workspace Portal (workspace publish + /portal + /p/w/[slug])
@@ -2934,10 +2832,8 @@ G) QA
 - [x] `pnpm -C statrumble run lint`
 - [x] `pnpm -C statrumble run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Hotfix Public Portal Redirect (commit: TODO)
+### Prompt ID: Hotfix Public Portal Redirect
 #### Prompt
 ```text
 [Hotfix] Public portal routes redirect to /login — find root cause and fix
@@ -3002,10 +2898,8 @@ Suggested commit message
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Next 16 cleanup - proxy migration (commit: TODO)
+### Prompt ID: Next 16 cleanup - proxy migration
 #### Prompt
 ```text
 [Next 16 cleanup] Migrate middleware.ts -> proxy.ts (keep auth + public allowlist)
@@ -3043,10 +2937,8 @@ Commit:
 - [x] `pnpm -C statrumble run lint`
 - [x] `pnpm -C statrumble run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Transform Proposals - arena_threads kind (commit: TODO)
+### Prompt ID: Transform Proposals - arena_threads kind
 #### Prompt
 ```text
 You are working in the StatRumble Next.js + Supabase repo.
@@ -3079,10 +2971,8 @@ Output:
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Transform Proposals - thread reads/types sync (commit: TODO)
+### Prompt ID: Transform Proposals - thread reads/types sync
 #### Prompt
 ```text
 You are working in the StatRumble Next.js + Supabase repo.
@@ -3151,10 +3041,8 @@ Output:
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Transform Spec DSL + execution engine (commit: TODO)
+### Prompt ID: Transform Spec DSL + execution engine
 #### Prompt
 ```text
 Implement a safe Transform Spec (JSON DSL) and an execution engine in TypeScript.
@@ -3191,10 +3079,8 @@ Output:
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Transform engine hardening edge-cases (commit: TODO)
+### Prompt ID: Transform engine hardening edge-cases
 #### Prompt
 ```text
 You are working in the StatRumble repo. We recently added a transform DSL/execution module:
@@ -3278,10 +3164,8 @@ fix(transforms): normalize series, default clip mode, guard MA window
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Transform proposal API route (commit: TODO)
+### Prompt ID: Transform proposal API route
 #### Prompt
 ```text
 You are working in the StatRumble Next.js (App Router) + Supabase repo.
@@ -3367,10 +3251,8 @@ feat(api): create transform proposal threads via codex
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Propose-transform hardening audit (commit: TODO)
+### Prompt ID: Propose-transform hardening audit
 #### Prompt
 ```text
 You are working in the StatRumble Next.js + Supabase repo.
@@ -3462,10 +3344,8 @@ fix(api): harden propose-transform (model defaults, structured outputs, diff per
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Propose-transform final pre-04 hardening (commit: TODO)
+### Prompt ID: Propose-transform final pre-04 hardening
 #### Prompt
 ```text
 You are working in the StatRumble Next.js + Supabase repo.
@@ -3538,10 +3418,8 @@ fix(api): stabilize diff report + verbosity fallback + parent validation
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Prompt 04 UI fork and compare transform proposals (commit: TODO)
+### Prompt ID: Prompt 04 UI fork and compare transform proposals
 #### Prompt
 ```text
 You are working in the StatRumble Next.js + Supabase repo.
@@ -3618,10 +3496,8 @@ feat(ui): fork and compare transform proposals
 - [x] `./scripts/verify.sh`
 - [ ] Create proposal thread and verify panel contents on `/threads/<id>`
 - [ ] Click `Fork`, submit prompt, verify redirect to child proposal and compare section
-#### Commit Link
-- TODO
 
-### Prompt ID: Auto-login demo smoke test (commit: TODO)
+### Prompt ID: Auto-login demo smoke test
 #### Prompt
 ```text
 Update scripts/demo-smoke.sh to support automatic login so we don’t have to manually copy browser cookies.
@@ -3681,10 +3557,8 @@ test(smoke): auto-login to avoid manual cookies
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Run `scripts/demo-smoke.sh` with auto-login env vars
-#### Commit Link
-- TODO
 
-### Prompt ID: Auto-seed workspace membership in smoke (commit: TODO)
+### Prompt ID: Auto-seed workspace membership in smoke
 #### Prompt
 ```text
 :  (  / /SQL Editor )  .
@@ -3757,10 +3631,8 @@ Output:
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Real smoke run with valid Supabase creds/import id (blocked: required env not present in current shell)
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix ThreadDetailPage performance measure runtime error (commit: TODO)
+### Prompt ID: Fix ThreadDetailPage performance measure runtime error
 #### Prompt
 ```text
 Fix runtime error on /threads/[id]:
@@ -3811,10 +3683,8 @@ fix(ui): remove unsafe performance.measure instrumentation
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual quick check: open `/threads/<id>` and confirm no runtime TypeError
-#### Commit Link
-- TODO
 
-### Prompt ID: Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests (commit: TODO)
+### Prompt ID: Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests
 #### Prompt
 ```text
 [Prompt] Polish v1 (1~4): public header gating + meaningful thread titles + custom 404/error + remove MVP scaffolding + minimal tests
@@ -3868,10 +3738,8 @@ Verification
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix flaky typecheck: deterministic Next route typegen (commit: TODO)
+### Prompt ID: Fix flaky typecheck: deterministic Next route typegen
 #### Prompt
 ```text
 [Prompt] Fix flaky typecheck: ensure Next route types are regenerated (next typegen) + clear stale .next types/cache + integrate into verify
@@ -3920,10 +3788,8 @@ D) Docs
 - [ ] Re-run `pnpm -C statrumble typecheck` repeatedly; stale route-type failures do not recur.
 - [ ] Confirm `./scripts/verify.sh` removes stale `.next` type/cache artifacts before typecheck.
 - [ ] Confirm verify fails clearly if Next type output directories are missing after typecheck.
-#### Commit Link
-- TODO
 
-### Prompt ID: Arena UX layout: chart-primary + data secondary accordion (commit: TODO)
+### Prompt ID: Arena UX layout: chart-primary + data secondary accordion
 #### Prompt
 ```text
 [Prompt] Arena UX layout: make Chart primary, move Recent Threads sidebar, collapse Data (CSV/Metrics/Imports), improve import option labels
@@ -3958,10 +3824,8 @@ Goals
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Thread UX polish v0: snapshot chart + sharing affordances (commit: TODO)
+### Prompt ID: Thread UX polish v0: snapshot chart + sharing affordances
 #### Prompt
 ```text
 [Prompt] Thread UX polish v0: add snapshot chart to thread page + small sharing affordances
@@ -4005,10 +3869,8 @@ Goal
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix migration drift 019-021 + non-null vote profile + thread UX polish (commit: TODO)
+### Prompt ID: Fix migration drift 019-021 + non-null vote profile + thread UX polish
 #### Prompt
 ```text
 [Prompt] Fix migration drift (019-021) + Create Thread vote_prompt NOT NULL + apply UX polish (Back to Threads, formatting consistency, snapshot parser hardening)
@@ -4056,10 +3918,8 @@ Goal
 - [x] `npm run typecheck`
 - [x] `pnpm -C statrumble test`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Stabilize + polish: vote profile, selected range, share actions, persisted titles (commit: TODO)
+### Prompt ID: Stabilize + polish: vote profile, selected range, share actions, persisted titles
 #### Prompt
 ```text
 [Prompt] Stabilize + polish: (1) ensure vote_prompt/vote_labels always set, (2) preserve selected range for propose-transform, (3) ThreadShareActions Back to Threads + clipboard fallback, (4) add thread title (create default + edit)
@@ -4105,10 +3965,8 @@ Goal
 - [x] `npm run typecheck`
 - [x] `pnpm -C statrumble test`
 - [x] `./scripts/verify.sh`
-#### Commit Link
-- TODO
 
-### Prompt ID: Contest preflight checks + README run instructions (commit: TODO)
+### Prompt ID: Contest preflight checks + README run instructions
 #### Original Prompt
 ```text
 [Prompt] Contest preflight: add one-command checks (secrets, verify/build, migrations, local supabase smoke) + README run instructions
@@ -4146,10 +4004,8 @@ Goal
 - [x] `./scripts/contest-preflight.sh --with-local-supabase` (current working tree): fails at clean-tree gate as designed.
 - [ ] `./scripts/contest-preflight.sh` in temporary clean clone: blocked at `pnpm -C statrumble build` due offline Google Fonts fetch in this environment.
 - [ ] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone: blocked at the same build step before Supabase smoke stage.
-#### Commit Link
-- TODO
 
-### Prompt ID: Remove remote font fetch and harden offline preflight (commit: TODO)
+### Prompt ID: Remove remote font fetch and harden offline preflight
 #### Original Prompt
 ```text
 [Prompt] Remove next/font/google build-time fetch (system fonts or local) + make contest-preflight pass offline + add regression check
@@ -4176,10 +4032,8 @@ Goal
 - [x] `./scripts/contest-preflight.sh` (current workspace) fails at clean-tree gate as designed.
 - [x] `./scripts/contest-preflight.sh` in temporary clean clone passes end-to-end, including build and migration checks.
 - [x] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone reaches optional stage and fails with `Docker is required` in this environment.
-#### Commit Link
-- TODO
 
-### Prompt ID: Preflight UX polish Docker skip (commit: TODO)
+### Prompt ID: Preflight UX polish Docker skip
 #### Original Prompt
 ```text
 [Prompt] Preflight UX polish: if Docker unavailable, skip --with-local-supabase stage with WARN (do not fail)
@@ -4195,10 +4049,8 @@ Goal
 - [x] README includes Docker skip note for `--with-local-supabase`.
 #### Verification
 - [x] `./scripts/contest-preflight.sh --with-local-supabase` in temporary clean clone (no Docker): warns and exits `0`.
-#### Commit Link
-- TODO
 
-### Prompt ID: Final i18n polish (commit: TODO)
+### Prompt ID: Final i18n polish
 #### Original Prompt
 ```text
 [Prompt] Final i18n polish: remove all Hangul from repo + switch timezone to US (America/Los_Angeles) + update tests + remove statrumble/README.md template
@@ -4239,10 +4091,8 @@ Goal
 - [x] `pnpm -C statrumble build`
 - [x] `./scripts/contest-preflight.sh` (run in temporary clean copy)
 - [x] `./scripts/contest-preflight.sh --with-local-supabase` (run in temporary clean copy; Docker unavailable, WARN+skip)
-#### Commit Link
-- TODO
 
-### Prompt ID: Workspace delete owner-only flow + safe RPC/API/UI/RLS (commit: TODO)
+### Prompt ID: Workspace delete owner-only flow + safe RPC/API/UI/RLS
 #### Prompt
 ```text
 [Prompt] Workspace delete: make deletion owner-only + safe RPC + API route + UI control + lock down RLS
@@ -4288,10 +4138,8 @@ Goals
 - [ ] Manual browser validation: deleted workspace disappears and invite/join code fails
 - [x] Migration-level lock removes direct `DELETE` policy from `public.workspaces`
 - [ ] `./scripts/contest-preflight.sh` (requires clean tree; run after commit)
-#### Commit Link
-- TODO
 
-### Prompt ID: README polish demo portal + password login limitations (commit: TODO)
+### Prompt ID: README polish demo portal + password login limitations
 #### Prompt
 ```text
 [Prompt] README polish: fix demo flow portal prerequisite + clarify password login limitations (English-only)
@@ -4318,10 +4166,8 @@ Goals
 - [x] English-only README copy for the new text
 - [x] No secret-like strings introduced
 - [ ] `./scripts/contest-preflight.sh` (requires clean tree)
-#### Commit Link
-- TODO
 
-### Prompt ID: Collaboration UX polish v0 display names + polling + nickname editor (commit: TODO)
+### Prompt ID: Collaboration UX polish v0 display names + polling + nickname editor
 #### Prompt
 ```text
 [Prompt] Collaboration UX polish (v0): show display names (not raw user_id) + lightweight polling + editable nickname after login
@@ -4361,10 +4207,8 @@ Context
 - [x] Refresh guard prevents overlap spam
 - [ ] Two-browser manual check for near-real-time message sync
 - [ ] `./scripts/contest-preflight.sh` with clean tree after commit
-#### Commit Link
-- TODO
 
-### Prompt ID: Demo/mock mode for AI actions (commit: TODO)
+### Prompt ID: Demo/mock mode for AI actions
 #### Prompt
 ```text
 [Prompt] Demo/Mock mode for AI actions: no API key required, full collaboration flow still works, optional real AI if key present
@@ -4428,10 +4272,8 @@ Goals
 - [ ] Manual runtime check with no `OPENAI_API_KEY`
 - [ ] Manual runtime check with `OPENAI_API_KEY` and demo mode unset
 - [ ] Manual UI check for `NEXT_PUBLIC_DEMO_MODE=1` badge visibility
-#### Commit Link
-- TODO
 
-### Prompt ID: Label AI actions as demo vs API/cost (commit: TODO)
+### Prompt ID: Label AI actions as demo vs API/cost
 #### Prompt
 ```text
 [Prompt] Add clear cost/API indicators for Run Referee + Transform actions (demo vs real), keep UX lightweight
@@ -4482,10 +4324,8 @@ Implementation details
 - [x] `pnpm -C statrumble test`
 - [x] `pnpm -C statrumble build` (required escalated run due sandbox Turbopack port-binding restriction)
 - [ ] Manual UI check: labels/helper text visible for both demo and non-demo env toggles
-#### Commit Link
-- TODO
 
-### Prompt ID: Contest strategy polish: make Demo default + BYOK optional explicit, and remove mode/cost confusion in UI/README (commit: TODO)
+### Prompt ID: Contest strategy polish: make Demo default + BYOK optional explicit, and remove mode/cost confusion in UI/README
 #### Prompt
 ```text
 [Prompt] Contest strategy polish: make Demo default + BYOK optional explicit, and remove mode/cost confusion in UI/README
@@ -4634,10 +4474,8 @@ Output
 - [ ] `./scripts/contest-preflight.sh` (fails at clean-tree guard because this prompt intentionally leaves uncommitted changes)
 - [ ] Manual runtime check with no `OPENAI_API_KEY`
 - [ ] Manual runtime check with `OPENAI_API_KEY` and `DEMO_MODE=0`
-#### Commit Link
-- TODO
 
-### Prompt ID: Workspaces page UX overhaul active context + separated list (commit: TODO)
+### Prompt ID: Workspaces page UX overhaul active context + separated list
 #### Prompt
 ```text
 [Prompt] Workspaces page UX overhaul: highlight active workspace context (name + display name + members + portal status), separate "My workspaces" list below
@@ -4699,10 +4537,8 @@ Output
 - [x] `pnpm -C statrumble build`
 - [ ] `./scripts/contest-preflight.sh` (fails at clean-tree gate during in-progress workspace changes)
 - [ ] Manual UI pass: active card hierarchy + no-membership CTA + switch/invite/portal flows in browser
-#### Commit Link
-- TODO
 
-### Prompt ID: Workspaces members UX visibility + counts + panel placement (commit: TODO)
+### Prompt ID: Workspaces members UX visibility + counts + panel placement
 #### Prompt
 ```text
 [Prompt] Workspaces members UX: show members per workspace (counts in list, details for active), move Members panel up, loosen member-list view to workspace members (promote stays owner-only)
@@ -4792,10 +4628,8 @@ Output
 - [x] `pnpm -C statrumble test`
 - [x] `pnpm -C statrumble build`
 - [ ] Manual owner/member UX validation in browser
-#### Commit Link
-- TODO
 
-### Prompt ID: feat(ui): add TransformSpec guidance + show Transform Plan (commit: TODO)
+### Prompt ID: feat(ui): add TransformSpec guidance + show Transform Plan
 #### Prompt
 ```text
 [Prompt] feat(ui): add TransformSpec guidance + show Transform Plan
@@ -4906,10 +4740,8 @@ feat(ui): add transform guidance panel + show transform plan in proposal threads
 - [x] `pnpm -C statrumble typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual smoke in browser (create/fork guidance panels and thread transform plan visibility)
-#### Commit Link
-- TODO
 
-### Prompt ID: polish(ui): make Transform Plan rendering resilient + align defaults (commit: TODO)
+### Prompt ID: polish(ui): make Transform Plan rendering resilient + align defaults
 #### Prompt
 ```text
 [Prompt] polish(ui): make Transform Plan rendering resilient + align defaults
@@ -4952,10 +4784,8 @@ polish(ui): harden transform plan rendering
 - [x] `pnpm -C statrumble typecheck`
 - [x] `./scripts/verify.sh`
 - [ ] Manual browser smoke for malformed mixed-op plans
-#### Commit Link
-- TODO
 
-### Prompt ID: Implement vote label editing UI (workspace templates + thread snapshot display + optional thread override) (commit: TODO)
+### Prompt ID: Implement vote label editing UI (workspace templates + thread snapshot display + optional thread override)
 #### Prompt
 ```text
 [Prompt] Implement vote label editing UI (workspace templates + thread snapshot display + optional thread override)
@@ -5172,10 +5002,8 @@ Manual checklist
 - [ ] Manual UI check: non-owner sees workspace vote settings as read-only
 - [ ] Manual UI check: thread vote UI shows prompt + labeled stances
 - [ ] Manual UI check: thread override 409 without reset, success with reset
-#### Commit Link
-- TODO
 
-### Prompt ID: Fix Referee Structured Outputs strict schema (commit: TODO)
+### Prompt ID: Fix Referee Structured Outputs strict schema
 #### Prompt
 ```text
 [Prompt] Fix Referee Structured Outputs strict schema: make all properties required + make demo_note nullable + add dev-time schema assertion + keep demo mock working
@@ -5288,10 +5116,12 @@ Output
 - [x] `./scripts/verify.sh`
 - [ ] Manual real API mode run: confirm no OpenAI schema 400
 - [ ] Manual demo mode run: confirm demo note renders
-#### Commit Link
-- TODO
 
-### Prompt ID: Final polish keyless demo default (commit: TODO)
+### Prompt ID: Final polish keyless demo default
+#### Summary
+- Intent: Keep keyless demo mode as the default for fresh clones and clarify this in setup docs.
+- What changed: Updated `.env.example` and README demo-mode guidance to avoid accidental API mode.
+- Verified: `npm run lint`, `npm run typecheck`, `pnpm -C statrumble test`, `pnpm -C statrumble build`.
 #### Prompt
 ```text
 [Prompt] Final polish (minimal): prevent accidental API mode by default + clarify README + run preflight
@@ -5348,10 +5178,12 @@ Output
 - [x] `pnpm -C statrumble build`
 - [ ] `./scripts/contest-preflight.sh` (run after commit on clean tree)
 - [ ] Optional manual smoke: empty key shows demo mode and demo AI actions
-#### Commit Link
-- TODO
 
-### Prompt ID: README main-page polish (commit: TODO)
+### Prompt ID: README main-page polish
+#### Summary
+- Intent: Improve README front-page clarity and roadmap visibility.
+- What changed: Refined top-level README sections, mode descriptions, and roadmap layout.
+- Verified: `npm run lint`, `npm run typecheck`, `./scripts/verify.sh`.
 #### Prompt
 ```text
 README main-page polish: move “Future plans / Roadmap” into GitHub README (Now/Next/Later), keep Discord post short, and update repo front page accordingly.
@@ -5369,10 +5201,12 @@ README main-page polish: move “Future plans / Roadmap” into GitHub README (N
 - [ ] `./scripts/contest-preflight.sh` (blocked in dirty tree: `Working tree is not clean. Commit or stash changes.`)
 - [x] No secrets introduced
 - [x] No Hangul introduced
-#### Commit Link
-- TODO
 
-### Prompt ID: Local-run README pitfalls (commit: TODO)
+### Prompt ID: Local-run README pitfalls
+#### Summary
+- Intent: Reduce local setup mistakes around Supabase anon key setup and OTP inbox discovery.
+- What changed: Added a compact quick-pitfalls block under local run instructions in README.
+- Verified: `pnpm -C statrumble lint`, `pnpm -C statrumble typecheck`, `pnpm -C statrumble build`.
 #### Prompt
 ```text
 You are Codex working at the repo root of `statrumble`.
@@ -5421,5 +5255,17 @@ Start now.
 - [x] `pnpm -C statrumble lint`
 - [x] `pnpm -C statrumble typecheck`
 - [x] `pnpm -C statrumble build`
-#### Commit Link
-- TODO
+
+### Prompt ID: Polish CODEX_LOG and AGENTS status tone
+#### Summary
+- Date: 2026-03-01
+- Intent: Remove broken-looking placeholder artifacts from documentation logs and align AGENTS status wording with README.
+- What changed: Cleaned placeholder/template and unfinished commit markers in `docs/CODEX_LOG.md`, and updated AGENTS goal text to neutral hackathon framing.
+- Verified: `./scripts/contest-preflight.sh` (see checklist), `pnpm -C statrumble build`.
+#### Prompt
+```text
+Polish documentation only: clean incomplete placeholder artifacts in docs/CODEX_LOG.md and align AGENTS.md tone with README status framing.
+```
+#### Manual Checklist
+- [ ] `./scripts/contest-preflight.sh` (blocked in dirty tree: `Working tree is not clean. Commit or stash changes.`)
+- [x] `pnpm -C statrumble build`

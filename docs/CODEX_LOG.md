@@ -5269,3 +5269,42 @@ Polish documentation only: clean incomplete placeholder artifacts in docs/CODEX_
 #### Manual Checklist
 - [ ] `./scripts/contest-preflight.sh` (blocked in dirty tree: `Working tree is not clean. Commit or stash changes.`)
 - [x] `pnpm -C statrumble build`
+
+### Prompt ID: Drop Playwright experiment + Hangul compliance cleanup
+#### Summary
+- Rolled back all local Playwright experiment changes from tracked files.
+- Removed Playwright untracked artifacts and confirmed clean working tree.
+- Re-ran Hangul checker across tracked files and confirmed compliance.
+
+#### Original prompt text
+```text
+You are Codex working at the statrumble repo root with full permissions.
+
+GOAL:
+- Do NOT fix OTP rate limiting now. We will rely on a manual demo account flow.
+- Clean up the repo so submission checks pass reliably:
+  (1) Working tree must be clean for contest-preflight.
+  (2) verify-no-hangul must pass (no Hangul in tracked files).
+```
+
+#### Change summary
+- Reverted tracked Playwright-related edits via `git restore`:
+  - `pnpm-lock.yaml`
+  - `statrumble/package.json`
+  - `statrumble/eslint.config.mjs`
+  - `statrumble/.gitignore`
+  - `docs/CODEX_LOG.md` (Playwright run log rollback)
+- Removed Playwright untracked files/directories:
+  - `statrumble/playwright.config.ts`
+  - `statrumble/e2e/`
+  - `statrumble/playwright-report/`
+  - `statrumble/test-results/`
+- Re-checked Hangul compliance: `verify-no-hangul: OK`.
+
+#### Manual checklist
+- [x] `git status --porcelain` clean after Playwright rollback
+- [x] `node scripts/verify-no-hangul.mjs`
+- [x] `./scripts/verify.sh`
+- [x] `./scripts/contest-preflight.sh` (after commit)
+
+(commit: TODO)

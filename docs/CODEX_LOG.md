@@ -5174,3 +5174,119 @@ Manual checklist
 - [ ] Manual UI check: thread override 409 without reset, success with reset
 #### Commit Link
 - TODO
+
+### Prompt ID: Fix Referee Structured Outputs strict schema (commit: TODO)
+#### Prompt
+```text
+[Prompt] Fix Referee Structured Outputs strict schema: make all properties required + make demo_note nullable + add dev-time schema assertion + keep demo mock working
+
+Context
+- "Run Referee (API)" is failing with OpenAI 400:
+  Invalid schema for response_format 'referee_report' because strict mode requires:
+  - `required` must exist
+  - `required` must be an array including EVERY key in `properties`
+  Missing: 'demo_note'
+- Current schema in statrumble/lib/referee/schema.ts includes `demo_note` in properties but not in required.
+- We want:
+  - strict schema compliant for real API
+  - demo mode still returns demo_note as string
+  - in real API mode, demo_note should be null (or omitted in app logic), but schema must still validate.
+
+Goals
+1) Refactor refereeJsonSchema so:
+   - All keys in properties are included in required (strict compliance)
+   - demo_note becomes nullable (string | null) so real API can return null
+2) Add a dev-time assertion so future edits can’t break strict compliance:
+   - if required is missing any property key, throw at module load (dev/test)
+3) Keep existing consumer code working:
+   - Demo mode continues to provide demo_note string
+   - Real mode sets demo_note to null (if you inject it) or the model output can set it null
+
+Implementation plan
+
+A) Refactor schema to build required automatically
+1) Edit statrumble/lib/referee/schema.ts
+- Create a `const PROPS = { ... }` object holding the schema properties.
+- Change demo_note property to be nullable:
+  - demo_note: { type: ["string", "null"] }
+- Build schema as:
+  export const refereeJsonSchema = {
+    type: "object",
+    additionalProperties: false,
+    properties: PROPS,
+    required: Object.keys(PROPS),
+  } as const;
+
+- Ensure nested objects also use additionalProperties: false where applicable (keep current behavior).
+
+B) Add strict compliance assertion
+1) In the same file, add a small helper:
+- function assertStrictRequiredAllKeys(schema)
+  - Extract keys = Object.keys(schema.properties)
+  - Ensure schema.required exists and includes all keys
+  - If any missing, throw new Error with a clear message listing missing keys
+- Call it once after schema definition:
+  assertStrictRequiredAllKeys(refereeJsonSchema)
+
+- Make sure this runs in tests and local dev; it’s fine to run in production too (fast), but if you prefer, guard with:
+  if (process.env.NODE_ENV !== "production") ...
+
+C) Ensure server route supplies demo_note correctly
+1) Edit statrumble/app/api/threads/[id]/judge/route.ts
+- In demo mode:
+  - keep demo_note as a string (already done)
+- In real API mode:
+  - Ensure you do NOT require the model to generate demo_note text; it can be null.
+  - Optionally, after receiving model output, explicitly set:
+    report.demo_note = null
+  so it’s consistent and doesn’t mislead.
+  (But only do this if it doesn’t break your result renderer.)
+
+D) Ensure RefereeReportView handles nullable demo_note
+1) Edit statrumble/app/components/RefereeReportView.tsx
+- If demo_note is null/empty, do not render the demo banner.
+- If demo_note is a non-empty string, render it as demo indicator.
+
+E) Tests
+1) Add a small node test to validate strict compliance:
+- scripts/verify-referee-schema.mjs
+  - Import refereeJsonSchema from statrumble/lib/referee/schema.ts
+  - Assert: required includes all keys in properties
+  - Assert: demo_note type includes "null"
+  - Print OK on success
+2) Wire into statrumble/package.json test command after existing verify scripts.
+
+Verification
+- npm run lint
+- npm run typecheck
+- pnpm -C statrumble test (should include verify-referee-schema)
+- pnpm -C statrumble build
+- In real API mode (OPENAI_API_KEY set, DEMO_MODE unset), click Run Referee:
+  - Should no longer 400 on schema
+- In demo mode, Run Referee:
+  - demo_note displays
+
+Output
+- Changed files list
+- Key diff summary
+- Verify results
+- Suggested commit: fix(referee): strict schema required keys + nullable demo_note
+```
+#### Result
+- Refactored `refereeJsonSchema` to define a `PROPS` object and auto-generate `required` with `Object.keys(PROPS)`, making strict-schema key drift harder to introduce.
+- Changed `demo_note` schema/type to nullable (`string | null`) and updated `RefereeReport` so the key is always present.
+- Added `assertStrictRequiredAllKeys` in `statrumble/lib/referee/schema.ts` to throw if any property key is missing from `required`.
+- Updated judge route real-mode flow to explicitly set `report.demo_note = null` before persistence/response.
+- Normalized reused legacy reports in judge route so missing/non-string `demo_note` is coerced to `null`.
+- Updated `RefereeReportView` to render demo banner only for non-empty trimmed strings.
+- Added `scripts/verify-referee-schema.mjs` and wired it into `statrumble/package.json` `test` script.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [x] `./scripts/verify.sh`
+- [ ] Manual real API mode run: confirm no OpenAI schema 400
+- [ ] Manual demo mode run: confirm demo note renders
+#### Commit Link
+- TODO

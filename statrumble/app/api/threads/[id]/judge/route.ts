@@ -285,7 +285,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
     }
 
-    const existingReport = (thread.referee_report as RefereeReport | null) ?? null;
+    const existingReportRaw = (thread.referee_report as RefereeReport | null) ?? null;
+    const existingReport = existingReportRaw
+      ? {
+          ...existingReportRaw,
+          demo_note: typeof existingReportRaw.demo_note === "string" ? existingReportRaw.demo_note : null,
+        }
+      : null;
 
     if (!force && existingReport) {
       return NextResponse.json({ ok: true, report: existingReport, reused: true });
@@ -398,6 +404,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
       report = fallbackParse.report;
     }
+
+    // Real API mode should not show a demo banner.
+    report = {
+      ...report,
+      demo_note: null,
+    };
 
     const { error: updateError } = await supabase
       .from("arena_threads")

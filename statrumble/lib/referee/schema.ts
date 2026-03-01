@@ -21,94 +21,115 @@ export type RefereeReport = {
     confidence_0_100: number;
     reason: string;
   };
-  demo_note?: string;
+  demo_note: string | null;
 };
+
+type JsonSchemaObject = {
+  properties: Record<string, unknown>;
+  required?: readonly string[];
+};
+
+function assertStrictRequiredAllKeys(schema: JsonSchemaObject) {
+  const propertyKeys = Object.keys(schema.properties);
+  const requiredSet = new Set(schema.required ?? []);
+  const missing = propertyKeys.filter((key) => !requiredSet.has(key));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `[referee schema] strict mode violation: required must include every property key. Missing: ${missing.join(", ")}`,
+    );
+  }
+}
+
+const PROPS = {
+  tldr: { type: "string" },
+  demo_note: { type: ["string", "null"] },
+  data_facts: {
+    type: "array",
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["fact", "support"],
+      properties: {
+        fact: { type: "string" },
+        support: { type: "string" },
+      },
+    },
+  },
+  stances: {
+    type: "object",
+    additionalProperties: false,
+    required: ["A", "B", "C"],
+    properties: {
+      A: {
+        type: "object",
+        additionalProperties: false,
+        required: ["steelman", "weakness"],
+        properties: {
+          steelman: { type: "string" },
+          weakness: { type: "string" },
+        },
+      },
+      B: {
+        type: "object",
+        additionalProperties: false,
+        required: ["steelman", "weakness"],
+        properties: {
+          steelman: { type: "string" },
+          weakness: { type: "string" },
+        },
+      },
+      C: {
+        type: "object",
+        additionalProperties: false,
+        required: ["steelman", "weakness"],
+        properties: {
+          steelman: { type: "string" },
+          weakness: { type: "string" },
+        },
+      },
+    },
+  },
+  confounders: {
+    type: "array",
+    items: { type: "string" },
+  },
+  next_checks: {
+    type: "array",
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: ["what", "why"],
+      properties: {
+        what: { type: "string" },
+        why: { type: "string" },
+      },
+    },
+  },
+  verdict: {
+    type: "object",
+    additionalProperties: false,
+    required: ["leading", "confidence_0_100", "reason"],
+    properties: {
+      leading: {
+        type: "string",
+        enum: ["A", "B", "C", "unclear"],
+      },
+      confidence_0_100: {
+        type: "number",
+        minimum: 0,
+        maximum: 100,
+      },
+      reason: { type: "string" },
+    },
+  },
+} as const;
 
 export const refereeJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["tldr", "data_facts", "stances", "confounders", "next_checks", "verdict"],
-  properties: {
-    tldr: { type: "string" },
-    demo_note: { type: "string" },
-    data_facts: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["fact", "support"],
-        properties: {
-          fact: { type: "string" },
-          support: { type: "string" },
-        },
-      },
-    },
-    stances: {
-      type: "object",
-      additionalProperties: false,
-      required: ["A", "B", "C"],
-      properties: {
-        A: {
-          type: "object",
-          additionalProperties: false,
-          required: ["steelman", "weakness"],
-          properties: {
-            steelman: { type: "string" },
-            weakness: { type: "string" },
-          },
-        },
-        B: {
-          type: "object",
-          additionalProperties: false,
-          required: ["steelman", "weakness"],
-          properties: {
-            steelman: { type: "string" },
-            weakness: { type: "string" },
-          },
-        },
-        C: {
-          type: "object",
-          additionalProperties: false,
-          required: ["steelman", "weakness"],
-          properties: {
-            steelman: { type: "string" },
-            weakness: { type: "string" },
-          },
-        },
-      },
-    },
-    confounders: {
-      type: "array",
-      items: { type: "string" },
-    },
-    next_checks: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["what", "why"],
-        properties: {
-          what: { type: "string" },
-          why: { type: "string" },
-        },
-      },
-    },
-    verdict: {
-      type: "object",
-      additionalProperties: false,
-      required: ["leading", "confidence_0_100", "reason"],
-      properties: {
-        leading: {
-          type: "string",
-          enum: ["A", "B", "C", "unclear"],
-        },
-        confidence_0_100: {
-          type: "number",
-          minimum: 0,
-          maximum: 100,
-        },
-        reason: { type: "string" },
-      },
-    },
-  },
+  properties: PROPS,
+  required: Object.keys(PROPS),
 } as const;
+
+assertStrictRequiredAllKeys(refereeJsonSchema);

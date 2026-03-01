@@ -81,10 +81,39 @@ echo "Running node scripts/verify-no-remote-fonts.mjs"
 node scripts/verify-no-remote-fonts.mjs
 echo "verify-no-remote-fonts: OK"
 
-echo "Running pnpm -C statrumble build"
 export NEXT_TELEMETRY_DISABLED=1
-pnpm -C statrumble build
-echo "build: OK"
+BUILD_OUTPUT_FILE="$(mktemp)"
+run_build_with_output() {
+  local log_file="$1"
+  shift
+
+  set +e
+  "$@" 2>&1 | tee "$log_file"
+  local status="${PIPESTATUS[0]}"
+  set -e
+
+  return "$status"
+}
+
+echo "Running pnpm -C statrumble build"
+if run_build_with_output "$BUILD_OUTPUT_FILE" pnpm -C statrumble build; then
+  echo "build: OK"
+else
+  if grep -Eiq 'turbopack|panic' "$BUILD_OUTPUT_FILE"; then
+    warn "Detected Turbopack-related build failure. Retrying with Webpack (--webpack)."
+    echo "Running pnpm -C statrumble build --webpack"
+    if run_build_with_output "$BUILD_OUTPUT_FILE" pnpm -C statrumble build --webpack; then
+      echo "build: OK (webpack fallback)"
+    else
+      rm -f "$BUILD_OUTPUT_FILE"
+      die "Build failed in both Turbopack and Webpack modes."
+    fi
+  else
+    rm -f "$BUILD_OUTPUT_FILE"
+    die "Build failed (non-Turbopack error)."
+  fi
+fi
+rm -f "$BUILD_OUTPUT_FILE"
 
 section "4) Migration sanity"
 MIGRATIONS_DIR="statrumble/supabase/migrations"

@@ -45,7 +45,7 @@
   - Original prompt text
   - Change summary
   - Manual checklist
-  - Commit placeholder or link (`(commit: TODO)` if unknown)
+  - Commit hash if known; otherwise omit the commit line.
 
 ## Out-of-Scope (until later phase)
 - Canonical vs User Overlay patching system

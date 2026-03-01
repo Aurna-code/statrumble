@@ -5307,4 +5307,30 @@ GOAL:
 - [x] `./scripts/verify.sh`
 - [x] `./scripts/contest-preflight.sh` (after commit)
 
-(commit: TODO)
+(commit: 6496075)
+
+### Prompt ID: Preflight webpack fallback + TODO placeholder cleanup
+#### Summary
+- Added Turbopack-aware Webpack fallback logic to `scripts/contest-preflight.sh` build step.
+- Replaced the specific CODEX log placeholder `(commit: TODO)` with `(commit: 6496075)` for the Playwright cleanup entry.
+- Updated `AGENTS.md` logging rule to require commit hash when known and omit commit line otherwise.
+
+#### Original prompt text
+```text
+You are Codex working at the repo root of `statrumble` with full permissions.
+
+GOAL:
+- Do NOT touch OTP/login behavior.
+- Make submission preflight more robust and polish documentation placeholders.
+- All edits must remain in English.
+```
+
+#### Change summary
+- `scripts/contest-preflight.sh` now captures build output to a temp file, retries with `pnpm -C statrumble build -- --webpack` only when failed output indicates Turbopack/panic, and preserves non-Turbopack failures as hard failures.
+- `docs/CODEX_LOG.md` Playwright cleanup entry now references real commit SHA `6496075`.
+- `AGENTS.md` logging rule now says: commit hash if known; otherwise omit commit line.
+
+#### Manual checklist
+- [x] `node scripts/verify-no-hangul.mjs`
+- [x] `./scripts/verify.sh`
+- [x] `./scripts/contest-preflight.sh`

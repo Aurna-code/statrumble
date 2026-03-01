@@ -5350,3 +5350,24 @@ Output
 - [ ] Optional manual smoke: empty key shows demo mode and demo AI actions
 #### Commit Link
 - TODO
+
+### Prompt ID: README main-page polish (commit: TODO)
+#### Prompt
+```text
+README main-page polish: move “Future plans / Roadmap” into GitHub README (Now/Next/Later), keep Discord post short, and update repo front page accordingly.
+```
+#### Result
+- Restructured `README.md` with a new top `What Works Now (2-3 Min Demo)` section.
+- Tightened and clarified `Demo Mode vs Real Mode` behavior (demo default, BYOK real mode conditions).
+- Updated screenshot placeholders to specific minimal captions.
+- Added a concise `Roadmap` section at the bottom using `Now / Next / Later`.
+- Added Discord-reader pointer line: short overview on Discord, full roadmap/setup in README.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] `./scripts/contest-preflight.sh` (blocked in dirty tree: `Working tree is not clean. Commit or stash changes.`)
+- [x] No secrets introduced
+- [x] No Hangul introduced
+#### Commit Link
+- TODO

@@ -4484,3 +4484,155 @@ Implementation details
 - [ ] Manual UI check: labels/helper text visible for both demo and non-demo env toggles
 #### Commit Link
 - TODO
+
+### Prompt ID: Contest strategy polish: make Demo default + BYOK optional explicit, and remove mode/cost confusion in UI/README (commit: TODO)
+#### Prompt
+```text
+[Prompt] Contest strategy polish: make Demo default + BYOK optional explicit, and remove mode/cost confusion in UI/README
+
+Context
+- Repo supports demo/mock mode via isDemoMode() (DEMO_MODE=1 or NEXT_PUBLIC_DEMO_MODE=1 or missing OPENAI_API_KEY).
+- Confusion risks:
+  1) UI “Demo mode” indicator currently depends on NEXT_PUBLIC_DEMO_MODE, but server may auto-fallback to demo when key is missing.
+  2) AI cost/API actions (Run Referee, Create Proposal/Fork) do not consistently disclose that they may incur costs in real mode.
+- Contest strategy:
+  - Hosted demo must be safe (no API calls, no costs).
+  - BYOK remains available for users who want real AI.
+
+Goals
+1) Always show a consistent “mode indicator” in the UI based on the server’s actual runtime mode:
+   - Demo mode: clearly labeled “Demo mode (no API calls)”
+   - Real mode: clearly labeled “API mode (may incur costs)”
+2) For every cost/API button:
+   - Add a visible (demo)/(API) label and a small helper line:
+     - demo: “No API calls.”
+     - API: “May incur costs.”
+   - Keep existing confirm behavior for Re-run (costs) and align its label to the same style.
+3) README clarity:
+   - Explicitly document two modes:
+     - Reviewer demo (hosted): DEMO_MODE=1, NEXT_PUBLIC_DEMO_MODE=1, no OPENAI_API_KEY
+     - BYOK real: OPENAI_API_KEY set, DEMO_MODE unset/0, NEXT_PUBLIC_DEMO_MODE optional
+   - Add a short “What reviewers should do” section: just run, no keys required.
+4) No new dependencies. English-only copy. Keep tests/preflight green.
+
+Implementation plan
+
+A) Make UI know the real runtime mode (no guessing)
+1) Update statrumble/app/layout.tsx (server component)
+- Import isDemoMode from statrumble/lib/demoMode.ts
+- Compute:
+  const demoMode = isDemoMode()
+- Add a stable data attribute to <html> or <body>:
+  <html data-demo-mode={demoMode ? "1" : "0"} ...>
+  (Prefer <html> so it’s easy to read in client components.)
+- Optional: also add data-demo-reason:
+  - "forced" if DEMO_MODE=1
+  - "no_key" if OPENAI_API_KEY missing
+  - "public" if NEXT_PUBLIC_DEMO_MODE=1
+  (Keep it simple; demo-mode alone is enough.)
+
+2) Add a tiny client helper:
+- Create statrumble/lib/runtimeMode.ts (client-safe)
+  export function getRuntimeDemoMode(): boolean {
+    if (typeof document === "undefined") return false;
+    return document.documentElement.dataset.demoMode === "1";
+  }
+
+B) Add a global banner so reviewers immediately understand mode
+1) Create statrumble/app/components/ModeBanner.tsx (client component)
+- Reads getRuntimeDemoMode()
+- If demo: show a compact banner at top of page:
+  "Demo mode: no API calls. Full collaboration flow works without keys."
+- If API: show:
+  "API mode: actions may incur costs."
+- Styling: subtle, text-xs, bg-zinc-50 border-b border-zinc-200
+- Render it once in layout right under the header (or above main).
+
+C) Make every cost/API button explicit
+Update these components to use getRuntimeDemoMode():
+
+1) statrumble/app/components/ThreadArena.tsx
+- For "Run Referee":
+  - Label: "Run Referee (demo)" or "Run Referee (API)"
+  - Helper text under buttons row:
+    - demo: "No API calls."
+    - API: "May incur costs."
+- For "Re-run":
+  - Keep confirm as-is, but label consistently:
+    - demo: "Re-run (demo)" (confirm optional; can skip confirm in demo)
+    - API: "Re-run (API)" (keep confirm)
+  - If you keep confirm in both modes, adjust confirm text:
+    - demo: "This is a demo run (no API calls). Continue?"
+    - API: keep existing cost warning.
+
+2) statrumble/app/components/TransformProposalCreateForm.tsx
+- For "Create Proposal":
+  - Label: "(demo)" vs "(API)" + helper line.
+- Ensure any existing “Demo mode” badge now relies on runtime mode, not NEXT_PUBLIC_DEMO_MODE.
+
+3) statrumble/app/components/TransformProposalForkForm.tsx
+- Same as above for "Create Fork".
+
+D) README: make contest strategy explicit (demo-first + BYOK)
+1) Update root README.md:
+- Add a short “Modes” section:
+  - Demo mode (default for reviewers): no keys required, no API calls.
+  - Real mode (BYOK): provide OPENAI_API_KEY and disable DEMO_MODE.
+- Add “Reviewer quick start”:
+  - “Run locally; AI features run in demo mode by default.”
+- Add “Enable real AI (optional)”:
+  - Steps:
+    - set OPENAI_API_KEY
+    - ensure DEMO_MODE is unset/0
+    - (optional) unset NEXT_PUBLIC_DEMO_MODE
+- Add “Hosted demo note” (if you host):
+  - Hosted demo runs in demo mode; no keys required.
+
+E) Tests (lightweight)
+1) Add a tiny verification script that ensures layout sets the dataset string (static check):
+- scripts/verify-demo-ui-mode.mjs:
+  - git grep for 'data-demo-mode' in statrumble/app/layout.tsx
+  - fail if missing
+2) Wire into pnpm -C statrumble test (after existing verify scripts).
+
+Verification
+- npm run lint
+- npm run typecheck
+- pnpm -C statrumble test
+- pnpm -C statrumble build
+- ./scripts/contest-preflight.sh (clean tree)
+
+Manual checklist
+- Run with NO OPENAI_API_KEY:
+  - Banner shows “Demo mode: no API calls”
+  - Buttons show (demo)
+  - Running Referee/Transform produces demo_note outputs
+- Run with OPENAI_API_KEY and DEMO_MODE unset:
+  - Banner shows “API mode: may incur costs”
+  - Buttons show (API) + helper text
+  - Re-run confirm warns about costs
+
+Output
+- Changed files list
+- Key diff summary
+- Verify results
+- Suggested commit: chore(demo): make demo/API mode explicit across UI and README
+```
+#### Result
+- Added server-authoritative runtime mode wiring in `statrumble/app/layout.tsx` via `<html data-demo-mode="1|0">` and a new global `ModeBanner` rendered below the header.
+- Added `statrumble/lib/runtimeMode.ts` and updated `ThreadArena`, `TransformProposalCreateForm`, and `TransformProposalForkForm` to show `(demo)` vs `(API)` labels and cost helper text from runtime mode, not `NEXT_PUBLIC_DEMO_MODE`.
+- Updated Re-run behavior in `ThreadArena` to keep cost confirmation in API mode while skipping confirmation in demo mode.
+- Passed server-computed `initialDemoMode` through `app/page.tsx` and `app/threads/[id]/page.tsx` into client components for consistent first render.
+- Expanded `README.md` with explicit mode documentation (reviewer demo vs BYOK), reviewer guidance, optional real-AI enablement steps, and hosted demo note.
+- Added `scripts/verify-demo-ui-mode.mjs` and wired it into `statrumble/package.json` `test` script.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [x] `./scripts/verify.sh`
+- [ ] `./scripts/contest-preflight.sh` (fails at clean-tree guard because this prompt intentionally leaves uncommitted changes)
+- [ ] Manual runtime check with no `OPENAI_API_KEY`
+- [ ] Manual runtime check with `OPENAI_API_KEY` and `DEMO_MODE=0`
+#### Commit Link
+- TODO

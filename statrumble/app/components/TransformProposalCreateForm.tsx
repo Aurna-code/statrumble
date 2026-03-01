@@ -2,12 +2,14 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getRuntimeDemoMode } from "@/lib/runtimeMode";
 
 type TransformProposalCreateFormProps = {
   importId: string;
   startTs?: string | null;
   endTs?: string | null;
   disabled?: boolean;
+  initialDemoMode: boolean;
 };
 
 type ProposeTransformApiResponse = {
@@ -23,10 +25,6 @@ type ValidationIssue = {
   path: string;
   message: string;
 };
-
-const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
-const AI_MODE_INLINE_LABEL = SHOW_DEMO_BADGE ? "(demo)" : "(API)";
-const AI_MODE_HELPER_TEXT = SHOW_DEMO_BADGE ? "No API calls." : "May incur costs.";
 
 function normalizeIssues(payload: ProposeTransformApiResponse | null): ValidationIssue[] {
   const issuesRaw = payload?.details?.issues;
@@ -53,6 +51,7 @@ export default function TransformProposalCreateForm({
   startTs = null,
   endTs = null,
   disabled = false,
+  initialDemoMode,
 }: TransformProposalCreateFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -63,6 +62,9 @@ export default function TransformProposalCreateForm({
   const normalizedImportId = useMemo(() => importId.trim(), [importId]);
   const isDisabled = disabled || normalizedImportId.length === 0;
   const disabledReason = "Select an import first";
+  const demoMode = getRuntimeDemoMode() || initialDemoMode;
+  const aiModeInlineLabel = demoMode ? "(demo)" : "(API)";
+  const aiModeHelperText = demoMode ? "No API calls." : "May incur costs.";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -148,7 +150,7 @@ export default function TransformProposalCreateForm({
         >
           {open ? "Close Proposal" : "Propose Transform (AI)"}
         </button>
-        {SHOW_DEMO_BADGE ? (
+        {demoMode ? (
           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
             Demo mode
           </span>
@@ -182,7 +184,7 @@ export default function TransformProposalCreateForm({
               disabled={submitting}
               className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Creating..." : `Create Proposal ${AI_MODE_INLINE_LABEL}`}
+              {submitting ? "Creating..." : `Create Proposal ${aiModeInlineLabel}`}
             </button>
             <button
               type="button"
@@ -193,7 +195,7 @@ export default function TransformProposalCreateForm({
               Cancel
             </button>
           </div>
-          <p className="text-xs text-zinc-500">{AI_MODE_HELPER_TEXT}</p>
+          <p className="text-xs text-zinc-500">{aiModeHelperText}</p>
 
           {error ? <p className="text-xs text-red-600">Failed to create proposal: {error}</p> : null}
           {issues.length > 0 ? (

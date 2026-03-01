@@ -34,20 +34,49 @@ To fetch local Supabase keys:
 pnpm -C statrumble exec supabase status
 ```
 
+## Modes
+- Demo mode (default for reviewers): no API keys required, no API calls, full collaboration flow still works.
+- API mode (BYOK): OpenAI calls are enabled and actions may incur costs.
+
+Reviewer demo mode (hosted/local safe default):
+- `DEMO_MODE=1`
+- `NEXT_PUBLIC_DEMO_MODE=1`
+- `OPENAI_API_KEY` unset
+
+BYOK real mode:
+- `OPENAI_API_KEY` set
+- `DEMO_MODE` unset or `0`
+- `NEXT_PUBLIC_DEMO_MODE` optional (unset is recommended)
+
 ## Environment Variables
 Use `statrumble/.env.local` and never commit real keys.
 
 - `NEXT_PUBLIC_SUPABASE_URL` (local default: `http://127.0.0.1:54321`)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (copy from `supabase status`)
-- `OPENAI_API_KEY` (user-provided API key)
+- `OPENAI_API_KEY` (optional; required only for real API mode)
 - `DEMO_MODE` (`1` forces deterministic mock AI responses on the server)
-- `NEXT_PUBLIC_DEMO_MODE` (`1` shows the Demo mode badge in AI UI actions)
+- `NEXT_PUBLIC_DEMO_MODE` (`1` forces demo mode via shared runtime mode logic)
 - `NEXT_PUBLIC_DEV_PASSWORD_LOGIN` (optional toggle to show password login UI)
 
-If `OPENAI_API_KEY` is set and `DEMO_MODE` is not `1`, server routes use real AI. For contest reviewers, demo mode runs the full collaboration flow without API keys.
-AI action buttons show `(demo)` or `(API)` in the UI to indicate expected request-cost behavior.
+If `OPENAI_API_KEY` is set and `DEMO_MODE` is not `1`, server routes use real AI.
+If `OPENAI_API_KEY` is missing, the app falls back to demo mode automatically.
+AI action buttons show `(demo)` or `(API)` and helper text (`No API calls.` / `May incur costs.`).
 
 Password login only works for accounts that already have an email+password set in Supabase Auth. This repo does not include password sign-up or password-setting flows. For first-time demos, prefer email OTP (magic link) login.
+
+## What Reviewers Should Do
+- Run locally with the standard setup commands.
+- Do not add API keys.
+- Use the app normally; AI-related flows run in demo mode by default.
+
+## Enable Real AI (Optional)
+1. Set `OPENAI_API_KEY` in `statrumble/.env.local`.
+2. Ensure `DEMO_MODE` is unset or `0`.
+3. Optionally unset `NEXT_PUBLIC_DEMO_MODE` (recommended).
+4. Restart the dev server if it is already running.
+
+## Hosted Demo Note
+- Hosted demo environments should run in demo mode (`DEMO_MODE=1`, `NEXT_PUBLIC_DEMO_MODE=1`, and no `OPENAI_API_KEY`).
 
 ## Contest Preflight
 - Standard preflight:

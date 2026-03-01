@@ -6,6 +6,7 @@ import ThreadArena from "@/app/components/ThreadArena";
 import TransformProposalForkForm from "@/app/components/TransformProposalForkForm";
 import { getDecisionForThread } from "@/lib/db/decisions";
 import { getThread } from "@/lib/db/threads";
+import { isDemoMode } from "@/lib/demoMode";
 import { createClient } from "@/lib/supabase/server";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
@@ -248,6 +249,7 @@ function buildBackToArenaHref(input: { importId: string | null; start: string | 
 }
 
 export default async function Page({ params, searchParams }: ThreadPageProps) {
+  const demoMode = isDemoMode();
   const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   let thread = null;
@@ -364,7 +366,11 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
                 </p>
               ) : null}
             </div>
-            <TransformProposalForkForm importId={thread.import_id} parentThreadId={thread.id} />
+            <TransformProposalForkForm
+              importId={thread.import_id}
+              parentThreadId={thread.id}
+              initialDemoMode={demoMode}
+            />
           </div>
 
           <div className="mt-4 space-y-4 text-sm">
@@ -493,6 +499,7 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
         initialDecisionId={initialDecisionId}
         currentUserId={currentUserId}
         currentUserDisplayName={currentUserDisplayName}
+        initialDemoMode={demoMode}
       />
     </main>
   );

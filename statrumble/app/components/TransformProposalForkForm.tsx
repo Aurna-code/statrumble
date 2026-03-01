@@ -2,10 +2,12 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getRuntimeDemoMode } from "@/lib/runtimeMode";
 
 type TransformProposalForkFormProps = {
   importId: string;
   parentThreadId: string;
+  initialDemoMode: boolean;
 };
 
 type ProposeTransformApiResponse = {
@@ -21,10 +23,6 @@ type ValidationIssue = {
   path: string;
   message: string;
 };
-
-const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
-const AI_MODE_INLINE_LABEL = SHOW_DEMO_BADGE ? "(demo)" : "(API)";
-const AI_MODE_HELPER_TEXT = SHOW_DEMO_BADGE ? "No API calls." : "May incur costs.";
 
 function normalizeIssues(payload: ProposeTransformApiResponse | null): ValidationIssue[] {
   const issuesRaw = payload?.details?.issues;
@@ -46,13 +44,20 @@ function normalizeIssues(payload: ProposeTransformApiResponse | null): Validatio
     .filter((issue) => issue.message.length > 0);
 }
 
-export default function TransformProposalForkForm({ importId, parentThreadId }: TransformProposalForkFormProps) {
+export default function TransformProposalForkForm({
+  importId,
+  parentThreadId,
+  initialDemoMode,
+}: TransformProposalForkFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
+  const demoMode = getRuntimeDemoMode() || initialDemoMode;
+  const aiModeInlineLabel = demoMode ? "(demo)" : "(API)";
+  const aiModeHelperText = demoMode ? "No API calls." : "May incur costs.";
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,7 +133,7 @@ export default function TransformProposalForkForm({ importId, parentThreadId }: 
         >
           {open ? "Close Fork" : "Fork"}
         </button>
-        {SHOW_DEMO_BADGE ? (
+        {demoMode ? (
           <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
             Demo mode
           </span>
@@ -156,7 +161,7 @@ export default function TransformProposalForkForm({ importId, parentThreadId }: 
               disabled={submitting || !importId.trim()}
               className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Creating..." : `Create Fork ${AI_MODE_INLINE_LABEL}`}
+              {submitting ? "Creating..." : `Create Fork ${aiModeInlineLabel}`}
             </button>
             <button
               type="button"
@@ -167,7 +172,7 @@ export default function TransformProposalForkForm({ importId, parentThreadId }: 
               Cancel
             </button>
           </div>
-          <p className="text-xs text-zinc-500">{AI_MODE_HELPER_TEXT}</p>
+          <p className="text-xs text-zinc-500">{aiModeHelperText}</p>
 
           {error ? <p className="text-xs text-red-600">{error}</p> : null}
           {issues.length > 0 ? (

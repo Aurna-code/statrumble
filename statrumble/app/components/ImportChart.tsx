@@ -24,6 +24,7 @@ type ImportOption = {
 
 type ImportChartProps = {
   imports: ImportOption[];
+  initialDemoMode: boolean;
 };
 
 type PointItem = {
@@ -72,7 +73,7 @@ function getDefaultBrushRange(pointsLength: number): BrushRange {
   };
 }
 
-export default function ImportChart({ imports }: ImportChartProps) {
+export default function ImportChart({ imports, initialDemoMode }: ImportChartProps) {
   const router = useRouter();
   const renderCountRef = useRef(0);
   const didWarnRenderLoopRef = useRef(false);
@@ -368,6 +369,7 @@ export default function ImportChart({ imports }: ImportChartProps) {
               startTs={selectedWindow?.startTs ?? null}
               endTs={selectedWindow?.endTs ?? null}
               disabled={!selectedImportId}
+              initialDemoMode={initialDemoMode}
             />
           </div>
 

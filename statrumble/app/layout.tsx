@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import HeaderNavLinks from "@/app/components/HeaderNavLinks";
+import ModeBanner from "@/app/components/ModeBanner";
 import WorkspaceSwitcher from "@/app/components/WorkspaceSwitcher";
 import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
+import { isDemoMode } from "@/lib/demoMode";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -16,6 +18,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const demoMode = isDemoMode();
   const supabase = await createClient();
   const {
     data: { user },
@@ -39,7 +42,7 @@ export default async function RootLayout({
   const showJoin = Boolean(user) && workspaceSelection.workspaces.length === 0 && !workspaceSelection.activeWorkspaceId;
 
   return (
-    <html lang="en">
+    <html lang="en" data-demo-mode={demoMode ? "1" : "0"}>
       <body className="antialiased font-sans">
         <div className="min-h-screen bg-zinc-50 text-zinc-900">
           <header className="border-b border-zinc-200 bg-white">
@@ -71,6 +74,7 @@ export default async function RootLayout({
               </div>
             </nav>
           </header>
+          <ModeBanner initialDemoMode={demoMode} />
           {children}
         </div>
       </body>

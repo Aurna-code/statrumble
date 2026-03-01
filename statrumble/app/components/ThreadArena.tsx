@@ -7,6 +7,7 @@ import RefereeReportView from "@/app/components/RefereeReportView";
 import type { RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
+import { getRuntimeDemoMode } from "@/lib/runtimeMode";
 import { shortId } from "@/lib/userDisplay";
 
 type VoteStance = "A" | "B" | "C";
@@ -65,12 +66,10 @@ type ThreadArenaProps = {
   initialDecisionId?: string | null;
   currentUserId?: string | null;
   currentUserDisplayName?: string | null;
+  initialDemoMode: boolean;
 };
 
 const POLL_INTERVAL_MS = 4000;
-const SHOW_DEMO_BADGE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
-const AI_MODE_INLINE_LABEL = SHOW_DEMO_BADGE ? "(demo)" : "(API)";
-const AI_MODE_HELPER_TEXT = SHOW_DEMO_BADGE ? "No API calls." : "May incur costs.";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -166,6 +165,7 @@ export default function ThreadArena({
   initialDecisionId = null,
   currentUserId = null,
   currentUserDisplayName = null,
+  initialDemoMode,
 }: ThreadArenaProps) {
   const router = useRouter();
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
@@ -224,6 +224,9 @@ export default function ThreadArena({
 
   const quoteSentence = useMemo(() => buildQuoteSentence(snapshot), [snapshot]);
   const loadingMessages = refreshing && messages.length === 0;
+  const demoMode = getRuntimeDemoMode() || initialDemoMode;
+  const aiModeInlineLabel = demoMode ? "(demo)" : "(API)";
+  const aiModeHelperText = demoMode ? "No API calls." : "May incur costs.";
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = messagesContainerRef.current;
@@ -588,12 +591,17 @@ export default function ThreadArena({
                 disabled={judging}
                 className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {judging ? "Running Referee..." : `Run Referee ${AI_MODE_INLINE_LABEL}`}
+                {judging ? "Running Referee..." : `Run Referee ${aiModeInlineLabel}`}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   if (judging) {
+                    return;
+                  }
+
+                  if (demoMode) {
+                    void onRunReferee(true);
                     return;
                   }
 
@@ -606,20 +614,15 @@ export default function ThreadArena({
                 disabled={judging}
                 className="rounded-md border border-zinc-300 px-4 py-2 text-sm text-zinc-900 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {judging ? "Re-running..." : `Re-run ${AI_MODE_INLINE_LABEL}`}
+                {judging ? "Re-running..." : `Re-run ${aiModeInlineLabel}`}
               </button>
               {refereeReused ? (
                 <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
                   Reused
                 </span>
               ) : null}
-              {SHOW_DEMO_BADGE ? (
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
-                  Demo mode
-                </span>
-              ) : null}
             </div>
-            <p className="mt-2 text-xs text-zinc-500">{AI_MODE_HELPER_TEXT}</p>
+            <p className="mt-2 text-xs text-zinc-500">{aiModeHelperText}</p>
             {judgeError ? <p className="mt-2 text-sm text-red-600">{judgeError}</p> : null}
           </div>
 

@@ -4,6 +4,7 @@ import { listImports, listMetrics, listThreads, type MetricImportRow } from "@/l
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import UploadCsvForm from "@/app/components/UploadCsvForm";
 import ImportChart from "@/app/components/ImportChart";
+import { isDemoMode } from "@/lib/demoMode";
 import { formatDateTimeLabel } from "@/lib/formatDate";
 import { formatMetricLabel, formatThreadPrimaryTitle, shortId } from "@/lib/threadLabel";
 
@@ -34,6 +35,7 @@ function formatImportDisplayName(row: MetricImportRow) {
 }
 
 export default async function Home() {
+  const demoMode = isDemoMode();
   let hasMembership = false;
 
   try {
@@ -92,7 +94,7 @@ export default async function Home() {
                   Failed to load: {importsError instanceof Error ? importsError.message : "Unknown error"}
                 </p>
               ) : (
-                <ImportChart imports={importsForChart} />
+                <ImportChart imports={importsForChart} initialDemoMode={demoMode} />
               )}
             </section>
 

@@ -122,6 +122,7 @@ Password login only works for accounts that already have an email+password set i
 <img width="1415" height="880" alt="Screenshot001" src="https://github.com/user-attachments/assets/ec123a77-ed4d-4305-9fda-6a054e4e5cd8" />
 <img width="942" height="740" alt="Screenshot002" src="https://github.com/user-attachments/assets/97400677-8a43-4b4d-a970-3820a51eea6a" />
 <img width="1372" height="773" alt="Screenshot003" src="https://github.com/user-attachments/assets/ee873f99-a2e1-4529-80f2-5b52456a9eb6" />
+<img width="1368" height="546" alt="Screenshot004" src="https://github.com/user-attachments/assets/41776bfe-c9ec-49ca-9f44-b5a82d202a2b" />
 
 
 

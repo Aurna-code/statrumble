@@ -74,6 +74,7 @@ export default function UploadCsvForm() {
           accept=".csv,text/csv"
           className="block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700 file:mr-3 file:rounded file:border-0 file:bg-zinc-100 file:px-2 file:py-1 file:text-sm file:font-medium file:text-zinc-700"
         />
+        <p className="mt-1 text-xs text-zinc-600">Expected header: ts,value (ts: ISO8601, value: number).</p>
       </div>
 
       <button

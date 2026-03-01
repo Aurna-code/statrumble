@@ -5334,3 +5334,59 @@ GOAL:
 - [x] `node scripts/verify-no-hangul.mjs`
 - [x] `./scripts/verify.sh`
 - [x] `./scripts/contest-preflight.sh`
+
+### Prompt ID: CSV format discoverability (`ts,value`)
+#### Summary
+- Added a concise `CSV Format` subsection in `README.md` documenting required headers and data types.
+- Updated Arena CSV upload helper copy to remove misleading “map fields” wording.
+- Added an inline upload-form hint clarifying expected CSV header and value types.
+- Ran repository verification via `./scripts/verify.sh`.
+
+#### Original prompt text
+```text
+You are Codex working at the repo root of `statrumble`.
+
+GOAL: Fix CSV format discoverability. The app currently requires CSV header columns `ts,value`, but UI/README do not clearly say so.
+Make minimal changes that improve user guidance. All text must be English.
+
+TASK A — README: document CSV format
+1) Open repo-root `README.md`.
+2) In the “What Works Now” section or near the “Demo Script / Run Locally” area, add a short subsection:
+   - Title: “CSV Format”
+   - Content (2–4 lines max):
+     - “CSV must include header columns: `ts,value`."
+     - “`ts` should be ISO8601 timestamp; `value` must be numeric."
+     - “See `docs/sample.csv` for an example."
+3) Keep it concise (no long explanation).
+
+TASK B — UI copy: remove misleading “map the metric fields”
+1) Open `statrumble/app/page.tsx` and locate the CSV Upload helper text:
+   “Upload a CSV and map the metric fields.”
+2) Replace it with something accurate, e.g.:
+   “Upload a CSV with columns `ts,value`."
+
+TASK C — Upload form hint (small, optional but recommended)
+1) Open `statrumble/app/components/UploadCsvForm.tsx`.
+2) Add a small helper text under the file input (or above the submit button):
+   “Expected header: ts,value (ts: ISO8601, value: number)."
+3) Do not add new dependencies.
+
+VALIDATION
+- Run `./scripts/verify.sh` and ensure it passes.
+
+COMMIT
+- Create one commit:
+  `docs(ui): document required CSV headers (ts,value)`
+
+OUTPUT
+- Show `git diff`
+- Show verify output summary
+```
+
+#### Change summary
+- `README.md`: added `CSV Format` section near local-run setup with concise header/type requirements and sample file pointer.
+- `statrumble/app/page.tsx`: updated CSV upload helper text to `Upload a CSV with columns \`ts,value\`.`
+- `statrumble/app/components/UploadCsvForm.tsx`: added helper hint `Expected header: ts,value (ts: ISO8601, value: number).`
+
+#### Manual checklist
+- [x] `./scripts/verify.sh`

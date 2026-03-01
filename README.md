@@ -49,6 +49,11 @@ pnpm -C statrumble dev
 Equivalent from inside `statrumble/`: `cp .env.example .env.local` (or set env vars directly).
 This flow starts in demo mode by default when `OPENAI_API_KEY` is not set.
 
+### CSV Format
+CSV must include header columns: `ts,value`.
+`ts` should be ISO8601 timestamp; `value` must be numeric.
+See `docs/sample.csv` for an example.
+
 To fetch local Supabase keys:
 
 ```bash

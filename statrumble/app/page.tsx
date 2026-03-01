@@ -104,7 +104,7 @@ export default async function Home() {
                 <div className="mt-4 space-y-6">
                   <div>
                     <h3 className="font-medium">CSV Upload</h3>
-                    <p className="mt-1 text-sm text-zinc-600">Upload a CSV and map the metric fields.</p>
+                    <p className="mt-1 text-sm text-zinc-600">Upload a CSV with columns `ts,value`.</p>
                     <UploadCsvForm />
                   </div>
 

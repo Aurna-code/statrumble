@@ -1,8 +1,13 @@
 # StatRumble
 
-StatRumble is a one-week MVP for data debate workflows. A user uploads a CSV series, selects a segment on the chart, opens an arena thread, and gets a Referee decision that can be promoted to a public decision page.
+StatRumble is a collaborative data debate arena for CSV and time-series analysis. Teams upload data, select a chart segment, debate in an arena thread, and run a Referee that produces a decision that can be published as a public page.
 
-The product scope is intentionally narrow: upload -> chart -> segment select -> arena thread -> referee -> decision. This keeps the path to demo stable while still proving collaborative analysis and adjudication.
+The product scope is intentionally focused: upload -> chart -> segment select -> arena thread -> referee -> decision. This boundary keeps the demo path stable while proving collaborative analysis and adjudication.
+
+## Status
+- Hackathon prototype (built in ~1 week).
+- Scope is intentionally narrow to keep the demo path stable.
+- See [Roadmap](#roadmap) for planned expansion.
 
 ## What Works Now (2-3 Min Demo)
 - Create workspace + invite code + join
@@ -10,8 +15,6 @@ The product scope is intentionally narrow: upload -> chart -> segment select -> 
 - Comments + votes
 - Run Referee/Judge (demo mode by default; real mode via BYOK)
 - Promote to decision + share `/p/decisions/<publicId>`
-
-Short overview: see Discord post; full roadmap and setup live here.
 
 ## How Codex Is Used
 - Transform proposals: users can propose transformed series, and Codex produces structured outputs that become candidate threads.
@@ -111,9 +114,7 @@ Password login only works for accounts that already have an email+password set i
 9. Optional: User A enables the workspace public portal so the workspace appears on `/portal`, then anonymous viewers can navigate to the public decision from there.
 
 ## Screenshots
-- `[TODO]` Arena chart + range selection
-- `[TODO]` Thread: comments/votes + Referee
-- `[TODO]` Decision publish + public decision page
+Screenshots coming soon.
 
 ## Repository Notes
 - App code lives in `statrumble/`.

@@ -16,7 +16,12 @@ type SaveProfileResponse = {
   error?: string;
 };
 
-export default function DisplayNameEditor() {
+type DisplayNameEditorProps = {
+  embedded?: boolean;
+  onDisplayNameChange?: (displayName: string) => void;
+};
+
+export default function DisplayNameEditor({ embedded = false, onDisplayNameChange }: DisplayNameEditorProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [displayName, setDisplayName] = useState("");
@@ -52,6 +57,7 @@ export default function DisplayNameEditor() {
         setDisplayName(nextDisplayName);
         setInitialDisplayName(nextDisplayName);
         setEmail(payload.email ?? null);
+        onDisplayNameChange?.(nextDisplayName);
       } catch (error) {
         if (cancelled) {
           return;
@@ -70,7 +76,7 @@ export default function DisplayNameEditor() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [onDisplayNameChange]);
 
   const isUnchanged = useMemo(() => displayName.trim() === initialDisplayName.trim(), [displayName, initialDisplayName]);
 
@@ -103,6 +109,7 @@ export default function DisplayNameEditor() {
       setDisplayName(nextDisplayName);
       setInitialDisplayName(nextDisplayName);
       setSuccessMessage("Display name saved.");
+      onDisplayNameChange?.(nextDisplayName);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unknown profile error");
     } finally {
@@ -110,8 +117,12 @@ export default function DisplayNameEditor() {
     }
   }
 
+  const containerClassName = embedded
+    ? "rounded-lg border border-zinc-200 bg-zinc-50 p-4"
+    : "mt-6 rounded-lg border border-zinc-200 bg-white p-5";
+
   return (
-    <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-5">
+    <section className={containerClassName}>
       <h2 className="text-base font-semibold">Display name</h2>
       <p className="mt-1 text-sm text-zinc-600">Set how your name appears in thread messages.</p>
       {email ? <p className="mt-1 text-xs text-zinc-500">Signed in as {email}</p> : null}

@@ -37,6 +37,11 @@ export type WorkspacePublicProfile = {
   updated_at: string;
 };
 
+export type WorkspacePortalStatus = {
+  workspace_id: string;
+  is_public: boolean;
+};
+
 type MemberWorkspaceQueryRow = {
   role: string;
   created_at: string;
@@ -270,4 +275,27 @@ export async function getWorkspacePublicProfile(workspaceId: string): Promise<Wo
   }
 
   return (data as WorkspacePublicProfile | null) ?? null;
+}
+
+export async function listWorkspacePortalStatuses(workspaceIds: string[]): Promise<WorkspacePortalStatus[]> {
+  if (workspaceIds.length === 0) {
+    return [];
+  }
+
+  const { supabase } = await getAuthenticatedUserId();
+  const { data, error } = await supabase
+    .from("workspace_public_profiles")
+    .select("workspace_id, is_public")
+    .in("workspace_id", workspaceIds);
+
+  if (error) {
+    throw new Error(`Failed to load workspace portal statuses: ${error.message}`);
+  }
+
+  const rows = (data as WorkspacePortalStatus[] | null) ?? [];
+
+  return rows.map((row) => ({
+    workspace_id: row.workspace_id,
+    is_public: Boolean(row.is_public),
+  }));
 }

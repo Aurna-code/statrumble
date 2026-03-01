@@ -12,6 +12,7 @@ type WorkspacePublicPortalControlsProps = {
         public_at: string | null;
       }
     | null;
+  onStatusChange?: (isPublic: boolean) => void;
 };
 
 type PublishApiResponse = {
@@ -27,6 +28,7 @@ export default function WorkspacePublicPortalControls({
   workspaceId,
   workspaceName,
   initialProfile,
+  onStatusChange,
 }: WorkspacePublicPortalControlsProps) {
   const [isPublic, setIsPublic] = useState(Boolean(initialProfile?.is_public));
   const [publicUrl, setPublicUrl] = useState<string | null>(
@@ -76,6 +78,7 @@ export default function WorkspacePublicPortalControls({
 
       setIsPublic(nextIsPublic);
       setPublicUrl(nextPublicUrl);
+      onStatusChange?.(nextIsPublic);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown publish error");
     } finally {

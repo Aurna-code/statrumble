@@ -4636,3 +4636,68 @@ Output
 - [ ] Manual runtime check with `OPENAI_API_KEY` and `DEMO_MODE=0`
 #### Commit Link
 - TODO
+
+### Prompt ID: Workspaces page UX overhaul active context + separated list (commit: TODO)
+#### Prompt
+```text
+[Prompt] Workspaces page UX overhaul: highlight active workspace context (name + display name + members + portal status), separate "My workspaces" list below
+
+Context
+- /workspaces is the hub for onboarding and collaboration state.
+- We want clearer information hierarchy:
+  1) Active workspace summary (single prominent card)
+  2) Quick actions
+  3) “My workspaces” list separated below
+- The active workspace card should show:
+  - workspace name (primary)
+  - under it: aligned meta row with:
+    - "You: <display name>" (or CTA to set)
+    - "Role: Owner/Member"
+    - "Members: N"
+    - "Portal: Public/Private"
+- Existing components exist and should be reused where possible:
+  - DisplayNameEditor (nickname)
+  - InviteCodeCopyButton
+  - WorkspacePublicPortalControls (publish toggle)
+  - Vote settings panel (if present)
+- Keep styling consistent with the rest of the app (rounded-xl, border-zinc-200, bg-white, shadow-sm, bg-zinc-50 page).
+- English-only copy. No new dependencies.
+
+Goals
+1) Make “Active workspace” the visual and functional focus.
+2) Make key state visible at a glance (who am I, how many members, is portal public).
+3) Keep “My workspaces” list present but visually secondary and separated below.
+4) Preserve existing functionality (create/join/switch/leave/invite/portal/vote settings).
+5) Keep lint/typecheck/tests/build/preflight green.
+
+Implementation plan
+- Add MetaChipsRow and workspaceLabel helper.
+- Rework /workspaces layout into active card + quick actions and separated “My workspaces”.
+- Plumb member count/portal status safely.
+- Preserve existing actions.
+- Run verification commands and update CODEX log.
+
+Output
+- Changed files list
+- Key diff summary
+- Verify results
+- Suggested commit: chore(ui): improve workspaces hub visibility and hierarchy
+```
+#### Result
+- Added `MetaChipsRow` and `workspaceLabel` helper utilities for consistent role/member/portal chip rendering.
+- Reworked `app/workspaces/page.tsx` into a `min-h-screen bg-zinc-50` shell with a unified `WorkspacesHub` render path and active user display-name + portal-status data plumbing.
+- Rebuilt `WorkspacesHub` hierarchy into: Active workspace focus card + Quick actions sidebar + separated `My workspaces` list below.
+- Active workspace now shows chips for `You`, `Role`, `Members`, and `Portal`, while keeping `DisplayNameEditor`, invite copy, and portal publish controls visible.
+- Preserved workspace switching, leaving, deleting, member promotion, and portal management behavior.
+- Updated `DisplayNameEditor` to support embedded mode and push display-name updates back to the active chip immediately after load/save.
+- Updated `WorkspacePublicPortalControls` with optional `onStatusChange` callback so portal status chips update immediately after publish toggle.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [ ] `./scripts/contest-preflight.sh` (fails at clean-tree gate during in-progress workspace changes)
+- [ ] Manual UI pass: active card hierarchy + no-membership CTA + switch/invite/portal flows in browser
+#### Commit Link
+- TODO

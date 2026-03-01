@@ -3,9 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import DisplayNameEditor from "@/app/components/DisplayNameEditor";
 import InviteCodeCopyButton from "@/app/components/InviteCodeCopyButton";
+import MetaChipsRow from "@/app/components/MetaChipsRow";
 import WorkspacePublicPortalControls from "@/app/components/WorkspacePublicPortalControls";
 import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
+import { membersLabel, portalStatusLabel, roleLabel } from "@/lib/workspaceLabel";
 import type { MemberWorkspaceRow, WorkspaceMemberRow, WorkspacePublicProfile } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatJoinedAt } from "@/lib/formatDate";
 
@@ -16,6 +19,8 @@ type WorkspacesHubProps = {
   membersWorkspaceId: string | null;
   membersError: string | null;
   workspacePublicProfile: WorkspacePublicProfile | null;
+  portalStatusByWorkspaceId: Record<string, boolean>;
+  initialDisplayName: string | null;
 };
 
 type SetActiveWorkspaceResponse = {
@@ -50,6 +55,8 @@ export default function WorkspacesHub({
   membersWorkspaceId,
   membersError,
   workspacePublicProfile,
+  portalStatusByWorkspaceId,
+  initialDisplayName,
 }: WorkspacesHubProps) {
   const router = useRouter();
   const [memberships, setMemberships] = useState(workspaces);
@@ -63,6 +70,8 @@ export default function WorkspacesHub({
   const [deleteErrorMessage, setDeleteErrorMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [members, setMembers] = useState(workspaceMembers);
+  const [viewerDisplayName, setViewerDisplayName] = useState(initialDisplayName?.trim() ?? "");
+  const [portalStatusByWorkspace, setPortalStatusByWorkspace] = useState(portalStatusByWorkspaceId);
 
   const activeWorkspace = useMemo(
     () => memberships.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
@@ -80,6 +89,14 @@ export default function WorkspacesHub({
   useEffect(() => {
     setMembers(workspaceMembers);
   }, [workspaceMembers]);
+
+  useEffect(() => {
+    setViewerDisplayName(initialDisplayName?.trim() ?? "");
+  }, [initialDisplayName]);
+
+  useEffect(() => {
+    setPortalStatusByWorkspace(portalStatusByWorkspaceId);
+  }, [portalStatusByWorkspaceId]);
 
   useEffect(() => {
     if (!deleteTargetId) {
@@ -156,6 +173,12 @@ export default function WorkspacesHub({
       }
 
       setMemberships((prev) => prev.filter((workspace) => workspace.id !== workspaceId));
+      setPortalStatusByWorkspace((prev) => {
+        const next = { ...prev };
+        delete next[workspaceId];
+        return next;
+      });
+
       const nextActiveWorkspaceId = payload.active_workspace_id ?? null;
       setSelectedWorkspaceId(nextActiveWorkspaceId);
 
@@ -268,6 +291,12 @@ export default function WorkspacesHub({
       }
 
       setMemberships((prev) => prev.filter((workspace) => workspace.id !== workspaceId));
+      setPortalStatusByWorkspace((prev) => {
+        const next = { ...prev };
+        delete next[workspaceId];
+        return next;
+      });
+
       const nextActiveWorkspaceId = payload.active_workspace_id ?? null;
       setSelectedWorkspaceId(nextActiveWorkspaceId);
 
@@ -291,212 +320,296 @@ export default function WorkspacesHub({
 
   const canShowMembers = membersWorkspaceId !== null && membersWorkspaceId === selectedWorkspaceId;
   const isActiveOwner = activeWorkspace?.role === "owner";
+  const activeWorkspacePortalStatus = portalStatusLabel(
+    activeWorkspace ? portalStatusByWorkspace[activeWorkspace.id] ?? workspacePublicProfile?.is_public : false,
+  );
+  const activeMembersCount = canShowMembers && !membersError ? members.length : undefined;
 
   return (
-    <section className="mt-6 space-y-4">
-      <div className="rounded-lg border border-zinc-200 bg-white p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Active workspace</p>
-            <p className="mt-2 text-lg font-semibold text-zinc-900">
-              {activeWorkspace ? activeWorkspace.name : "No active workspace"}
-            </p>
-            {activeWorkspace ? (
-              <p className="mt-1 text-sm text-zinc-600">
-                role: {activeWorkspace.role} · joined {formatJoinedAt(activeWorkspace.joined_at)}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-zinc-600">Select a workspace.</p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <section className="mt-6">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_320px] md:items-start">
+        <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Active workspace</p>
+
+          {activeWorkspace ? (
+            <div className="mt-3 space-y-4">
+              <div>
+                <h2 className="text-xl font-semibold text-zinc-900">{activeWorkspace.name}</h2>
+                <p className="mt-1 text-xs text-zinc-500">Joined {formatJoinedAt(activeWorkspace.joined_at)}</p>
+              </div>
+
+              <MetaChipsRow
+                chips={[
+                  {
+                    label: `You: ${viewerDisplayName || "(set a display name)"}`,
+                    tone: viewerDisplayName ? "default" : "warning",
+                  },
+                  { label: `Role: ${roleLabel(activeWorkspace.role)}` },
+                  { label: `Members: ${membersLabel(activeMembersCount)}` },
+                  {
+                    label: `Portal: ${activeWorkspacePortalStatus.text}`,
+                    tone: activeWorkspacePortalStatus.tone,
+                  },
+                ]}
+              />
+
+              <DisplayNameEditor embedded onDisplayNameChange={setViewerDisplayName} />
+
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                <p className="text-sm font-semibold text-zinc-900">Invite code</p>
+                <p className="mt-1 font-mono text-base font-semibold tracking-wide text-zinc-900">
+                  {activeWorkspace.invite_code}
+                </p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Invites are {activeWorkspace.invite_enabled ? "enabled" : "disabled"}.
+                </p>
+                <InviteCodeCopyButton inviteCode={activeWorkspace.invite_code} />
+              </div>
+
+              {isActiveOwner ? (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+                  <p className="text-sm font-semibold text-zinc-900">Workspace Public Portal</p>
+                  <p className="mt-1 text-xs text-zinc-600">Publish or unpublish your workspace portal.</p>
+                  <div className="mt-3">
+                    <WorkspacePublicPortalControls
+                      workspaceId={activeWorkspace.id}
+                      workspaceName={activeWorkspace.name}
+                      initialProfile={workspacePublicProfile}
+                      onStatusChange={(isPublic) => {
+                        setPortalStatusByWorkspace((prev) => ({
+                          ...prev,
+                          [activeWorkspace.id]: isPublic,
+                        }));
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600">
+                  Only workspace owners can change portal visibility.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <h2 className="text-lg font-semibold text-zinc-900">No active workspace</h2>
+              <p className="mt-1 text-sm text-zinc-600">Create or join a workspace to continue.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href="/create-workspace"
+                  className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+                >
+                  Create workspace
+                </Link>
+                <Link
+                  href="/join"
+                  className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                >
+                  Join workspace
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <aside className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-zinc-900">Quick actions</h2>
+          <p className="mt-1 text-sm text-zinc-600">Jump to key workflow steps.</p>
+          <div className="mt-4 space-y-2">
+            <Link
+              href="/create-workspace"
+              className="inline-flex w-full items-center justify-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+            >
+              Create workspace
+            </Link>
             <Link
               href="/join"
-              className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+              className="inline-flex w-full items-center justify-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
             >
               Join workspace
             </Link>
             <Link
-              href="/create-workspace"
-              className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+              href="/#chart"
+              className="inline-flex w-full items-center justify-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
             >
-              Create workspace
+              Go to Arena
+            </Link>
+            <Link
+              href="/threads"
+              className="inline-flex w-full items-center justify-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+            >
+              Threads
+            </Link>
+            <Link
+              href="/decisions"
+              className="inline-flex w-full items-center justify-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+            >
+              Decisions
             </Link>
           </div>
-        </div>
+          {!activeWorkspace ? (
+            <p className="mt-3 text-xs text-zinc-600">Start by creating or joining a workspace.</p>
+          ) : null}
+        </aside>
       </div>
 
       {errorMessage ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {errorMessage}
-        </div>
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
       ) : null}
 
-      {activeWorkspace && isActiveOwner ? (
-        <div className="rounded-lg border border-zinc-200 bg-white p-5">
-          <div className="flex items-baseline justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-semibold">Workspace Public Portal</h2>
-              <p className="mt-1 text-sm text-zinc-600">Configure your public workspace portal.</p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <WorkspacePublicPortalControls
-              workspaceId={activeWorkspace.id}
-              workspaceName={activeWorkspace.name}
-              initialProfile={workspacePublicProfile}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      <div className="rounded-lg border border-zinc-200 bg-white p-5">
-        <div className="flex items-baseline justify-between gap-2">
+      <section className="mt-8">
+        <div className="flex items-baseline justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Your workspaces</h2>
-            <p className="mt-1 text-sm text-zinc-600">Check role, joined_at, and invite status, then switch.</p>
+            <h2 className="text-lg font-semibold text-zinc-900">My workspaces</h2>
+            <p className="mt-1 text-sm text-zinc-600">Switch between workspaces you belong to.</p>
           </div>
           <p className="text-xs text-zinc-500">{memberships.length} total</p>
         </div>
 
-        <ul className="mt-4 space-y-4">
-          {memberships.map((workspace) => {
-            const isActive = workspace.id === selectedWorkspaceId;
-            const isSwitching = switchingId === workspace.id;
-            const isLeaving = leavingId === workspace.id;
-            const isDeleting = deletingId === workspace.id;
-            const isDeletePanelOpen = deleteTargetId === workspace.id;
-            const canDeleteWorkspace = workspace.role === "owner";
-            const hasAnyPendingDelete = deletingId !== null;
-            const isLastOwner = workspace.role === "owner" && workspace.owner_count === 1;
-            const isSwitchDisabled = isActive || isSwitching || isLeaving || isDeleting || hasAnyPendingDelete;
-            const isLeaveDisabled = isLeaving || isSwitching || isDeleting || isLastOwner || hasAnyPendingDelete;
-            const isDeleteToggleDisabled = isSwitching || isLeaving || hasAnyPendingDelete;
-            const isDeleteSubmitDisabled = isDeleting;
+        <div className="mt-3 rounded-xl border border-zinc-200 bg-white shadow-sm">
+          {memberships.length === 0 ? (
+            <p className="p-5 text-sm text-zinc-600">No workspaces yet. Create or join one above.</p>
+          ) : (
+            <ul className="divide-y divide-zinc-200">
+              {memberships.map((workspace) => {
+                const isActive = workspace.id === selectedWorkspaceId;
+                const isSwitching = switchingId === workspace.id;
+                const isLeaving = leavingId === workspace.id;
+                const isDeleting = deletingId === workspace.id;
+                const isDeletePanelOpen = deleteTargetId === workspace.id;
+                const canDeleteWorkspace = workspace.role === "owner";
+                const hasAnyPendingDelete = deletingId !== null;
+                const isLastOwner = workspace.role === "owner" && workspace.owner_count === 1;
+                const isSwitchDisabled = isActive || isSwitching || isLeaving || isDeleting || hasAnyPendingDelete;
+                const isLeaveDisabled = isLeaving || isSwitching || isDeleting || isLastOwner || hasAnyPendingDelete;
+                const isDeleteToggleDisabled = isSwitching || isLeaving || hasAnyPendingDelete;
+                const isDeleteSubmitDisabled = isDeleting;
+                const workspacePortalStatus = portalStatusLabel(portalStatusByWorkspace[workspace.id]);
+                const workspaceMembersCount =
+                  canShowMembers && workspace.id === selectedWorkspaceId && !membersError ? members.length : undefined;
 
-            return (
-              <li key={workspace.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-zinc-900">{workspace.name}</p>
-                      {isActive ? (
-                        <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white">
-                          Active
-                        </span>
-                      ) : null}
+                return (
+                  <li key={workspace.id} className="p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium text-zinc-900">{workspace.name}</p>
+                          {isActive ? (
+                            <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white">
+                              Active
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <MetaChipsRow
+                          chips={[
+                            { label: `Role: ${roleLabel(workspace.role)}` },
+                            { label: `Members: ${membersLabel(workspaceMembersCount)}` },
+                            {
+                              label: `Portal: ${workspacePortalStatus.text}`,
+                              tone: workspacePortalStatus.tone,
+                            },
+                          ]}
+                        />
+
+                        <p className="text-xs text-zinc-500">Joined {formatJoinedAt(workspace.joined_at)}</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handleSwitch(workspace.id)}
+                          disabled={isSwitchDisabled}
+                          className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSwitching ? "Switching..." : isActive ? "Active" : "Switch"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleLeave(workspace.id)}
+                          disabled={isLeaveDisabled}
+                          className="inline-flex items-center rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isLeaving ? "Leaving..." : "Leave"}
+                        </button>
+                        {canDeleteWorkspace ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isDeletePanelOpen) {
+                                closeDeletePanel();
+                                return;
+                              }
+
+                              openDeletePanel(workspace.id);
+                            }}
+                            disabled={isDeleteToggleDisabled}
+                            className="inline-flex items-center rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isDeletePanelOpen ? "Close delete" : "Delete"}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      role: {workspace.role} · joined {formatJoinedAt(workspace.joined_at)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleSwitch(workspace.id)}
-                      disabled={isSwitchDisabled}
-                      className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isSwitching ? "Switching..." : isActive ? "Active" : "Switch"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleLeave(workspace.id)}
-                      disabled={isLeaveDisabled}
-                      className="inline-flex items-center rounded-md border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isLeaving ? "Leaving..." : "Leave"}
-                    </button>
-                    {canDeleteWorkspace ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isDeletePanelOpen) {
-                            closeDeletePanel();
-                            return;
-                          }
 
-                          openDeletePanel(workspace.id);
-                        }}
-                        disabled={isDeleteToggleDisabled}
-                        className="inline-flex items-center rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isDeletePanelOpen ? "Close delete" : "Delete"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-                {isLastOwner ? (
-                  <p className="mt-2 text-xs text-amber-700">
-                    You cannot leave as the last owner. Promote another owner, or use Delete for this workspace.
-                  </p>
-                ) : null}
-                {isDeletePanelOpen ? (
-                  <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
-                    <p className="text-sm font-semibold text-red-800">Delete workspace</p>
-                    <p className="mt-1 text-xs text-red-700">Type the workspace name to confirm deletion.</p>
-                    <p className="mt-1 text-xs text-red-700">
-                      This will permanently delete threads, imports, decisions, and memberships.
-                    </p>
-                    <label className="mt-3 block text-xs font-medium text-red-800">
-                      Workspace name
-                      <input
-                        type="text"
-                        value={deleteConfirmName}
-                        onChange={(event) => setDeleteConfirmName(event.target.value)}
-                        placeholder={workspace.name}
-                        disabled={isDeleting}
-                        className="mt-1 w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-red-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
-                      />
-                    </label>
-                    {deleteErrorMessage ? (
-                      <p className="mt-2 rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-700">
-                        {deleteErrorMessage}
+                    {isLastOwner ? (
+                      <p className="mt-2 text-xs text-amber-700">
+                        You cannot leave as the last owner. Promote another owner, or use Delete for this workspace.
                       </p>
                     ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={closeDeletePanel}
-                        disabled={isDeleting}
-                        className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(workspace.id)}
-                        disabled={isDeleteSubmitDisabled}
-                        className="inline-flex items-center rounded-md border border-red-200 bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isDeleting ? "Deleting..." : "Delete workspace"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
 
-                <div className="mt-3 grid gap-2 text-xs text-zinc-600 md:grid-cols-2">
-                  <div>
-                    <p className="text-zinc-500">Invite code</p>
-                    <p className="mt-1 font-mono text-base font-semibold tracking-wide text-zinc-900">
-                      {workspace.invite_code}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-zinc-500">Invite status</p>
-                    <p className="mt-1 text-sm text-zinc-700">
-                      {workspace.invite_enabled ? "enabled" : "disabled"}
-                    </p>
-                  </div>
-                </div>
-                <InviteCodeCopyButton inviteCode={workspace.invite_code} />
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+                    {isDeletePanelOpen ? (
+                      <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3">
+                        <p className="text-sm font-semibold text-red-800">Delete workspace</p>
+                        <p className="mt-1 text-xs text-red-700">Type the workspace name to confirm deletion.</p>
+                        <p className="mt-1 text-xs text-red-700">
+                          This will permanently delete threads, imports, decisions, and memberships.
+                        </p>
+                        <label className="mt-3 block text-xs font-medium text-red-800">
+                          Workspace name
+                          <input
+                            type="text"
+                            value={deleteConfirmName}
+                            onChange={(event) => setDeleteConfirmName(event.target.value)}
+                            placeholder={workspace.name}
+                            disabled={isDeleting}
+                            className="mt-1 w-full rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-red-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-zinc-100"
+                          />
+                        </label>
+                        {deleteErrorMessage ? (
+                          <p className="mt-2 rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-700">
+                            {deleteErrorMessage}
+                          </p>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={closeDeletePanel}
+                            disabled={isDeleting}
+                            className="inline-flex items-center rounded-md border border-zinc-300 px-3 py-2 text-xs font-semibold text-zinc-800 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(workspace.id)}
+                            disabled={isDeleteSubmitDisabled}
+                            className="inline-flex items-center rounded-md border border-red-200 bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isDeleting ? "Deleting..." : "Delete workspace"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
 
-      <div className="rounded-lg border border-zinc-200 bg-white p-5">
+      <section className="mt-8 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <div className="flex items-baseline justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">Members</h2>
@@ -506,9 +619,7 @@ export default function WorkspacesHub({
         </div>
 
         {membersError ? (
-          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {membersError}
-          </div>
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{membersError}</div>
         ) : null}
 
         {!activeWorkspace ? (
@@ -540,9 +651,7 @@ export default function WorkspacesHub({
                   </div>
                   <div>
                     {member.role === "owner" ? (
-                      <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white">
-                        Owner
-                      </span>
+                      <span className="rounded-full bg-zinc-900 px-2 py-0.5 text-xs font-semibold text-white">Owner</span>
                     ) : (
                       <button
                         type="button"
@@ -559,7 +668,7 @@ export default function WorkspacesHub({
             })}
           </ul>
         )}
-      </div>
+      </section>
     </section>
   );
 }

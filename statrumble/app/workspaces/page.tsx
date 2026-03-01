@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import OnboardingCard from "@/app/components/OnboardingCard";
-import DisplayNameEditor from "@/app/components/DisplayNameEditor";
 import WorkspacesHub from "@/app/components/WorkspacesHub";
 import {
   listMemberWorkspaces,
+  listWorkspacePortalStatuses,
   listWorkspaceMembers,
   getWorkspacePublicProfile,
   type MemberWorkspaceRow,
+  type WorkspacePortalStatus,
   type WorkspaceMemberRow,
   type WorkspacePublicProfile,
 } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
+import { getDisplayNameFromUser } from "@/lib/userDisplay";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
 
 export const dynamic = "force-dynamic";
@@ -30,14 +31,26 @@ export default async function WorkspacesPage() {
   let membersWorkspaceId: string | null = null;
   let membersError: string | null = null;
   let workspacePublicProfile: WorkspacePublicProfile | null = null;
+  let workspacePortalStatuses: WorkspacePortalStatus[] = [];
+  let viewerDisplayName: string | null = null;
 
   if (authError || !user) {
     loadError = "Login required.";
   } else {
+    viewerDisplayName = getDisplayNameFromUser(user);
+
     try {
       workspaces = await listMemberWorkspaces();
     } catch (error) {
       loadError = error instanceof Error ? error.message : "Unknown error";
+    }
+
+    if (workspaces.length > 0) {
+      try {
+        workspacePortalStatuses = await listWorkspacePortalStatuses(workspaces.map((workspace) => workspace.id));
+      } catch {
+        workspacePortalStatuses = [];
+      }
     }
   }
 
@@ -67,40 +80,38 @@ export default async function WorkspacesPage() {
     }
   }
 
+  const portalStatusByWorkspaceId = Object.fromEntries(
+    workspacePortalStatuses.map((workspace) => [workspace.workspace_id, workspace.is_public]),
+  );
+
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
-      <h1 className="text-2xl font-semibold">Workspaces</h1>
-      <p className="mt-2 text-sm text-zinc-600">Manage your workspace memberships and switch active workspace.</p>
-      {!loadError ? <DisplayNameEditor /> : null}
+    <main className="min-h-screen bg-zinc-50">
+      <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Workspaces</h1>
+        <p className="mt-1 text-sm text-zinc-600">Manage your workspace, invite members, and publish a portal.</p>
 
-      {loadError ? (
-        <section className="mt-6 rounded-lg border border-red-200 bg-red-50 p-5">
-          <p className="text-sm text-red-700">{loadError}</p>
-          {loadError.includes("Login") ? (
-            <Link href="/login" className="mt-3 inline-flex text-sm font-medium text-red-700 hover:underline">
-              Go to login
-            </Link>
-          ) : null}
-        </section>
-      ) : null}
-
-      {!loadError && workspaces.length === 0 ? (
-        <OnboardingCard
-          title="No workspace membership"
-          description="Join or create a workspace before using the hub."
-        />
-      ) : null}
-
-      {!loadError && workspaces.length > 0 ? (
-        <WorkspacesHub
-          workspaces={workspaces}
-          activeWorkspaceId={activeWorkspaceId}
-          workspaceMembers={workspaceMembers}
-          membersWorkspaceId={membersWorkspaceId}
-          membersError={membersError}
-          workspacePublicProfile={workspacePublicProfile}
-        />
-      ) : null}
+        {loadError ? (
+          <section className="mt-6 rounded-xl border border-red-200 bg-red-50 p-5">
+            <p className="text-sm text-red-700">{loadError}</p>
+            {loadError.includes("Login") ? (
+              <Link href="/login" className="mt-3 inline-flex text-sm font-medium text-red-700 hover:underline">
+                Go to login
+              </Link>
+            ) : null}
+          </section>
+        ) : (
+          <WorkspacesHub
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            workspaceMembers={workspaceMembers}
+            membersWorkspaceId={membersWorkspaceId}
+            membersError={membersError}
+            workspacePublicProfile={workspacePublicProfile}
+            portalStatusByWorkspaceId={portalStatusByWorkspaceId}
+            initialDisplayName={viewerDisplayName}
+          />
+        )}
+      </div>
     </main>
   );
 }

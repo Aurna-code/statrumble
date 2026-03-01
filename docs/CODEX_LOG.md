@@ -5290,3 +5290,63 @@ Output
 - [ ] Manual demo mode run: confirm demo note renders
 #### Commit Link
 - TODO
+
+### Prompt ID: Final polish keyless demo default (commit: TODO)
+#### Prompt
+```text
+[Prompt] Final polish (minimal): prevent accidental API mode by default + clarify README + run preflight
+
+Goal
+- Make “keyless demo by default” actually work for fresh clones.
+- Prevent users from accidentally entering API mode with an invalid placeholder key.
+- Add one short README clarification.
+- Re-run the full preflight in a clean tree.
+
+Changes
+
+A) Fix statrumble/.env.example so it does NOT imply an API key is set
+1) Edit statrumble/.env.example
+- Change:
+  OPENAI_API_KEY=YOUR_OPENAI_KEY
+  to:
+  OPENAI_API_KEY=
+- Keep the rest unchanged.
+Rationale: isDemoMode() treats “missing/empty key” as demo, but a non-empty placeholder triggers API mode.
+
+B) README: add one explicit line in “Run locally” / env section
+1) Edit root README.md (near the env var instructions / demo mode note)
+- Add a single sentence, concise:
+  - “Leave OPENAI_API_KEY empty to run in demo mode (no API calls).”
+- Also clarify that adding a key enables real AI:
+  - “Set OPENAI_API_KEY to enable real AI mode.”
+
+C) Verification: ensure everything still passes
+1) Run:
+- npm run lint
+- npm run typecheck
+- pnpm -C statrumble test
+- pnpm -C statrumble build
+2) In a clean tree (commit changes), run:
+- ./scripts/contest-preflight.sh
+3) Optional manual smoke:
+- Start dev server with OPENAI_API_KEY empty and confirm banner says “Demo mode” and AI buttons show (demo).
+
+Output
+- Changed files list
+- Key diff summary
+- Verify results
+- Suggested commit: chore(demo): keep keyless demo as default in env example
+```
+#### Result
+- Updated `statrumble/.env.example` to `OPENAI_API_KEY=` so fresh clones default to keyless demo behavior.
+- Added explicit README clarification that empty key keeps demo mode and setting key enables real AI mode.
+- Completed requested verification commands (`lint`, `typecheck`, `test`, `build`).
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [ ] `./scripts/contest-preflight.sh` (run after commit on clean tree)
+- [ ] Optional manual smoke: empty key shows demo mode and demo AI actions
+#### Commit Link
+- TODO

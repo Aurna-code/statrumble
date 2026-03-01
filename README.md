@@ -62,6 +62,7 @@ Use `statrumble/.env.local` and never commit real keys.
 
 If `OPENAI_API_KEY` is set and `DEMO_MODE` is not `1`, server routes use real AI.
 If `OPENAI_API_KEY` is missing, the app falls back to demo mode automatically.
+Leave `OPENAI_API_KEY` empty to run in demo mode (no API calls). Set `OPENAI_API_KEY` to enable real AI mode.
 AI action buttons show `(demo)` or `(API)` and helper text (`No API calls.` / `May incur costs.`).
 
 Password login only works for accounts that already have an email+password set in Supabase Auth. This repo does not include password sign-up or password-setting flows. For first-time demos, prefer email OTP (magic link) login.

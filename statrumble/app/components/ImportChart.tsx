@@ -332,10 +332,18 @@ export default function ImportChart({ imports, initialDemoMode }: ImportChartPro
                   startIndex={brushRange.startIndex}
                   endIndex={brushRange.endIndex}
                   onChange={(nextRange) => {
-                    setBrushRange({
-                      startIndex: nextRange.startIndex ?? 0,
-                      endIndex: nextRange.endIndex ?? Math.max(points.length - 1, 0),
-                    });
+                    if (!nextRange) {
+                      return;
+                    }
+
+                    const nextStart = nextRange.startIndex ?? 0;
+                    const nextEnd = nextRange.endIndex ?? Math.max(points.length - 1, 0);
+
+                    setBrushRange((prev) =>
+                      prev.startIndex === nextStart && prev.endIndex === nextEnd
+                        ? prev
+                        : { startIndex: nextStart, endIndex: nextEnd },
+                    );
                   }}
                   tickFormatter={(value) => chartData[value]?.label ?? String(value)}
                 />

@@ -5390,3 +5390,37 @@ OUTPUT
 
 #### Manual checklist
 - [x] `./scripts/verify.sh`
+
+### Prompt ID: Fix Arena brush update loop
+#### Summary
+- Fixed the Arena chart brush state update loop by guarding `Brush` `onChange` updates in `ImportChart`.
+- Prevented redundant state updates when the brush range is unchanged.
+- Ran repository verification via `./scripts/verify.sh`.
+
+#### Original prompt text
+```text
+You are Codex working at the repo root.
+
+Bug: On the Arena page while adjusting the chart range, React throws:
+“Maximum update depth exceeded”.
+This strongly suggests an update loop triggered by Recharts <Brush> calling onChange repeatedly while our handler always calls setBrushRange with a new object.
+
+Task:
+1) Open `statrumble/app/components/ImportChart.tsx`.
+2) Find the <Brush ... onChange={(nextRange) => { setBrushRange({ ... }) }} /> handler.
+3) Change it to a guarded functional state update:
+   - if nextRange is null/undefined, return
+   - compute nextStart/nextEnd
+   - call setBrushRange(prev => prev.startIndex===nextStart && prev.endIndex===nextEnd ? prev : {startIndex: nextStart, endIndex: nextEnd})
+4) Run `./scripts/verify.sh`.
+
+Commit:
+- `fix(ui): prevent brush range update loop`
+Show diff and verify output.
+```
+
+#### Change summary
+- `statrumble/app/components/ImportChart.tsx`: updated `Brush` `onChange` to return early when range is null/undefined, compute `nextStart`/`nextEnd`, and use a functional `setBrushRange` update that returns `prev` when indices are unchanged.
+
+#### Manual checklist
+- [x] `./scripts/verify.sh`

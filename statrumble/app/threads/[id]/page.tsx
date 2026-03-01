@@ -252,7 +252,28 @@ function buildBackToArenaHref(input: { importId: string | null; start: string | 
   return queryString.length > 0 ? `/?${queryString}#chart` : "/#chart";
 }
 
-function readTransformPlanLines(spec: unknown): string[] | null {
+type TransformPlanView = {
+  lines: string[];
+  hasParseWarnings: boolean;
+};
+
+function toCompactRawForPlan(value: unknown): string {
+  try {
+    const serialized = JSON.stringify(value);
+
+    if (typeof serialized !== "string") {
+      return "null";
+    }
+
+    const compact = serialized.replace(/\s+/g, " ");
+    const maxLength = 120;
+    return compact.length > maxLength ? `${compact.slice(0, maxLength - 1)}…` : compact;
+  } catch {
+    return '"[unserializable]"';
+  }
+}
+
+function readTransformPlanLines(spec: unknown): TransformPlanView | null {
   const specRecord = asRecord(spec);
   const opsRaw = specRecord?.ops;
 
@@ -261,12 +282,15 @@ function readTransformPlanLines(spec: unknown): string[] | null {
   }
 
   const lines: string[] = [];
+  let hasParseWarnings = false;
 
   for (const opRaw of opsRaw) {
     const op = asRecord(opRaw);
 
     if (!op) {
-      return null;
+      lines.push(`unknown_op(raw=${toCompactRawForPlan(opRaw)})`);
+      hasParseWarnings = true;
+      continue;
     }
 
     const opName = asNonEmptyString(op.op);
@@ -276,11 +300,13 @@ function readTransformPlanLines(spec: unknown): string[] | null {
       const mode = op.mode;
 
       if ((method !== "iqr" && method !== "zscore") || (mode !== "clip" && mode !== "remove")) {
-        return null;
+        lines.push("invalid_op(op=filter_outliers)");
+        hasParseWarnings = true;
+        continue;
       }
 
       if (method === "zscore") {
-        const z = asFiniteNumber(op.z) ?? 3;
+        const z = asFiniteNumber(op.z) ?? 2.5;
         lines.push(`filter_outliers(method=zscore, mode=${mode}, z=${z})`);
         continue;
       }
@@ -295,7 +321,9 @@ function readTransformPlanLines(spec: unknown): string[] | null {
       const window = windowRaw !== null && Number.isInteger(windowRaw) && windowRaw >= 1 ? windowRaw : null;
 
       if (window === null) {
-        return null;
+        lines.push("invalid_op(op=moving_average)");
+        hasParseWarnings = true;
+        continue;
       }
 
       const center = asBoolean(op.center) ?? false;
@@ -304,10 +332,11 @@ function readTransformPlanLines(spec: unknown): string[] | null {
       continue;
     }
 
-    return null;
+    lines.push(`unknown_op(raw=${toCompactRawForPlan(opRaw)})`);
+    hasParseWarnings = true;
   }
 
-  return lines.length > 0 ? lines : null;
+  return lines.length > 0 ? { lines, hasParseWarnings } : null;
 }
 
 function toPrettyJson(value: unknown): string {
@@ -389,7 +418,7 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   const isTransformProposal = thread.kind === "transform_proposal";
   const proposalTitle = resolveProposalTitle(thread);
   const proposalPrompt = asNonEmptyString(thread.transform_prompt);
-  const transformPlanLines = readTransformPlanLines(thread.transform_spec);
+  const transformPlan = readTransformPlanLines(thread.transform_spec);
   const rawTransformSpecJson = toPrettyJson(thread.transform_spec);
   const sqlPreview = asNonEmptyString(thread.transform_sql_preview);
   const proposalStatsRecord = asRecord(thread.transform_stats);
@@ -457,9 +486,9 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
             <div>
               <p className="text-xs font-medium text-zinc-500">Transform Plan</p>
               <div className="mt-1 rounded-md border border-zinc-200 bg-white p-3">
-                {transformPlanLines ? (
+                {transformPlan ? (
                   <ul className="space-y-1 text-xs text-zinc-800">
-                    {transformPlanLines.map((line, index) => (
+                    {transformPlan.lines.map((line, index) => (
                       <li key={`${line}-${index}`} className="font-mono">
                         {line}
                       </li>
@@ -468,6 +497,9 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
                 ) : (
                   <p className="text-xs text-zinc-600">No transform spec recorded.</p>
                 )}
+                {transformPlan?.hasParseWarnings ? (
+                  <p className="mt-2 text-xs text-amber-700">Some ops could not be parsed; see raw JSON.</p>
+                ) : null}
 
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs font-medium text-zinc-500">Raw transform_spec JSON</summary>

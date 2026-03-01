@@ -4908,3 +4908,49 @@ feat(ui): add transform guidance panel + show transform plan in proposal threads
 - [ ] Manual smoke in browser (create/fork guidance panels and thread transform plan visibility)
 #### Commit Link
 - TODO
+
+### Prompt ID: polish(ui): make Transform Plan rendering resilient + align defaults (commit: TODO)
+#### Prompt
+```text
+[Prompt] polish(ui): make Transform Plan rendering resilient + align defaults
+
+Goal:
+- Keep Transform Plan visible even if one op is malformed (show best-effort lines + warning).
+- Align display defaults with server normalization/guidance (zscore default 2.5).
+
+Tasks:
+1) Update: statrumble/app/threads/[id]/page.tsx
+   - In readTransformPlanLines(spec):
+     - Do NOT return null for the whole plan if one op fails.
+     - Instead:
+       - For unknown/malformed ops, push a line like:
+         - `unknown_op(raw=<...>)` or `invalid_op(op=<opName>)`
+       - Continue parsing remaining ops.
+     - Change zscore fallback default from 3 to 2.5.
+   - In UI:
+     - If any invalid/unknown lines exist, show a small warning text under the plan:
+       "Some ops could not be parsed; see raw JSON."
+
+2) Run:
+- pnpm -C statrumble lint
+- pnpm -C statrumble typecheck
+- ./scripts/verify.sh
+
+Output:
+- Patch diff
+- Short note
+Suggested commit message:
+polish(ui): harden transform plan rendering
+```
+#### Result
+- Hardened `readTransformPlanLines` to parse ops best-effort and continue when an op is malformed, emitting fallback lines (`unknown_op(raw=...)` / `invalid_op(op=...)`) instead of dropping the entire plan.
+- Added compact raw serialization helper for unknown-op lines to keep plan rows readable.
+- Updated filter_outliers zscore display fallback to `2.5` to align with server normalization behavior.
+- Updated Transform Plan UI to show warning text when any op line required fallback parsing: "Some ops could not be parsed; see raw JSON."
+#### Manual Checklist
+- [x] `pnpm -C statrumble lint`
+- [x] `pnpm -C statrumble typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] Manual browser smoke for malformed mixed-op plans
+#### Commit Link
+- TODO

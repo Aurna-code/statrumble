@@ -4701,3 +4701,96 @@ Output
 - [ ] Manual UI pass: active card hierarchy + no-membership CTA + switch/invite/portal flows in browser
 #### Commit Link
 - TODO
+
+### Prompt ID: Workspaces members UX visibility + counts + panel placement (commit: TODO)
+#### Prompt
+```text
+[Prompt] Workspaces members UX: show members per workspace (counts in list, details for active), move Members panel up, loosen member-list view to workspace members (promote stays owner-only)
+
+Goals
+1) Move the Members section so it visually belongs to the active workspace (not below “Your workspaces”).
+2) Show member counts for each workspace row in “Your workspaces”.
+3) Allow any workspace member to VIEW the member list, but keep promoting owners owner-only.
+
+A) DB: loosen list_workspace_members to allow workspace members to view
+1) Create a new migration (next sequential):
+- Update public.list_workspace_members(p_workspace_id uuid):
+  - Replace owner-only check with membership check:
+    exists(select 1 from public.workspace_members wm where wm.workspace_id=p_workspace_id and wm.user_id=auth.uid())
+  - Keep return columns (member_user_id, role, joined_at) unchanged
+- Keep SECURITY DEFINER and grant execute to authenticated.
+
+B) Server page: load members for active workspace for any member
+1) statrumble/app/workspaces/page.tsx
+- Currently it loads workspaceMembers only if activeWorkspace.role === "owner".
+- Change it to load members when activeWorkspaceId exists (no role restriction):
+  - try { workspaceMembers = await listWorkspaceMembers(activeWorkspaceId); membersWorkspaceId=activeWorkspaceId; } catch ...
+- Keep promote capability gated in client (owner-only) and/or promote RPC already enforces owner-only.
+
+C) WorkspacesHub: move Members panel up and tie it to active workspace
+1) statrumble/app/components/WorkspacesHub.tsx
+- Move the Members card so it appears directly after the Active workspace card (or inside it).
+- Adjust copy:
+  - If no active workspace: “Select a workspace.”
+  - If loading: “Loading members…”
+  - If not owner: still show list read-only, but hide promote buttons and show note:
+    “Only owners can promote members.”
+- For each member row:
+  - Replace raw User ID display with shortId:
+    - label: "User"
+    - value: "User <shortId>"
+  - Keep role badge.
+  - Promote button rendered only when isActiveOwner === true
+
+D) Show member counts per workspace in “Your workspaces” list
+1) Add a DB helper:
+- In statrumble/lib/db/workspaces.ts:
+  - Add listWorkspaceMemberCounts() RPC call OR a new RPC:
+    - list_workspace_member_counts returns table(workspace_id uuid, member_count int)
+    - membership-based visibility is OK (counts are not sensitive)
+  - Merge member_count into MemberWorkspaceRow.
+
+2) Update WorkspacesHub “Your workspaces” rows:
+- Add a small chip line:
+  - “Members: <member_count>”
+  - “Owners: <owner_count>” (existing)
+  - “Invite: enabled/disabled”
+- If member_count not available yet, show “Members: —” and do not break layout.
+
+E) Verification
+- npm run lint
+- npm run typecheck
+- pnpm -C statrumble test
+- pnpm -C statrumble build
+
+Manual checklist
+- As owner: can view members list and promote.
+- As member: can view members list (read-only), cannot promote.
+- “Your workspaces” shows member counts per row.
+- Members panel is visually near the active workspace section (not at the very bottom).
+
+Output
+- Changed files list
+- Key diff summary
+- Verify results
+- Suggested commit: chore(workspaces): per-workspace members visibility and counts
+```
+#### Result
+- Added migration `024_workspace_member_visibility_and_counts.sql` to:
+  - loosen `list_workspace_members` visibility from owner-only to workspace-member visibility,
+  - add `list_workspace_member_counts()` RPC with membership-scoped visibility.
+- Extended `MemberWorkspaceRow` with `member_count` and updated workspace DB loading to fetch owner/member counts via RPCs.
+- Updated `/workspaces` server page to load active workspace members for any active member (owner or non-owner).
+- Reworked `WorkspacesHub` layout so Members card is directly under the Active workspace card in the left column.
+- Members panel now shows list read-only for non-owners, with promote controls rendered only for owners.
+- Member row identity display now uses short user label (`User <shortId>`) and shows role badge.
+- “My workspaces” row chips now include `Members`, `Owners`, and `Invite` (plus existing context chips), with fallback `Members: —` if count is unavailable.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [x] `pnpm -C statrumble test`
+- [x] `pnpm -C statrumble build`
+- [ ] Manual owner/member UX validation in browser
+#### Commit Link
+- TODO

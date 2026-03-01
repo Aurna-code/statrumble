@@ -12,6 +12,7 @@ export type MemberWorkspaceRow = {
   role: string;
   joined_at: string;
   owner_count: number;
+  member_count: number | null;
 };
 
 export type MemberWorkspaceSummary = {
@@ -66,6 +67,11 @@ type WorkspaceOwnerCountRow = {
   owner_count: number;
 };
 
+type WorkspaceMemberCountRow = {
+  workspace_id: string;
+  member_count: number;
+};
+
 type WorkspaceMemberQueryRow = {
   member_user_id: string;
   role: string;
@@ -115,15 +121,29 @@ async function listMemberWorkspaceRows(): Promise<MemberWorkspaceRow[]> {
 
   const rows = (data as MemberWorkspaceQueryRow[] | null) ?? [];
   const ownerCountsByWorkspace = new Map<string, number>();
+  const memberCountsByWorkspace = new Map<string, number>();
+  let hasMemberCounts = false;
 
   if (rows.length > 0) {
-    const { data: ownerCounts, error: ownerCountError } = await supabase.rpc("list_workspace_owner_counts");
+    const [
+      { data: ownerCounts, error: ownerCountError },
+      { data: memberCounts, error: memberCountError },
+    ] = await Promise.all([supabase.rpc("list_workspace_owner_counts"), supabase.rpc("list_workspace_member_counts")]);
 
     if (!ownerCountError) {
       const ownerRows = (ownerCounts as WorkspaceOwnerCountRow[] | null) ?? [];
 
       for (const row of ownerRows) {
         ownerCountsByWorkspace.set(row.workspace_id, row.owner_count);
+      }
+    }
+
+    if (!memberCountError) {
+      hasMemberCounts = true;
+      const memberRows = (memberCounts as WorkspaceMemberCountRow[] | null) ?? [];
+
+      for (const row of memberRows) {
+        memberCountsByWorkspace.set(row.workspace_id, row.member_count);
       }
     }
   }
@@ -144,6 +164,7 @@ async function listMemberWorkspaceRows(): Promise<MemberWorkspaceRow[]> {
         role: row.role,
         joined_at: row.created_at,
         owner_count: ownerCountsByWorkspace.get(workspace.id) ?? 0,
+        member_count: hasMemberCounts ? (memberCountsByWorkspace.get(workspace.id) ?? 0) : null,
       } satisfies MemberWorkspaceRow;
     })
     .filter((row): row is MemberWorkspaceRow => row !== null);

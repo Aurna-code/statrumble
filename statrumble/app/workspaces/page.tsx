@@ -64,14 +64,14 @@ export default async function WorkspacesPage() {
   if (!loadError && activeWorkspaceId) {
     const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
 
-    if (activeWorkspace?.role === "owner") {
-      try {
-        workspaceMembers = await listWorkspaceMembers(activeWorkspaceId);
-        membersWorkspaceId = activeWorkspaceId;
-      } catch (error) {
-        membersError = error instanceof Error ? error.message : "Unknown error";
-      }
+    try {
+      workspaceMembers = await listWorkspaceMembers(activeWorkspaceId);
+      membersWorkspaceId = activeWorkspaceId;
+    } catch (error) {
+      membersError = error instanceof Error ? error.message : "Unknown error";
+    }
 
+    if (activeWorkspace?.role === "owner") {
       try {
         workspacePublicProfile = await getWorkspacePublicProfile(activeWorkspaceId);
       } catch {

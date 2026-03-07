@@ -5691,3 +5691,48 @@ Append the prompt/result summary to docs/CODEX_LOG.md if that is the repo conven
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-07-finalize-referee-gated-promotion
+#### Original prompt text
+```text
+Finalize the referee-gated promotion patch in StatRumble.
+
+Context:
+- Promotion to decision must require a valid referee report.
+- The patch already blocks promote before judge, updates the UI, and adds verification coverage.
+
+Tasks:
+1) Confirm the working tree still reflects the intended behavior:
+   - promote before judge returns 400
+   - no decision card is created
+   - promote is disabled/hidden in UI until a valid referee report exists
+2) Re-run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+3) Create a commit with:
+   fix(decision): require referee report before promote
+4) Show:
+   - git status
+   - git diff --stat HEAD~1..HEAD
+   - commit hash
+5) Do not push unless explicitly configured to do so in this environment.
+
+Output:
+- Final verification result
+- Commit hash
+- Short merge-ready summary
+Append the prompt/result summary to docs/CODEX_LOG.md if that is the repo convention.
+```
+
+#### Change summary
+- Confirmed the committed tree still blocks `/api/threads/[id]/promote` with `400` and the `"Run Judge before promoting this thread."` error until a valid referee report exists.
+- Confirmed the thread UI still disables Promote and shows the inline reason until a valid referee report is available.
+- Confirmed the verification coverage remains present in `scripts/verify-decision-promotion.mjs` and the README smoke assertions.
+- Re-ran `npm run lint`, `npm run typecheck`, and `./scripts/verify.sh`.
+- Created the requested finalization commit after appending this log entry. The functional referee-gated promotion changes were already present in the committed tree before this finalization step.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`

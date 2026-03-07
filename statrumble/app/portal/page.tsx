@@ -1,9 +1,30 @@
 import Link from "next/link";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import { listPublicWorkspaceProfiles, type PublicWorkspaceProfile } from "@/lib/db/publicPortal";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
 export default async function PortalPage() {
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Public portal");
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-5xl px-4 py-10 md:px-8">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Public Portal</p>
+          <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Public Workspaces</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            Public workspace browsing is unavailable until Supabase is configured.
+          </p>
+        </div>
+        <div className="mt-6">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Portal requires Supabase setup" />
+        </div>
+      </main>
+    );
+  }
+
   let workspaces: PublicWorkspaceProfile[] = [];
   let loadError: string | null = null;
 

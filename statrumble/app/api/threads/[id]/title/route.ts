@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -47,22 +46,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  let activeWorkspaceId = "";
-
-  try {
-    activeWorkspaceId = await getRequiredActiveWorkspaceId();
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "No workspace membership." },
-      { status: 403 },
-    );
-  }
-
   const { data: thread, error: threadError } = await supabase
     .from("arena_threads")
-    .select("id")
+    .select("id, workspace_id")
     .eq("id", id)
-    .eq("workspace_id", activeWorkspaceId)
     .maybeSingle();
 
   if (threadError) {
@@ -77,7 +64,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     .from("arena_threads")
     .update({ title: normalizedTitle })
     .eq("id", id)
-    .eq("workspace_id", activeWorkspaceId);
+    .eq("workspace_id", thread.workspace_id);
 
   if (updateError) {
     return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });

@@ -5,7 +5,11 @@ import { listMessages } from "@/lib/db/messages";
 import { getVoteSummary } from "@/lib/db/votes";
 import { mockRefereeReport } from "@/lib/demoMock";
 import { isDemoMode } from "@/lib/demoMode";
-import { refereeJsonSchema, type RefereeReport } from "@/lib/referee/schema";
+import {
+  readRefereeReport,
+  refereeJsonSchema,
+  type RefereeReport,
+} from "@/lib/referee/schema";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -189,7 +193,15 @@ function tryParseRefereeReport(rawOutput: string, model: string):
   const candidate = toJsonCandidate(raw);
 
   try {
-    const report = JSON.parse(candidate) as RefereeReport;
+    const parsed = JSON.parse(candidate) as unknown;
+    const report = readRefereeReport(parsed);
+
+    if (!report) {
+      return {
+        ok: false,
+        error: "Failed to parse referee JSON: Output did not match the referee schema.",
+      };
+    }
 
     return {
       ok: true,
@@ -285,13 +297,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
     }
 
-    const existingReportRaw = (thread.referee_report as RefereeReport | null) ?? null;
-    const existingReport = existingReportRaw
-      ? {
-          ...existingReportRaw,
-          demo_note: typeof existingReportRaw.demo_note === "string" ? existingReportRaw.demo_note : null,
-        }
-      : null;
+    const existingReport = readRefereeReport(thread.referee_report);
 
     if (!force && existingReport) {
       return NextResponse.json({ ok: true, report: existingReport, reused: true });

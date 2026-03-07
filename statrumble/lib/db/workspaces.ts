@@ -3,6 +3,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
+import { resolveActiveWorkspaceId } from "@/lib/workspace/context";
 
 export type MemberWorkspaceRow = {
   id: string;
@@ -211,18 +212,9 @@ export async function listWorkspaceMembers(workspaceId: string): Promise<Workspa
 export async function getActiveWorkspaceId(): Promise<string | null> {
   const workspaces = await listMemberWorkspaceSummaries();
 
-  if (workspaces.length === 0) {
-    return null;
-  }
-
   const cookieStore = await cookies();
   const candidate = cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value?.trim();
-
-  if (candidate && workspaces.some((workspace) => workspace.id === candidate)) {
-    return candidate;
-  }
-
-  return workspaces[0].id;
+  return resolveActiveWorkspaceId(workspaces, candidate);
 }
 
 export async function getActiveWorkspaceSelection(): Promise<{
@@ -231,21 +223,12 @@ export async function getActiveWorkspaceSelection(): Promise<{
 }> {
   const workspaces = await listMemberWorkspaceSummaries();
 
-  if (workspaces.length === 0) {
-    return {
-      workspaces,
-      activeWorkspaceId: null,
-    };
-  }
-
   const cookieStore = await cookies();
   const candidate = cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value?.trim();
-  const activeWorkspaceId =
-    candidate && workspaces.some((workspace) => workspace.id === candidate) ? candidate : workspaces[0].id;
 
   return {
     workspaces,
-    activeWorkspaceId,
+    activeWorkspaceId: resolveActiveWorkspaceId(workspaces, candidate),
   };
 }
 

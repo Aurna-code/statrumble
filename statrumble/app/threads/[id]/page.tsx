@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import ResourceWorkspaceSyncBanner from "@/app/components/ResourceWorkspaceSyncBanner";
 import ThreadShareActions from "@/app/components/ThreadShareActions";
 import ThreadSnapshotChart from "@/app/components/ThreadSnapshotChart";
 import ThreadTitleEditor from "@/app/components/ThreadTitleEditor";
@@ -10,13 +12,15 @@ import { getThread } from "@/lib/db/threads";
 import { listMemberWorkspaces } from "@/lib/db/workspaces";
 import { isDemoMode } from "@/lib/demoMode";
 import { createClient } from "@/lib/supabase/server";
-import type { RefereeReport } from "@/lib/referee/schema";
+import { readRefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
 import { extractSelectedSeries } from "@/lib/snapshot";
 import { formatMetricLabel, shortId } from "@/lib/threadLabel";
 import { getDisplayNameFromUser } from "@/lib/userDisplay";
 import { coerceVoteProfileFromThreadFields } from "@/lib/voteProfile";
+import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
+import { normalizeWorkspaceId, resolveResourceWorkspaceContext } from "@/lib/workspace/context";
 
 export const dynamic = "force-dynamic";
 
@@ -359,6 +363,8 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   let initialDecisionId: string | null = null;
   let currentUserId: string | null = null;
   let currentUserDisplayName: string | null = null;
+  const cookieStore = await cookies();
+  const activeWorkspaceId = normalizeWorkspaceId(cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value);
 
   try {
     const supabase = await createClient();
@@ -392,14 +398,20 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
   }
 
   let isThreadWorkspaceOwner = false;
+  let resourceWorkspaceName: string | null = null;
 
   try {
     const memberships = await listMemberWorkspaces();
-    isThreadWorkspaceOwner = memberships.some(
-      (workspace) => workspace.id === thread.workspace_id && workspace.role === "owner",
-    );
+    const resourceWorkspaceContext = resolveResourceWorkspaceContext({
+      workspaces: memberships,
+      activeWorkspaceId,
+      resourceWorkspaceId: thread.workspace_id,
+    });
+    isThreadWorkspaceOwner = resourceWorkspaceContext.resourceWorkspace?.role === "owner";
+    resourceWorkspaceName = resourceWorkspaceContext.resourceWorkspace?.name ?? null;
   } catch {
     isThreadWorkspaceOwner = false;
+    resourceWorkspaceName = null;
   }
 
   try {
@@ -461,6 +473,12 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+      <ResourceWorkspaceSyncBanner
+        activeWorkspaceId={activeWorkspaceId}
+        resourceWorkspaceId={thread.workspace_id}
+        resourceWorkspaceName={resourceWorkspaceName}
+        resourceLabel="thread"
+      />
       <ThreadTitleEditor threadId={thread.id} initialTitle={thread.title} />
       {isTransformProposal ? (
         <p className="mt-2">
@@ -653,7 +671,7 @@ export default async function Page({ params, searchParams }: ThreadPageProps) {
         snapshot={thread.snapshot}
         votePrompt={voteProfile.prompt}
         voteLabels={voteProfile.labels}
-        initialRefereeReport={(thread.referee_report as RefereeReport | null) ?? null}
+        initialRefereeReport={readRefereeReport(thread.referee_report)}
         initialDecisionId={initialDecisionId}
         currentUserId={currentUserId}
         currentUserDisplayName={currentUserDisplayName}

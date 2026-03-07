@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
 
 type CreateWorkspaceResponse = {
@@ -12,10 +14,25 @@ type CreateWorkspaceResponse = {
 };
 
 export default function CreateWorkspacePage() {
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Create workspace");
   const router = useRouter();
   const [name, setName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Create Workspace</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Workspace creation is disabled until the local Supabase configuration is valid.
+        </p>
+        <div className="mt-6 max-w-3xl">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Workspace creation requires Supabase setup" />
+        </div>
+      </main>
+    );
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

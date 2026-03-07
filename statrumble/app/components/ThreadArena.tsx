@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import RefereeReportView from "@/app/components/RefereeReportView";
-import type { RefereeReport } from "@/lib/referee/schema";
+import { getPromoteAvailability } from "@/lib/decisions/promotion";
+import { readRefereeReport, type RefereeReport } from "@/lib/referee/schema";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
 import { formatCount as formatCountLabel, formatNumber as formatNumberLabel } from "@/lib/formatNumber";
 import { getRuntimeDemoMode } from "@/lib/runtimeMode";
@@ -232,6 +233,14 @@ export default function ThreadArena({
   const demoMode = getRuntimeDemoMode() || initialDemoMode;
   const aiModeInlineLabel = demoMode ? "(demo)" : "(API)";
   const aiModeHelperText = demoMode ? "No API calls." : "May incur costs.";
+  const promoteAvailability = useMemo(
+    () =>
+      getPromoteAvailability({
+        decisionId,
+        refereeReport,
+      }),
+    [decisionId, refereeReport],
+  );
 
   const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = messagesContainerRef.current;
@@ -306,7 +315,7 @@ export default function ThreadArena({
         setMyStance(nextMyStance);
       }
 
-      setRefereeReport(payload.referee_report ?? null);
+      setRefereeReport(readRefereeReport(payload.referee_report));
       setRefereeReused(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown refresh error";
@@ -442,8 +451,9 @@ export default function ThreadArena({
         throw new Error(payload.error ?? "Failed to run referee.");
       }
 
-      setRefereeReport(payload.report);
+      setRefereeReport(readRefereeReport(payload.report));
       setRefereeReused(payload.reused === true ? true : null);
+      setPromoteError(null);
     } catch (error) {
       setJudgeError(error instanceof Error ? error.message : "Unknown referee error");
     } finally {
@@ -651,7 +661,8 @@ export default function ThreadArena({
               <button
                 type="button"
                 onClick={() => void onPromoteDecision()}
-                disabled={promoting}
+                disabled={promoting || !promoteAvailability.canPromote}
+                title={!promoteAvailability.canPromote ? promoteAvailability.reason ?? undefined : undefined}
                 className="rounded-md bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {promoting ? "Promoting..." : "Promote to Decision"}
@@ -659,6 +670,9 @@ export default function ThreadArena({
             )}
             {promoteError ? <p className="text-sm text-red-600">{promoteError}</p> : null}
           </div>
+          {!decisionId && !promoteAvailability.canPromote && promoteAvailability.reason ? (
+            <p className="mt-2 text-sm text-amber-700">{promoteAvailability.reason}</p>
+          ) : null}
         </div>
       </section>
 

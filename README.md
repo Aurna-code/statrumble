@@ -43,7 +43,7 @@ pnpm -C statrumble dev
 > Quick pitfalls:
 > After `supabase start`, run `pnpm -C statrumble exec supabase status` and set `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `statrumble/.env.local`.
 > OTP/magic-link emails appear in the local inbox URL shown by `supabase status` (for example, Inbucket).
-> If the anon key is missing, the app may boot but auth/DB can fail silently.
+> If auth or data requests fail before reaching Supabase, open `/setup` or `/healthz` to inspect the required env vars.
 > Before submitting, run `./scripts/contest-preflight.sh` for a final check.
 
 Equivalent from inside `statrumble/`: `cp .env.example .env.local` (or set env vars directly).
@@ -78,6 +78,10 @@ Use `statrumble/.env.local` and never commit real keys.
 
 Password login only works for accounts that already have an email+password set in Supabase Auth. This repo does not include password sign-up or password-setting flows. For first-time demos, prefer email OTP (magic link) login.
 
+Local diagnostics:
+- `/setup` shows the current Supabase env status and recommended local fix steps.
+- `/healthz` returns a lightweight JSON health check with env validation results.
+
 ## What Reviewers Should Do
 - Run locally with the standard setup commands.
 - Do not add API keys.
@@ -106,6 +110,36 @@ Password login only works for accounts that already have an email+password set i
 ```
 
 `--with-local-supabase` requires Docker; if unavailable, the smoke step is skipped with a warning.
+
+## Deterministic README Demo Smoke
+Run the full two-user README demo path in demo mode against local Supabase:
+
+```bash
+pnpm -C statrumble smoke:readme
+```
+
+What the suite does:
+- starts local Supabase and resets the database
+- starts the Next app in demo mode (`DEMO_MODE=1`, `NEXT_PUBLIC_DEMO_MODE=1`)
+- creates deterministic local users for User A and User B
+- runs the README path end-to-end:
+  workspace create -> invite join -> CSV import -> chart segment/thread create -> comments/votes -> judge -> promote -> publish -> public decision page render
+
+Notes:
+- This suite is intentionally separate from `npm test` because it requires Docker and boots a real Next dev server.
+- Docker must be installed and the Docker daemon must be running before you start the suite.
+- It uses `docs/sample.csv` as the import fixture.
+- The smoke runner starts and stops local Supabase itself; no `.env.local` editing is required for the smoke run.
+
+### CI
+In CI, run the same command on a Linux runner with Docker available:
+
+```bash
+pnpm install
+pnpm -C statrumble smoke:readme
+```
+
+If your CI job already runs `pnpm -C statrumble exec supabase ...` successfully, no extra secrets are required for this smoke suite.
 
 ## Demo Script (Two Users)
 1. User A signs in and creates a workspace.

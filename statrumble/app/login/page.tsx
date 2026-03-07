@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/client";
 
 const MAGIC_LINK_COOLDOWN_SECONDS = 60;
@@ -25,6 +27,7 @@ function getAuthErrorMessage(error: { message: string; status?: number | null })
 }
 
 export default function LoginPage() {
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Login");
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,6 +53,20 @@ export default function LoginPage() {
 
     return () => window.clearInterval(timer);
   }, [cooldownLeft]);
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Login</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Supabase auth is unavailable until the local environment is configured.
+        </p>
+        <div className="mt-6 max-w-3xl">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Login requires Supabase setup" />
+        </div>
+      </main>
+    );
+  }
 
   async function onSendMagicLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

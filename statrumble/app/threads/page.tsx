@@ -1,13 +1,31 @@
 import Link from "next/link";
 import OnboardingCard from "@/app/components/OnboardingCard";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import { listThreads, type ArenaThreadListItem } from "@/lib/db/threads";
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 import { formatThreadPrimaryTitle, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
 
 export default async function ThreadsPage() {
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Threads");
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Threads</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Thread list loading is blocked until Supabase is configured.
+        </p>
+        <div className="mt-6">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Threads require Supabase setup" />
+        </div>
+      </main>
+    );
+  }
+
   let hasMembership = false;
 
   try {

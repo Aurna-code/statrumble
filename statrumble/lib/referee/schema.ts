@@ -1,28 +1,64 @@
+import { z } from "zod";
+
 export type RefereeLeading = "A" | "B" | "C" | "unclear";
 
-export type RefereeReport = {
-  tldr: string;
-  data_facts: Array<{
-    fact: string;
-    support: string;
-  }>;
-  stances: {
-    A: { steelman: string; weakness: string };
-    B: { steelman: string; weakness: string };
-    C: { steelman: string; weakness: string };
+export const RefereeLeadingSchema = z.enum(["A", "B", "C", "unclear"]);
+
+export const RefereeReportSchema = z.preprocess((input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return input;
+  }
+
+  const record = input as Record<string, unknown>;
+
+  if (Object.hasOwn(record, "demo_note")) {
+    return input;
+  }
+
+  return {
+    ...record,
+    demo_note: null,
   };
-  confounders: string[];
-  next_checks: Array<{
-    what: string;
-    why: string;
-  }>;
-  verdict: {
-    leading: RefereeLeading;
-    confidence_0_100: number;
-    reason: string;
-  };
-  demo_note: string | null;
-};
+},
+z
+  .object({
+    tldr: z.string(),
+    data_facts: z.array(
+      z
+        .object({
+          fact: z.string(),
+          support: z.string(),
+        })
+        .strict(),
+    ),
+    stances: z
+      .object({
+        A: z.object({ steelman: z.string(), weakness: z.string() }).strict(),
+        B: z.object({ steelman: z.string(), weakness: z.string() }).strict(),
+        C: z.object({ steelman: z.string(), weakness: z.string() }).strict(),
+      })
+      .strict(),
+    confounders: z.array(z.string()),
+    next_checks: z.array(
+      z
+        .object({
+          what: z.string(),
+          why: z.string(),
+        })
+        .strict(),
+    ),
+    verdict: z
+      .object({
+        leading: RefereeLeadingSchema,
+        confidence_0_100: z.number().finite().min(0).max(100),
+        reason: z.string(),
+      })
+      .strict(),
+    demo_note: z.string().nullable(),
+  })
+  .strict());
+
+export type RefereeReport = z.infer<typeof RefereeReportSchema>;
 
 type JsonSchemaObject = {
   properties: Record<string, unknown>;
@@ -133,3 +169,19 @@ export const refereeJsonSchema = {
 } as const;
 
 assertStrictRequiredAllKeys(refereeJsonSchema);
+
+export function readRefereeReport(value: unknown): RefereeReport | null {
+  const parsed = RefereeReportSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export function extractRefereeSummary(report: unknown): string | null {
+  const parsed = readRefereeReport(report);
+
+  if (!parsed) {
+    return null;
+  }
+
+  const summary = parsed.tldr.trim();
+  return summary.length > 0 ? summary : null;
+}

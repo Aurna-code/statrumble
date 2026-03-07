@@ -13,6 +13,7 @@ export type DecisionCardListItem = {
 };
 
 export type DecisionCardDetail = DecisionCardListItem & {
+  workspace_id: string;
   decision: string;
   context: string | null;
   snapshot: unknown;
@@ -35,6 +36,47 @@ export type PublicDecisionCard = {
   referee_report: unknown | null;
 };
 
+type DecisionMembershipRow = {
+  id: string;
+  workspace_id: string;
+};
+
+async function getAuthenticatedUserId() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    return null;
+  }
+
+  return {
+    supabase,
+    userId: user.id,
+  };
+}
+
+async function ensureDecisionWorkspaceMembership(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  workspaceId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("workspace_id", params.workspaceId)
+    .eq("user_id", params.userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to verify decision access: ${error.message}`);
+  }
+
+  return Boolean(data);
+}
+
 export async function listDecisions(limit = 20): Promise<DecisionCardListItem[]> {
   const supabase = await createClient();
   const workspaceId = await getRequiredActiveWorkspaceId();
@@ -53,22 +95,38 @@ export async function listDecisions(limit = 20): Promise<DecisionCardListItem[]>
 }
 
 export async function getDecision(decisionId: string): Promise<DecisionCardDetail | null> {
-  const supabase = await createClient();
-  const workspaceId = await getRequiredActiveWorkspaceId();
+  const auth = await getAuthenticatedUserId();
+
+  if (!auth) {
+    return null;
+  }
+
+  const { supabase, userId } = auth;
   const { data, error } = await supabase
     .from("decision_cards")
     .select(
-      "id, title, summary, decision, context, snapshot, snapshot_start, snapshot_end, referee_report, created_at, updated_at, created_by, thread_id, is_public, public_id, public_at",
+      "id, workspace_id, title, summary, decision, context, snapshot, snapshot_start, snapshot_end, referee_report, created_at, updated_at, created_by, thread_id, is_public, public_id, public_at",
     )
     .eq("id", decisionId)
-    .eq("workspace_id", workspaceId)
     .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to load decision: ${error.message}`);
   }
 
-  return (data as DecisionCardDetail | null) ?? null;
+  const decision = (data as DecisionCardDetail | null) ?? null;
+
+  if (!decision) {
+    return null;
+  }
+
+  const hasMembership = await ensureDecisionWorkspaceMembership({
+    supabase,
+    userId,
+    workspaceId: decision.workspace_id,
+  });
+
+  return hasMembership ? decision : null;
 }
 
 export async function getPublicDecisionByPublicId(publicId: string): Promise<PublicDecisionCard | null> {
@@ -88,13 +146,17 @@ export async function getPublicDecisionByPublicId(publicId: string): Promise<Pub
 }
 
 export async function getDecisionForThread(threadId: string): Promise<DecisionCardListItem | null> {
-  const supabase = await createClient();
-  const workspaceId = await getRequiredActiveWorkspaceId();
+  const auth = await getAuthenticatedUserId();
+
+  if (!auth) {
+    return null;
+  }
+
+  const { supabase, userId } = auth;
   const { data, error } = await supabase
     .from("decision_cards")
-    .select("id, title, summary, created_at, created_by, thread_id")
+    .select("id, workspace_id, title, summary, created_at, created_by, thread_id")
     .eq("thread_id", threadId)
-    .eq("workspace_id", workspaceId)
     .limit(1)
     .maybeSingle();
 
@@ -102,5 +164,28 @@ export async function getDecisionForThread(threadId: string): Promise<DecisionCa
     throw new Error(`Failed to load decision: ${error.message}`);
   }
 
-  return (data as DecisionCardListItem | null) ?? null;
+  const decision = (data as (DecisionCardListItem & DecisionMembershipRow) | null) ?? null;
+
+  if (!decision) {
+    return null;
+  }
+
+  const hasMembership = await ensureDecisionWorkspaceMembership({
+    supabase,
+    userId,
+    workspaceId: decision.workspace_id,
+  });
+
+  if (!hasMembership) {
+    return null;
+  }
+
+  return {
+    id: decision.id,
+    title: decision.title,
+    summary: decision.summary,
+    created_at: decision.created_at,
+    created_by: decision.created_by,
+    thread_id: decision.thread_id,
+  };
 }

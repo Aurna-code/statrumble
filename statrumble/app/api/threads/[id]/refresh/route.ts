@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listMessages } from "@/lib/db/messages";
 import { getThread } from "@/lib/db/threads";
+import { readRefereeReport } from "@/lib/referee/schema";
 import { getVoteSummary } from "@/lib/db/votes";
 import { createClient } from "@/lib/supabase/server";
 
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       messages,
       counts: votes.counts,
       my_stance: votes.my_stance,
-      referee_report: thread.referee_report ?? null,
+      referee_report: readRefereeReport(thread.referee_report),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

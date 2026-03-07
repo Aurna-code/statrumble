@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 import { ACTIVE_WORKSPACE_STORAGE_KEY } from "@/lib/workspace/active";
 
 type JoinResponse = {
@@ -11,10 +13,25 @@ type JoinResponse = {
 };
 
 export default function JoinPage() {
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Join workspace");
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Join Workspace</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Joining by invite code is disabled until the local Supabase configuration is valid.
+        </p>
+        <div className="mt-6 max-w-3xl">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Workspace join requires Supabase setup" />
+        </div>
+      </main>
+    );
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

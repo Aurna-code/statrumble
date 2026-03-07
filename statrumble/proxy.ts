@@ -1,22 +1,16 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  getSupabaseEnvStatus,
+  readSupabaseEnvSource,
+  requireSupabaseEnv,
+} from "@/lib/supabase/env";
 
 const EXCLUDED_PREFIXES = ["/_next", "/favicon.ico"];
-const EXCLUDED_PATHS = new Set(["/auth/callback"]);
+const EXCLUDED_PATHS = new Set(["/auth/callback", "/healthz"]);
 
-const PUBLIC_PATHS = new Set(["/portal", "/p"]);
+const PUBLIC_PATHS = new Set(["/portal", "/p", "/setup"]);
 const PUBLIC_PREFIXES = ["/portal/", "/p/"];
-
-function getSupabaseEnv() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
-
-  return { supabaseUrl, supabaseAnonKey };
-}
 
 function isExcludedPath(pathname: string) {
   if (EXCLUDED_PATHS.has(pathname)) {
@@ -43,7 +37,27 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "request auth");
+
+  if (!supabaseEnv.ok) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: supabaseEnv.message,
+          missing: supabaseEnv.missing,
+          invalid: supabaseEnv.invalid,
+        },
+        {
+          status: 503,
+        },
+      );
+    }
+
+    return NextResponse.next();
+  }
+
+  const { supabaseUrl, supabaseAnonKey } = requireSupabaseEnv("request auth");
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {

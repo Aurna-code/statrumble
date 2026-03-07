@@ -1,19 +1,9 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import { requireSupabaseEnv } from "@/lib/supabase/env";
 
 let client: ReturnType<typeof createBrowserClient> | undefined;
-
-function getSupabaseEnv() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
-  }
-
-  return { supabaseUrl, supabaseAnonKey };
-}
 
 function getAuthEndpoint(input: RequestInfo | URL) {
   const requestUrl =
@@ -55,7 +45,7 @@ export function createClient() {
     return client;
   }
 
-  const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv();
+  const { supabaseUrl, supabaseAnonKey } = requireSupabaseEnv("browser auth client");
   client = createBrowserClient(supabaseUrl, supabaseAnonKey, {
     global: {
       fetch: authEndpointLoggingFetch,

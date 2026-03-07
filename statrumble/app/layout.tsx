@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import HeaderNavLinks from "@/app/components/HeaderNavLinks";
 import ModeBanner from "@/app/components/ModeBanner";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import WorkspaceSwitcher from "@/app/components/WorkspaceSwitcher";
 import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
 import { isDemoMode } from "@/lib/demoMode";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 
@@ -19,16 +22,22 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const demoMode = isDemoMode();
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "app startup");
+  let user: User | null = null;
   let workspaceSelection = {
     workspaces: [],
     activeWorkspaceId: null,
   } as Awaited<ReturnType<typeof getActiveWorkspaceSelection>>;
 
-  if (user) {
+  if (supabaseEnv.ok) {
+    const supabase = await createClient();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    user = authUser;
+  }
+
+  if (user && supabaseEnv.ok) {
     try {
       workspaceSelection = await getActiveWorkspaceSelection();
     } catch {
@@ -75,6 +84,17 @@ export default async function RootLayout({
             </nav>
           </header>
           <ModeBanner initialDemoMode={demoMode} />
+          {!supabaseEnv.ok ? (
+            <div className="border-b border-amber-200 bg-amber-50">
+              <div className="mx-auto w-full max-w-6xl px-4 py-4 md:px-8">
+                <SetupDiagnosticsPanel
+                  status={supabaseEnv}
+                  title="Supabase setup required"
+                  description="StatRumble started, but Supabase-backed auth and data flows are unavailable until the required environment variables are configured."
+                />
+              </div>
+            </div>
+          ) : null}
           {children}
         </div>
       </body>

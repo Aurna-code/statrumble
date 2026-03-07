@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  PROMOTE_REQUIRES_JUDGE_MESSAGE,
+  getPromotableRefereeReport,
+} from "@/lib/decisions/promotion";
 import { getThread } from "@/lib/db/threads";
-import { getRequiredActiveWorkspaceId } from "@/lib/db/workspaces";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateLabel } from "@/lib/formatDate";
 
@@ -14,17 +17,6 @@ function buildDecisionTitle(metricName: string | null | undefined, startTs: stri
   const endLabel = formatDateLabel(endTs);
 
   return `${safeMetric} (${startLabel} ~ ${endLabel})`;
-}
-
-function extractSummary(report: unknown) {
-  if (!report || typeof report !== "object") {
-    return null;
-  }
-
-  const record = report as Record<string, unknown>;
-  const tldr = typeof record.tldr === "string" ? record.tldr.trim() : "";
-
-  return tldr.length > 0 ? tldr : null;
 }
 
 export async function POST(_request: Request, context: RouteContext) {
@@ -44,20 +36,9 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
   }
 
-  let activeWorkspaceId = "";
-
-  try {
-    activeWorkspaceId = await getRequiredActiveWorkspaceId();
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "No workspace membership." },
-      { status: 403 },
-    );
-  }
-
   const thread = await getThread(id);
 
-  if (!thread || thread.workspace_id !== activeWorkspaceId) {
+  if (!thread) {
     return NextResponse.json({ ok: false, error: "Thread not found." }, { status: 404 });
   }
 
@@ -65,7 +46,7 @@ export async function POST(_request: Request, context: RouteContext) {
     .from("decision_cards")
     .select("id")
     .eq("thread_id", id)
-    .eq("workspace_id", activeWorkspaceId)
+    .eq("workspace_id", thread.workspace_id)
     .limit(1)
     .maybeSingle();
 
@@ -77,8 +58,13 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: true, decisionId: existingDecision.id, created: false });
   }
 
-  const summary = extractSummary(thread.referee_report);
-  const decisionText = summary ?? "Decision pending.";
+  const promotableReport = getPromotableRefereeReport(thread.referee_report);
+
+  if (!promotableReport) {
+    return NextResponse.json({ ok: false, error: PROMOTE_REQUIRES_JUDGE_MESSAGE }, { status: 400 });
+  }
+
+  const decisionText = promotableReport.summary;
   const title = buildDecisionTitle(thread.metric?.name ?? null, thread.start_ts, thread.end_ts);
 
   const { data: insertedDecision, error: insertError } = await supabase
@@ -87,14 +73,14 @@ export async function POST(_request: Request, context: RouteContext) {
       workspace_id: thread.workspace_id,
       thread_id: thread.id,
       title,
-      summary,
+      summary: promotableReport.summary,
       decision: decisionText,
       context: null,
       snapshot: thread.snapshot,
       snapshot_start: thread.start_ts,
       snapshot_end: thread.end_ts,
       created_by: user.id,
-      referee_report: thread.referee_report ?? null,
+      referee_report: promotableReport.report,
     })
     .select("id")
     .single();
@@ -105,7 +91,7 @@ export async function POST(_request: Request, context: RouteContext) {
         .from("decision_cards")
         .select("id")
         .eq("thread_id", id)
-        .eq("workspace_id", activeWorkspaceId)
+        .eq("workspace_id", thread.workspace_id)
         .limit(1)
         .maybeSingle();
 

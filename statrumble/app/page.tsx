@@ -1,11 +1,13 @@
 import Link from "next/link";
 import OnboardingCard from "@/app/components/OnboardingCard";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import { listImports, listMetrics, listThreads, type MetricImportRow } from "@/lib/db";
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import UploadCsvForm from "@/app/components/UploadCsvForm";
 import ImportChart from "@/app/components/ImportChart";
 import { isDemoMode } from "@/lib/demoMode";
 import { formatDateTimeLabel } from "@/lib/formatDate";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 import { formatMetricLabel, formatThreadPrimaryTitle, shortId } from "@/lib/threadLabel";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,24 @@ function formatImportDisplayName(row: MetricImportRow) {
 
 export default async function Home() {
   const demoMode = isDemoMode();
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Arena");
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="min-h-screen bg-zinc-50">
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+          <h1 className="text-2xl font-semibold">Arena</h1>
+          <p className="mt-2 text-sm text-zinc-600">
+            Configure Supabase before uploading data or creating arena threads.
+          </p>
+          <div className="mt-6">
+            <SetupDiagnosticsPanel status={supabaseEnv} title="Arena requires Supabase setup" />
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   let hasMembership = false;
 
   try {

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-snapshot.mjs && node ../scripts/verify-no-remote-fonts.mjs && node ../scripts/verify-no-hangul.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-demo-mock.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-referee-schema.mjs && node ../scripts/verify-demo-ui-mode.mjs",
+    "smoke:readme": "node --loader ../scripts/ts-strip-loader.mjs scripts/readme-demo-smoke.mjs",
+    "test": "node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-nav.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-snapshot.mjs && node ../scripts/verify-no-remote-fonts.mjs && node ../scripts/verify-no-hangul.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-demo-mock.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-referee-schema.mjs && node ../scripts/verify-demo-ui-mode.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-supabase-env.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-decision-promotion.mjs && node --loader ../scripts/ts-strip-loader.mjs ../scripts/verify-workspace-context.mjs",
     "verify": "../scripts/verify.sh"
   },
   "dependencies": {

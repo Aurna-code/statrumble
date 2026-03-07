@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import { getPublicDecisionByPublicId } from "@/lib/db/decisions";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,19 @@ function extractRefereeSummary(report: unknown) {
 
 export default async function PublicDecisionPage({ params }: PublicDecisionPageProps) {
   const { publicId } = await params;
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Public decision page");
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 py-10 md:px-8">
+        <SetupDiagnosticsPanel
+          status={supabaseEnv}
+          title="Public decision page requires Supabase setup"
+          description="Anonymous decision rendering still depends on the public Supabase URL and anon key."
+        />
+      </main>
+    );
+  }
 
   if (!publicId) {
     notFound();

@@ -1,49 +1,23 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import DecisionPublishControls from "@/app/components/DecisionPublishControls";
 import OnboardingCard from "@/app/components/OnboardingCard";
 import RefereeReportView from "@/app/components/RefereeReportView";
+import ResourceWorkspaceSyncBanner from "@/app/components/ResourceWorkspaceSyncBanner";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import { getDecision, type DecisionCardDetail } from "@/lib/db/decisions";
-import { getActiveWorkspaceSelection } from "@/lib/db/workspaces";
-import type { RefereeReport } from "@/lib/referee/schema";
+import { listMemberWorkspaces } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { readRefereeReport } from "@/lib/referee/schema";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
+import { ACTIVE_WORKSPACE_COOKIE } from "@/lib/workspace/active";
+import { normalizeWorkspaceId, resolveResourceWorkspaceContext } from "@/lib/workspace/context";
 
 export const dynamic = "force-dynamic";
 
 interface DecisionDetailPageProps {
   params: Promise<{ id: string }>;
-}
-
-function isRefereeReport(value: unknown): value is RefereeReport {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const record = value as Record<string, unknown>;
-
-  if (typeof record.tldr !== "string") {
-    return false;
-  }
-
-  if (!Array.isArray(record.data_facts) || !Array.isArray(record.confounders) || !Array.isArray(record.next_checks)) {
-    return false;
-  }
-
-  if (!record.stances || typeof record.stances !== "object") {
-    return false;
-  }
-
-  if (!record.verdict || typeof record.verdict !== "object") {
-    return false;
-  }
-
-  const verdict = record.verdict as Record<string, unknown>;
-
-  return (
-    typeof verdict.leading === "string" &&
-    typeof verdict.confidence_0_100 === "number" &&
-    typeof verdict.reason === "string"
-  );
 }
 
 function renderSummary(decision: DecisionCardDetail) {
@@ -60,21 +34,32 @@ function renderSummary(decision: DecisionCardDetail) {
 
 export default async function DecisionDetailPage({ params }: DecisionDetailPageProps) {
   const { id } = await params;
-  let workspaceSelection = {
-    workspaces: [],
-    activeWorkspaceId: null,
-  } as Awaited<ReturnType<typeof getActiveWorkspaceSelection>>;
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Decision detail");
 
-  try {
-    workspaceSelection = await getActiveWorkspaceSelection();
-  } catch {
-    workspaceSelection = {
-      workspaces: [],
-      activeWorkspaceId: null,
-    };
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Decision</h1>
+        <p className="mt-2 text-sm text-zinc-600">Open the local setup diagnostics before loading decision details.</p>
+        <div className="mt-6">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Decision detail requires Supabase setup" />
+        </div>
+      </main>
+    );
   }
 
-  if (workspaceSelection.workspaces.length === 0) {
+  let memberships = [] as Awaited<ReturnType<typeof listMemberWorkspaces>>;
+  let membershipsLoaded = false;
+
+  try {
+    memberships = await listMemberWorkspaces();
+    membershipsLoaded = true;
+  } catch {
+    memberships = [];
+    membershipsLoaded = false;
+  }
+
+  if (membershipsLoaded && memberships.length === 0) {
     return (
       <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
         <h1 className="text-2xl font-semibold">Decision</h1>
@@ -84,9 +69,6 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
     );
   }
 
-  const activeWorkspace =
-    workspaceSelection.workspaces.find((workspace) => workspace.id === workspaceSelection.activeWorkspaceId) ?? null;
-  const isOwner = activeWorkspace?.role === "owner";
   let decision: DecisionCardDetail | null = null;
   let loadError: string | null = null;
 
@@ -100,10 +82,28 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
     notFound();
   }
 
-  const report = decision && isRefereeReport(decision.referee_report) ? decision.referee_report : null;
+  const cookieStore = await cookies();
+  const activeWorkspaceId = normalizeWorkspaceId(cookieStore.get(ACTIVE_WORKSPACE_COOKIE)?.value);
+  const resourceWorkspaceContext = decision
+    ? resolveResourceWorkspaceContext({
+        workspaces: memberships,
+        activeWorkspaceId,
+        resourceWorkspaceId: decision.workspace_id,
+      })
+    : null;
+  const isOwner = resourceWorkspaceContext?.resourceWorkspace?.role === "owner";
+  const report = decision ? readRefereeReport(decision.referee_report) : null;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+      {decision ? (
+        <ResourceWorkspaceSyncBanner
+          activeWorkspaceId={activeWorkspaceId}
+          resourceWorkspaceId={decision.workspace_id}
+          resourceWorkspaceName={resourceWorkspaceContext?.resourceWorkspace?.name ?? null}
+          resourceLabel="decision"
+        />
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Decision</h1>

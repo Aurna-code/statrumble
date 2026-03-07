@@ -5424,3 +5424,270 @@ Show diff and verify output.
 
 #### Manual checklist
 - [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-07-readme-demo-smoke
+#### Original prompt text
+```text
+Implement deterministic end-to-end smoke tests for the README two-user demo path in demo mode.
+Cover:
+- User A creates workspace
+- User B joins by invite code
+- CSV import
+- chart segment -> thread creation
+- comments and votes from both users
+- judge/referee run
+- promote to decision
+- publish decision
+- verify public decision page renders
+Use the repo's existing test stack if present; otherwise add the smallest sensible one.
+Document how to run the suite locally and in CI.
+```
+
+#### Change summary
+- Added `statrumble/lib/csvImport.ts` to share CSV parsing and explicit workspace-scoped import persistence.
+- Updated `statrumble/app/actions/uploadCsv.ts` to use the shared CSV import helper instead of duplicating parse/persist logic.
+- Added `statrumble/scripts/readme-demo-smoke.mjs`, a deterministic Docker-backed smoke runner that:
+  - starts/reset local Supabase
+  - boots the Next app in demo mode
+  - creates deterministic local users
+  - exercises the README two-user path through workspace create/join, import, thread creation, comments, votes, judge, promote, publish, and anonymous public decision render
+- Added `smoke:readme` to `statrumble/package.json`.
+- Updated `README.md` with local and CI instructions for the new smoke suite.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] `pnpm -C statrumble smoke:readme` (blocked in this environment: Docker daemon unavailable)
+
+### Prompt ID: 2026-03-07-supabase-env-validation
+#### Original prompt text
+```text
+Find all places where missing Supabase environment variables can cause silent or delayed failure.
+Implement:
+- centralized env validation,
+- explicit startup/runtime errors,
+- a lightweight /healthz endpoint,
+- a setup diagnostics page for local development.
+Do not add heavy dependencies.
+Write tests for the new validation behavior.
+```
+
+#### Change summary
+- Added `statrumble/lib/supabase/env.ts` as the shared source of truth for required public Supabase env vars, structured diagnostics, and tagged `SupabaseEnvError` messages.
+- Updated `statrumble/lib/supabase/server.ts`, `statrumble/lib/supabase/client.ts`, and `statrumble/proxy.ts` to use centralized validation and emit explicit `503` JSON errors for API requests when Supabase env is incomplete.
+- Added `statrumble/app/healthz/route.ts` for a lightweight JSON health check that reports env validation status without hitting the database.
+- Added `statrumble/app/setup/page.tsx` and `statrumble/app/components/SetupDiagnosticsPanel.tsx` to provide local setup diagnostics and recovery steps.
+- Updated the root layout, error boundary, login/create/join pages, Arena/Threads/Decisions pages, decision detail page, and public portal/public decision pages so missing Supabase env no longer degrades into misleading empty-state or `notFound()` UI.
+- Added `scripts/verify-supabase-env.mjs` and wired it into `statrumble/package.json` test coverage.
+- Updated `README.md` to point local users to `/setup` and `/healthz` for setup diagnostics.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-07-supabase-env-validation-rerun
+#### Original prompt text
+```text
+Find all places where missing Supabase environment variables can cause silent or delayed failure.
+Implement:
+- centralized env validation,
+- explicit startup/runtime errors,
+- a lightweight /healthz endpoint,
+- a setup diagnostics page for local development.
+Do not add heavy dependencies.
+Write tests for the new validation behavior.
+```
+
+#### Change summary
+- Verified that the requested Supabase env validation work was already present in the working tree and did not require additional code changes in this turn.
+- Confirmed centralized validation in `statrumble/lib/supabase/env.ts`, explicit client/proxy/runtime wiring in `statrumble/lib/supabase/server.ts`, `statrumble/lib/supabase/client.ts`, `statrumble/proxy.ts`, and startup surfacing in `statrumble/app/layout.tsx`.
+- Confirmed lightweight diagnostics routes/pages at `statrumble/app/healthz/route.ts` and `statrumble/app/setup/page.tsx`.
+- Confirmed validation test coverage in `scripts/verify-supabase-env.mjs` and package test wiring.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-07-require-referee-before-promote
+#### Original prompt text
+```text
+[Prompt A] Block decision promotion until referee exists
+
+Context:
+- StatRumble currently allows POST /api/threads/[id]/promote to create a decision even when thread.referee_report is null, falling back to "Decision pending."
+- This breaks the intended product path: discussion -> referee -> decision.
+
+Goal:
+Require a completed referee report before a thread can be promoted to a decision.
+
+Tasks:
+1) Open statrumble/app/api/threads/[id]/promote/route.ts
+2) If thread.referee_report is null/empty/invalid, return 400 with a clear error like:
+   "Run Judge before promoting this thread."
+3) Do NOT create a decision card in this case.
+4) Update the thread UI so the Promote action is disabled or hidden until a valid referee report exists.
+5) Show a clear inline message explaining why promote is unavailable.
+6) Add/extend a verification test covering:
+   - promote before judge => 400, no decision created
+   - promote after valid judge => success
+7) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+
+Output:
+- Patch diff
+- Short note on API/UI behavior
+Suggested commit:
+fix(decision): require referee report before promote
+```
+
+#### Change summary
+- Added `statrumble/lib/decisions/promotion.ts` to centralize promotion eligibility checks and the shared `"Run Judge before promoting this thread."` message.
+- Updated `statrumble/app/api/threads/[id]/promote/route.ts` to reject promotion with `400` when the thread referee report is missing, empty, or schema-invalid, and to avoid inserting a decision in that case.
+- Tightened referee report parsing in `statrumble/lib/referee/schema.ts`, `statrumble/app/api/threads/[id]/judge/route.ts`, `statrumble/app/api/threads/[id]/refresh/route.ts`, `statrumble/app/threads/[id]/page.tsx`, and `statrumble/app/decisions/[id]/page.tsx` so UI and API code only treat schema-valid reports as complete.
+- Updated `statrumble/app/components/ThreadArena.tsx` to disable Promote until a valid referee report exists and show an inline reason when promotion is unavailable.
+- Extended verification with `scripts/verify-decision-promotion.mjs`, added the negative promote-before-judge assertion to `statrumble/scripts/readme-demo-smoke.mjs`, and extended `scripts/ts-strip-loader.mjs` so Node-based TS verification can resolve extensionless local `.ts` imports.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-07-resource-workspace-scope
+#### Original prompt text
+```text
+[Prompt B] Remove hidden active-workspace coupling from thread/decision flows
+
+Context:
+- Several routes use getRequiredActiveWorkspaceId() even when a thread id or decision id is already provided.
+- This causes copied links / cross-workspace navigation to fail depending on the current active workspace cookie.
+
+Goal:
+Make thread and decision flows derive workspace context from the resource itself, and self-heal the active workspace context when possible.
+
+Tasks:
+1) Audit routes/pages involved in thread and decision access/update/promote flows.
+   Prioritize:
+   - app/api/threads/[id]/promote/route.ts
+   - app/api/threads/[id]/title/route.ts
+   - thread page
+   - decision page
+2) Where a resource id is already available:
+   - load the thread/decision first
+   - use its workspace_id as the authoritative scope
+   - rely on membership/RLS for authorization
+   - do not fail just because the active workspace cookie points elsewhere
+3) On page load for a thread/decision the user belongs to:
+   - update active workspace cookie/local state to that resource workspace, OR
+   - otherwise render a clear workspace-switch recovery path instead of a generic not found
+4) Preserve authorization boundaries; do not allow access across non-member workspaces.
+5) Add tests for:
+   - opening a valid thread link while another workspace is active
+   - promoting a valid thread while another workspace is active
+   - unauthorized access to a different workspace still fails
+6) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+
+Output:
+- Patch diff
+- Brief explanation of the new workspace-resolution rule
+Suggested commit:
+fix(workspace): scope thread and decision flows by resource workspace
+```
+
+#### Change summary
+- Added `statrumble/lib/workspace/context.ts` as the shared pure helper for active-workspace normalization, fallback selection, and resource-workspace mismatch detection.
+- Updated `statrumble/lib/db/workspaces.ts` to use the shared active-workspace resolver.
+- Removed active-workspace cookie scoping from `statrumble/app/api/threads/[id]/promote/route.ts`, `statrumble/app/api/threads/[id]/title/route.ts`, `statrumble/lib/db/decisions.ts#getDecision`, and `statrumble/lib/db/decisions.ts#getDecisionForThread`, so resource ids are now scoped by the thread/decision workspace and RLS membership instead of the active workspace cookie.
+- Added `statrumble/app/components/ResourceWorkspaceSyncBanner.tsx` and wired it into `statrumble/app/threads/[id]/page.tsx` and `statrumble/app/decisions/[id]/page.tsx` so copied thread/decision links render under the correct workspace and automatically repair the active workspace cookie after hydration.
+- Fixed decision-page owner gating to use the decision workspace membership rather than the currently active workspace.
+- Added `scripts/verify-workspace-context.mjs` to package test coverage and extended `statrumble/scripts/readme-demo-smoke.mjs` with cross-workspace thread link, title update, promote, decision-page, and unauthorized-access checks.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+- [ ] `pnpm -C statrumble smoke:readme` (blocked in this environment: Docker daemon unavailable)
+
+### Prompt ID: 2026-03-07-workspace-context-audit
+#### Original prompt text
+```text
+You are auditing the recent workspace-context changes in StatRumble before merge.
+
+Context:
+- A recent patch changed thread/decision flows to derive workspace context from the resource's workspace_id instead of hard-failing on active workspace cookie mismatch.
+- This is directionally correct, but it must not introduce auth/RLS bypass, existence oracle leaks, or client-side privilege escalation.
+
+Your job:
+Perform a focused audit of the B patch and make only minimal fixes if you find real issues.
+Do not do broad refactors.
+
+Primary audit targets:
+1) Resource-first loading must be user-scoped and RLS-safe
+   - Any thread/decision lookup done before checking active workspace must use the authenticated user-scoped Supabase client, not service-role/admin paths.
+   - Confirm this for the modified routes/pages/helpers.
+   - If any route can reveal resource existence outside membership, fix it.
+
+2) ResourceWorkspaceSyncBanner must only sync server-validated workspace ids
+   - Verify the banner only receives workspace ids from already-authorized server-loaded resources.
+   - It must not accept arbitrary client-provided ids and turn them into active workspace state.
+   - If unsafe, fix it with the smallest possible change.
+
+3) Owner/admin capability must still be enforced server-side
+   - UI-derived workspace context may affect visibility, but mutation routes must still enforce authorization on the server.
+   - Audit title update, promote, publish, and any related mutation routes touched by the new logic.
+   - If client-side role context can enable an unauthorized mutation, fix it.
+
+Specific tasks:
+- Grep and inspect all relevant usages of:
+  - getRequiredActiveWorkspaceId
+  - ResourceWorkspaceSyncBanner
+  - workspace_id
+  - createServerClient / server Supabase client helpers
+  - any admin/service-role Supabase helpers
+- Inspect at minimum:
+  - app/api/threads/[id]/promote/route.ts
+  - app/api/threads/[id]/title/route.ts
+  - app/threads/[id]/page.tsx
+  - app/decisions/[id]/page.tsx
+  - any shared helper introduced for resource workspace context
+  - any server/client Supabase helper these paths depend on
+- Search for other resource-id routes that may still have the same hidden active-workspace coupling and list them, but do not refactor them unless directly required for correctness.
+- Add or adjust targeted verification if you fix anything.
+
+Verification:
+Run:
+- npm run lint
+- npm run typecheck
+- ./scripts/verify.sh
+
+Output:
+1) Audit summary with pass/fail on the 3 audit targets
+2) Exact files inspected
+3) Any real issues found
+4) Minimal patch diff if needed
+5) Merge verdict:
+   - SAFE TO MERGE
+   - SAFE TO MERGE AFTER INCLUDED FIXES
+   - DO NOT MERGE
+
+Do not commit automatically.
+Append the prompt/result summary to docs/CODEX_LOG.md if that is the repo convention.
+```
+
+#### Change summary
+- Audited the resource-first workspace-context patch across the modified routes, pages, shared workspace helper, Supabase client helpers, and adjacent resource-id endpoints that still rely on the active workspace.
+- Confirmed the thread-side resource-first lookups use the authenticated server Supabase client and remain RLS-scoped; confirmed `ResourceWorkspaceSyncBanner` only persists the workspace id returned by the server-validated `/api/workspaces/active` route.
+- Found and fixed one real auth issue in `statrumble/lib/db/decisions.ts`: private decision loaders could return published decisions to non-members because `decision_cards` also has a public-select RLS policy. Added an authenticated-membership check so `/decisions/[id]` and thread-linked decision lookups stay membership-scoped even when a decision is public.
+- Extended `statrumble/scripts/readme-demo-smoke.mjs` so published decisions are still `404` on the authenticated `/decisions/[id]` route for non-members, while the public `/p/decisions/[publicId]` path remains the intended anonymous entry.
+
+#### Manual checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`

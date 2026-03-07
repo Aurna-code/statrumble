@@ -1,12 +1,30 @@
 import Link from "next/link";
 import OnboardingCard from "@/app/components/OnboardingCard";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import { listDecisions, type DecisionCardListItem } from "@/lib/db/decisions";
 import { listMemberWorkspaceSummaries } from "@/lib/db/workspaces";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
 export default async function DecisionsPage() {
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Decisions");
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
+        <h1 className="text-2xl font-semibold">Decisions</h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          Decision cards are unavailable until Supabase is configured.
+        </p>
+        <div className="mt-6">
+          <SetupDiagnosticsPanel status={supabaseEnv} title="Decisions require Supabase setup" />
+        </div>
+      </main>
+    );
+  }
+
   let hasMembership = false;
 
   try {

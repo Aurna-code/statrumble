@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import SetupDiagnosticsPanel from "@/app/components/SetupDiagnosticsPanel";
 import {
   getPublicWorkspaceProfileBySlug,
   listPublicWorkspaceDecisions,
   type PublicWorkspaceDecision,
 } from "@/lib/db/publicPortal";
 import { formatDateTimeLabel as formatDateLabel } from "@/lib/formatDate";
+import { getSupabaseEnvStatus, readSupabaseEnvSource } from "@/lib/supabase/env";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,19 @@ interface PublicWorkspacePageProps {
 
 export default async function PublicWorkspacePage({ params }: PublicWorkspacePageProps) {
   const { slug } = await params;
+  const supabaseEnv = getSupabaseEnvStatus(readSupabaseEnvSource(), "Public workspace page");
+
+  if (!supabaseEnv.ok) {
+    return (
+      <main className="mx-auto w-full max-w-4xl px-4 py-10 md:px-8">
+        <SetupDiagnosticsPanel
+          status={supabaseEnv}
+          title="Public workspace page requires Supabase setup"
+          description="Workspace portal rendering uses the same public Supabase configuration as the rest of the app."
+        />
+      </main>
+    );
+  }
 
   if (!slug) {
     notFound();

@@ -7,6 +7,7 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createClient } from "@supabase/supabase-js";
 import { parseCsvRows, persistCsvImportToWorkspace } from "../lib/csvImport.ts";
+import { LOCAL_DEMO_USERS, ensureDemoUser, parseEnvOutput, runCommand } from "./local-demo-auth.mjs";
 
 const APP_HOST = "127.0.0.1";
 const APP_PORT = Number(process.env.README_SMOKE_PORT ?? 3010);
@@ -15,17 +16,11 @@ const WORKSPACE_NAME = "README Demo Workspace";
 const METRIC_NAME = "README Demo Metric";
 const METRIC_UNIT = "pts";
 const SAMPLE_FILE_NAME = "sample.csv";
-const USER_A = {
-  email: "demo-user-a@statrumble.local",
-  password: "SmokePass123!",
-};
-const USER_B = {
-  email: "demo-user-b@statrumble.local",
-  password: "SmokePass123!",
-};
+const [USER_A, USER_B] = LOCAL_DEMO_USERS;
 const USER_C = {
-  email: "demo-user-c@statrumble.local",
-  password: "SmokePass123!",
+  email: "demo-c@local.statrumble.test",
+  password: "StatRumbleLocalC!2026",
+  displayName: "Demo User C",
 };
 
 const appDir = process.cwd();
@@ -38,38 +33,6 @@ function pass(message) {
 
 function fail(message) {
   throw new Error(message);
-}
-
-function parseEnvOutput(output) {
-  const env = {};
-
-  for (const line of output.split(/\r?\n/)) {
-    const trimmed = line.trim();
-
-    if (!trimmed || trimmed.startsWith("#")) {
-      continue;
-    }
-
-    const separatorIndex = trimmed.indexOf("=");
-
-    if (separatorIndex < 0) {
-      continue;
-    }
-
-    const key = trimmed.slice(0, separatorIndex).trim();
-    let value = trimmed.slice(separatorIndex + 1).trim();
-
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-
-    env[key] = value;
-  }
-
-  return env;
 }
 
 function encodeSessionCookieValue(session) {
@@ -139,44 +102,6 @@ class CookieJar {
       this.cookies.set(name, value);
     }
   }
-}
-
-async function runCommand(command, args, options = {}) {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd ?? appDir,
-      env: {
-        ...process.env,
-        ...(options.env ?? {}),
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    let stdout = "";
-    let stderr = "";
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0 || options.allowFailure) {
-        resolve({ code: code ?? 0, stdout, stderr });
-        return;
-      }
-
-      reject(
-        new Error(
-          `${command} ${args.join(" ")} failed with exit code ${code ?? "unknown"}.\nSTDOUT:\n${stdout}\nSTDERR:\n${stderr}`,
-        ),
-      );
-    });
-  });
 }
 
 function startLoggedProcess(command, args, options = {}) {
@@ -313,48 +238,6 @@ async function requestText(baseUrl, jar, pathName) {
     response,
     text,
   };
-}
-
-async function ensureDemoUser(adminClient, user) {
-  const { data, error } = await adminClient.auth.admin.createUser({
-    email: user.email,
-    password: user.password,
-    email_confirm: true,
-  });
-
-  if (!error && data.user) {
-    return data.user;
-  }
-
-  if (!error?.message?.toLowerCase().includes("already")) {
-    fail(`Failed to create demo user ${user.email}: ${error?.message ?? "Unknown error"}`);
-  }
-
-  const { data: listedUsers, error: listError } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
-
-  if (listError) {
-    fail(`Failed to list demo users: ${listError.message}`);
-  }
-
-  const existing = listedUsers.users.find((candidate) => candidate.email === user.email);
-
-  if (!existing) {
-    fail(`Demo user ${user.email} already exists but could not be listed.`);
-  }
-
-  const { data: updatedUser, error: updateError } = await adminClient.auth.admin.updateUserById(existing.id, {
-    password: user.password,
-    email_confirm: true,
-  });
-
-  if (updateError || !updatedUser.user) {
-    fail(`Failed to update demo user ${user.email}: ${updateError?.message ?? "Unknown error"}`);
-  }
-
-  return updatedUser.user;
 }
 
 async function signInUser(supabaseUrl, anonKey, user) {

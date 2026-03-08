@@ -76,7 +76,7 @@ Use `statrumble/.env.local` and never commit real keys.
 - `NEXT_PUBLIC_DEMO_MODE` (`1` forces demo mode via shared runtime mode logic)
 - `NEXT_PUBLIC_DEV_PASSWORD_LOGIN` (optional toggle to show password login UI)
 
-Password login only works for accounts that already have an email+password set in Supabase Auth. This repo does not include password sign-up or password-setting flows. For first-time demos, prefer email OTP (magic link) login.
+Password login stays hidden unless `NEXT_PUBLIC_DEV_PASSWORD_LOGIN=1`. Hosted and production auth behavior is unchanged. For deterministic local demos, seed the local demo users described below and then enable the flag in `statrumble/.env.local`.
 
 Local diagnostics:
 - `/setup` shows the current Supabase env status and recommended local fix steps.
@@ -140,6 +140,64 @@ pnpm -C statrumble smoke:readme
 ```
 
 If your CI job already runs `pnpm -C statrumble exec supabase ...` successfully, no extra secrets are required for this smoke suite.
+
+## Deterministic Two-User Local Demo
+This flow creates two stable local-only Supabase Auth users and keeps password login hidden until you explicitly enable it.
+
+1. Start local Supabase:
+
+```bash
+pnpm -C statrumble exec supabase start
+```
+
+2. Reset the local database:
+
+```bash
+pnpm -C statrumble exec supabase db reset --yes
+```
+
+3. Seed the deterministic local demo users:
+
+```bash
+pnpm -C statrumble demo:seed-users
+```
+
+The seed command fails fast with a short message if Docker is unavailable, the Supabase CLI is missing, or local Supabase is not running.
+
+4. Create `statrumble/.env.local` and set the local anon key plus the password-login toggle:
+
+```bash
+cp statrumble/.env.example statrumble/.env.local
+pnpm -C statrumble exec supabase status
+```
+
+Copy `ANON_KEY` from `supabase status` into `statrumble/.env.local` as `NEXT_PUBLIC_SUPABASE_ANON_KEY=...`, then set:
+
+```dotenv
+NEXT_PUBLIC_DEV_PASSWORD_LOGIN=1
+```
+
+5. Start the app:
+
+```bash
+pnpm -C statrumble dev
+```
+
+6. Log in in two separate browser sessions:
+- User A: `demo-a@local.statrumble.test` / `StatRumbleLocalA!2026`
+- User B: `demo-b@local.statrumble.test` / `StatRumbleLocalB!2026`
+
+Exact reproducible command list:
+
+```bash
+pnpm install
+pnpm -C statrumble exec supabase start
+pnpm -C statrumble exec supabase db reset --yes
+pnpm -C statrumble demo:seed-users
+cp statrumble/.env.example statrumble/.env.local
+pnpm -C statrumble exec supabase status
+pnpm -C statrumble dev
+```
 
 ## Demo Script (Two Users)
 1. User A signs in and creates a workspace.

@@ -9,8 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 const MAGIC_LINK_COOLDOWN_SECONDS = 60;
 const RATE_LIMIT_MESSAGE =
   "Email sending is rate-limited. Use dev password login or try later.";
-const DEV_PASSWORD_LOGIN_ENABLED =
-  process.env.NEXT_PUBLIC_DEV_PASSWORD_LOGIN === "1" || process.env.NODE_ENV === "development";
+const DEV_PASSWORD_LOGIN_ENABLED = process.env.NEXT_PUBLIC_DEV_PASSWORD_LOGIN === "1";
 
 function getAuthErrorMessage(error: { message: string; status?: number | null }) {
   const normalizedMessage = error.message.toLowerCase();

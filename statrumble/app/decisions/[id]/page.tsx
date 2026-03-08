@@ -93,6 +93,7 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
     : null;
   const isOwner = resourceWorkspaceContext?.resourceWorkspace?.role === "owner";
   const report = decision ? readRefereeReport(decision.referee_report) : null;
+  const visibilityState = decision ? (decision.is_public ? "public" : "private") : null;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
@@ -123,8 +124,8 @@ export default async function DecisionDetailPage({ params }: DecisionDetailPageP
           <div className="rounded-lg border border-zinc-200 bg-white p-5">
             <h2 className="text-lg font-semibold">{decision.title}</h2>
             <p className="mt-2 text-sm text-zinc-700">{renderSummary(decision)}</p>
-            <p className="mt-2 text-xs text-zinc-500">
-              Visibility: {decision.is_public ? "Public" : "Private"}
+            <p className="mt-2 text-xs text-zinc-500" data-decision-visibility={visibilityState}>
+              Visibility: <span className="font-medium capitalize">{visibilityState}</span>
             </p>
             <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
               <p className="rounded-md border border-zinc-200 bg-zinc-50 p-3">

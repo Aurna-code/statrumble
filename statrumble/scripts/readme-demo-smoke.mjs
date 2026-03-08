@@ -16,6 +16,7 @@ const WORKSPACE_NAME = "README Demo Workspace";
 const METRIC_NAME = "README Demo Metric";
 const METRIC_UNIT = "pts";
 const SAMPLE_FILE_NAME = "sample.csv";
+const DECISION_VISIBILITY_MARKER = "data-decision-visibility";
 const [USER_A, USER_B] = LOCAL_DEMO_USERS;
 const USER_C = {
   email: "demo-c@local.statrumble.test",
@@ -302,6 +303,32 @@ async function requestText(baseUrl, jar, pathName) {
     response,
     text,
   };
+}
+
+function htmlPreview(text, maxLength = 320) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
+}
+
+function assertPageContainsMarker(page, marker, message) {
+  if (page.text.includes(marker)) {
+    return;
+  }
+
+  fail(
+    `${message}\nstatus=${page.response.status}\nurl=${page.response.url}\nexpected=${marker}\nhtml_preview=${htmlPreview(page.text)}`,
+  );
+}
+
+function assertPageOmitsText(page, unexpected, message) {
+  if (!page.text.includes(unexpected)) {
+    return;
+  }
+
+  fail(
+    `${message}\nstatus=${page.response.status}\nurl=${page.response.url}\nunexpected=${unexpected}\nhtml_preview=${htmlPreview(page.text)}`,
+  );
 }
 
 async function signInUser(supabaseUrl, anonKey, user) {
@@ -609,18 +636,31 @@ async function main() {
     const decisionId = promoteDecision.payload.decisionId;
     pass("Thread promoted to a decision even when another workspace is active.");
 
+    const decisionRowBeforePublish = await adminClient
+      .from("decision_cards")
+      .select("is_public, public_id")
+      .eq("id", decisionId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    assert.equal(decisionRowBeforePublish.error, null, "Pre-publish decision lookup should succeed");
+    assert.equal(decisionRowBeforePublish.data?.is_public, false, "Decision should remain private before publish");
+    assert.equal(decisionRowBeforePublish.data?.public_id ?? null, null, "Decision should not have a public id before publish");
+
     const decisionPageBeforePublish = await requestText(BASE_URL, jarB, `/decisions/${decisionId}`);
     assert.equal(decisionPageBeforePublish.response.status, 200, "Decision page should render before publish");
-    assert(
-      decisionPageBeforePublish.text.includes("Visibility: Private"),
-      "Decision page should show private visibility before publish",
+    assertPageContainsMarker(
+      decisionPageBeforePublish,
+      `${DECISION_VISIBILITY_MARKER}="private"`,
+      "Decision page should expose a private visibility marker before publish",
     );
-    assert(
-      decisionPageBeforePublish.text.includes("Workspace context mismatch"),
+    assertPageContainsMarker(
+      decisionPageBeforePublish,
+      "Workspace context mismatch",
       "Decision page should explain the workspace correction when another workspace is active",
     );
-    assert(
-      !decisionPageBeforePublish.text.includes("Public Portal"),
+    assertPageOmitsText(
+      decisionPageBeforePublish,
+      "Public Portal",
       "Decision page should not show owner-only publish controls to non-owners from another active workspace",
     );
 
@@ -650,9 +690,10 @@ async function main() {
 
     const decisionPageAfterPublish = await requestText(BASE_URL, jarA, `/decisions/${decisionId}`);
     assert.equal(decisionPageAfterPublish.response.status, 200, "Decision page should render after publish");
-    assert(
-      decisionPageAfterPublish.text.includes("Visibility: Public"),
-      "Decision page should show public visibility after publish",
+    assertPageContainsMarker(
+      decisionPageAfterPublish,
+      `${DECISION_VISIBILITY_MARKER}="public"`,
+      "Decision page should expose a public visibility marker after publish",
     );
 
     const unauthorizedPublishedDecisionPage = await requestText(BASE_URL, jarC, `/decisions/${decisionId}`);

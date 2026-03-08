@@ -73,6 +73,61 @@ ci(smoke): simplify local supabase smoke workflow
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
 
+### Prompt ID: 2026-03-08-prepublish-decision-visibility
+#### Original Prompt
+```text
+Investigate and fix the failing pre-publish decision visibility assertion in StatRumble smoke.
+
+Context:
+- The GitHub Actions smoke flow now gets all the way through local Supabase startup, app startup, deterministic demo users, workspace creation/join, CSV import, thread creation, judge, and promote.
+- The current failure is no longer infrastructure-related.
+- It fails at:
+  "Decision page should show private visibility before publish"
+- We need to determine whether:
+  1) the decision is correctly private but the UI text/marker changed,
+  2) the decision is accidentally marked published too early,
+  3) the smoke is reading the wrong page/redirect state.
+
+Goal:
+Make the unpublished/private state explicit and stable, and make the smoke assertion check that stable contract.
+
+Tasks:
+1) Inspect:
+   - statrumble/scripts/readme-demo-smoke.mjs around the failing assertion
+   - statrumble/app/decisions/[id]/page.tsx
+   - statrumble/app/api/decisions/[id]/publish/route.ts
+   - any shared decision loader/helper and relevant migrations/schema
+2) Determine the actual pre-publish decision state and why the current assertion fails.
+3) Fix the product/test contract in the smallest correct way:
+   - if unpublished decisions are already private, render an explicit stable marker on the private decision page
+     (example text or data-testid for private visibility)
+   - if the decision is being published too early, fix the real bug instead
+   - if the smoke is checking the wrong target after redirect/workspace sync, fix the flow
+4) Improve smoke diagnostics around this assertion:
+   - print status/url/html preview on failure
+   - keep logs concise but actually useful
+5) Prefer a stable assertion target over brittle prose matching.
+6) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+
+Output:
+- Root cause
+- Patch diff
+- Exact stable marker/assertion used for unpublished/private state
+Suggested commit:
+fix(smoke): make pre-publish decision visibility explicit
+```
+#### Change Summary
+- Confirmed the decision remains unpublished until the explicit publish route runs; the failure came from the smoke suite matching raw HTML text around a React-rendered expression boundary on the decision detail page.
+- Added `data-decision-visibility="private|public"` to `statrumble/app/decisions/[id]/page.tsx` so the visibility state is explicit and stable in the rendered HTML.
+- Updated `statrumble/scripts/readme-demo-smoke.mjs` to assert the DB row is still private before publish, check the new visibility marker instead of brittle prose, and print status/url/html preview when the decision-page assertions fail.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
 ### Prompt ID: CI-02
 #### Prompt
 ```text
@@ -6068,6 +6123,61 @@ ci(smoke): slim and harden local supabase startup
 - Added CI-aware Supabase startup handling in `statrumble/scripts/readme-demo-smoke.mjs` so GitHub-hosted runners start only the local services the smoke path needs.
 - In CI, `supabase start` now runs with `--debug`, excludes `studio`, `mailpit`, `logflare`, `vector`, `imgproxy`, `storage-api`, `realtime`, `postgres-meta`, `edge-runtime`, and `supavisor`, and retries once after a cleanup `supabase stop`.
 - Extended `statrumble/scripts/local-demo-auth.mjs` so subprocess output can stream directly to the job log, making startup stderr visible before the smoke script exits.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-08-prepublish-decision-visibility
+#### Original Prompt
+```text
+Investigate and fix the failing pre-publish decision visibility assertion in StatRumble smoke.
+
+Context:
+- The GitHub Actions smoke flow now gets all the way through local Supabase startup, app startup, deterministic demo users, workspace creation/join, CSV import, thread creation, judge, and promote.
+- The current failure is no longer infrastructure-related.
+- It fails at:
+  "Decision page should show private visibility before publish"
+- We need to determine whether:
+  1) the decision is correctly private but the UI text/marker changed,
+  2) the decision is accidentally marked published too early,
+  3) the smoke is reading the wrong page/redirect state.
+
+Goal:
+Make the unpublished/private state explicit and stable, and make the smoke assertion check that stable contract.
+
+Tasks:
+1) Inspect:
+   - statrumble/scripts/readme-demo-smoke.mjs around the failing assertion
+   - statrumble/app/decisions/[id]/page.tsx
+   - statrumble/app/api/decisions/[id]/publish/route.ts
+   - any shared decision loader/helper and relevant migrations/schema
+2) Determine the actual pre-publish decision state and why the current assertion fails.
+3) Fix the product/test contract in the smallest correct way:
+   - if unpublished decisions are already private, render an explicit stable marker on the private decision page
+     (example text or data-testid for private visibility)
+   - if the decision is being published too early, fix the real bug instead
+   - if the smoke is checking the wrong target after redirect/workspace sync, fix the flow
+4) Improve smoke diagnostics around this assertion:
+   - print status/url/html preview on failure
+   - keep logs concise but actually useful
+5) Prefer a stable assertion target over brittle prose matching.
+6) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+
+Output:
+- Root cause
+- Patch diff
+- Exact stable marker/assertion used for unpublished/private state
+Suggested commit:
+fix(smoke): make pre-publish decision visibility explicit
+```
+#### Change Summary
+- Confirmed the decision remains unpublished until the explicit publish route runs; the failure came from the smoke suite matching raw HTML text around a React-rendered expression boundary on the decision detail page.
+- Added `data-decision-visibility="private|public"` to `statrumble/app/decisions/[id]/page.tsx` so the visibility state is explicit and stable in the rendered HTML.
+- Updated `statrumble/scripts/readme-demo-smoke.mjs` to assert the DB row is still private before publish, check the new visibility marker instead of brittle prose, and print status/url/html preview when the decision-page assertions fail.
 #### Manual Checklist
 - [x] `npm run lint`
 - [x] `npm run typecheck`

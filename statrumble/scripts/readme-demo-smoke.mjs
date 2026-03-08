@@ -22,6 +22,20 @@ const USER_C = {
   password: "StatRumbleLocalC!2026",
   displayName: "Demo User C",
 };
+const IS_CI = Boolean(process.env.CI);
+// README smoke only needs the local gateway, Auth, and PostgREST over Postgres.
+const CI_SUPABASE_EXCLUDED_SERVICES = [
+  "studio",
+  "mailpit",
+  "logflare",
+  "vector",
+  "imgproxy",
+  "storage-api",
+  "realtime",
+  "postgres-meta",
+  "edge-runtime",
+  "supavisor",
+];
 
 const appDir = process.cwd();
 const repoRoot = path.resolve(appDir, "..");
@@ -182,6 +196,56 @@ async function waitForServer(url, timeoutMs = 120_000) {
   fail(lastError);
 }
 
+function getSupabaseStartArgs() {
+  const args = ["exec", "supabase", "start"];
+
+  if (!IS_CI) {
+    return args;
+  }
+
+  args.push("--debug");
+
+  for (const service of CI_SUPABASE_EXCLUDED_SERVICES) {
+    args.push("-x", service);
+  }
+
+  return args;
+}
+
+async function startLocalSupabase() {
+  const attempts = IS_CI ? 2 : 1;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      if (IS_CI) {
+        console.log(
+          `CI smoke: supabase start attempt ${attempt}/${attempts} excluding ${CI_SUPABASE_EXCLUDED_SERVICES.join(", ")}`,
+        );
+      }
+
+      await runCommand("pnpm", getSupabaseStartArgs(), {
+        cwd: appDir,
+        streamOutput: IS_CI,
+      });
+      return;
+    } catch (error) {
+      if (attempt >= attempts) {
+        throw error;
+      }
+
+      console.error(error instanceof Error ? error.message : String(error));
+      console.error("CI smoke: supabase start failed once; retrying after cleanup.");
+
+      await runCommand("pnpm", ["exec", "supabase", "stop"], {
+        cwd: appDir,
+        allowFailure: true,
+        streamOutput: true,
+      });
+      await delay(2_000);
+    }
+  }
+}
+
 async function request(baseUrl, jar, pathName, options = {}) {
   const headers = new Headers(options.headers ?? {});
 
@@ -303,10 +367,7 @@ async function main() {
   let supabaseStarted = false;
 
   try {
-    await runCommand("pnpm", ["exec", "supabase", "start"], {
-      cwd: appDir,
-      allowFailure: false,
-    });
+    await startLocalSupabase();
     supabaseStarted = true;
     pass("Local Supabase started.");
 

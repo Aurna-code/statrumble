@@ -6018,3 +6018,57 @@ Do not push automatically.
 - [x] `npm run lint`
 - [x] `npm run typecheck`
 - [x] `./scripts/verify.sh`
+
+### Prompt ID: 2026-03-08-ci-smoke-start-hardening
+#### Original Prompt
+```text
+Make the StatRumble README smoke more robust on GitHub-hosted runners.
+
+Context:
+- The smoke workflow now correctly delegates Supabase lifecycle to `pnpm -C statrumble smoke:readme`.
+- But `supabase start` inside `readme-demo-smoke.mjs` is still failing in GitHub Actions during/around the local Docker startup phase.
+- The failure is happening before any app auth flow, so this is not a hosted-project login issue.
+- The smoke path appears to need only the local services required for:
+  - Supabase Auth
+  - Postgres / PostgREST API
+  - the local API URL / anon key / service role key
+- It does not appear to need Studio, Mailpit, Logflare, Vector, or other heavy optional services for the smoke assertions.
+
+Goal:
+Reduce CI flakiness for `supabase start` and improve failure visibility without changing normal local developer behavior.
+
+Tasks:
+1) Edit `statrumble/scripts/readme-demo-smoke.mjs` and any small helper it depends on.
+2) Change the CI smoke path so local Supabase starts with a reduced service set when running in CI.
+   - Use `supabase start -x ...`
+   - Exclude the heaviest services that are not needed for the smoke path.
+   - Be conservative: keep only what the smoke actually needs.
+3) Add CI-only debug visibility:
+   - when `process.env.CI` is set, run `supabase start --debug` OR equivalent debug-friendly behavior
+   - make the actual failing stderr cause easier to see in Actions logs
+4) Add one bounded retry for `supabase start` in CI only:
+   - at most one retry
+   - only around the startup step
+   - print a short message when retrying
+5) Preserve local developer defaults outside CI.
+6) If needed, add a tiny comment in README or CODEX_LOG, but avoid broad docs churn.
+7) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+
+Output:
+- Patch diff
+- Exact reduced service list used in CI
+- Short explanation of why each excluded service is safe to omit for the smoke flow
+Suggested commit:
+ci(smoke): slim and harden local supabase startup
+```
+#### Change Summary
+- Added CI-aware Supabase startup handling in `statrumble/scripts/readme-demo-smoke.mjs` so GitHub-hosted runners start only the local services the smoke path needs.
+- In CI, `supabase start` now runs with `--debug`, excludes `studio`, `mailpit`, `logflare`, `vector`, `imgproxy`, `storage-api`, `realtime`, `postgres-meta`, `edge-runtime`, and `supavisor`, and retries once after a cleanup `supabase stop`.
+- Extended `statrumble/scripts/local-demo-auth.mjs` so subprocess output can stream directly to the job log, making startup stderr visible before the smoke script exits.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`

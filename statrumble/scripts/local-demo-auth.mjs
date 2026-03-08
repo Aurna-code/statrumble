@@ -77,11 +77,21 @@ export async function runCommand(command, args, options = {}) {
     let stderr = "";
 
     child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
+      const text = chunk.toString();
+      stdout += text;
+
+      if (options.streamOutput) {
+        process.stdout.write(text);
+      }
     });
 
     child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
+      const text = chunk.toString();
+      stderr += text;
+
+      if (options.streamOutput) {
+        process.stderr.write(text);
+      }
     });
 
     child.on("error", reject);

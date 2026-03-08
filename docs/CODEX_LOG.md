@@ -2,6 +2,77 @@
 
 Chronological log of Codex-assisted changes in this repository. Each entry records prompt intent, key changes, and verification when available.
 
+### Prompt ID: Fix smoke workflow for StatRumble
+#### Prompt
+```text
+Fix the GitHub Actions smoke workflow for StatRumble.
+
+Context:
+- The current `.github/workflows/smoke-local-supabase.yml` explicitly runs:
+  - `supabase start`
+  - `supabase db reset`
+  - `demo:seed-users`
+  - then `pnpm -C statrumble smoke:readme`
+- But `statrumble/scripts/readme-demo-smoke.mjs` already starts local Supabase, resets the DB, and ensures demo users itself.
+- The current workflow failed on GitHub Actions with:
+  `failed to bind host port for 0.0.0.0:54322 ... address already in use`
+- Supabase default local DB port is 54322, so we want the workflow to be less redundant and more resilient to runner port conflicts.
+
+Goal:
+1) Simplify the smoke workflow so the smoke script owns the Supabase lifecycle.
+2) Add lightweight diagnostics for port conflicts.
+3) If needed, make the workflow resilient by applying CI-only alternate Supabase local ports before running the smoke flow.
+
+Tasks:
+1) Edit `.github/workflows/smoke-local-supabase.yml`.
+2) Remove the explicit workflow steps that:
+   - start local Supabase
+   - reset the local database
+   - seed deterministic demo users
+3) Keep:
+   - checkout
+   - pnpm setup
+   - node setup
+   - dependency install
+   - docker availability check
+   - final `pnpm -C statrumble smoke:readme`
+   - failure diagnostics upload
+4) Add a small diagnostic step before smoke that logs:
+   - `ss -ltn` for likely Supabase local ports
+   - `docker ps -a`
+5) If the workflow still needs extra hardening, add a CI-only config rewrite step before smoke:
+   - update the repo’s local Supabase config to use alternate ports for CI
+   - prefer changing:
+     - api.port
+     - db.port
+     - db.shadow_port
+     - studio.port
+     - db.pooler.port
+   - choose a clean alternate block such as 55421/55422/55420/55423/55429
+6) Do not change local developer defaults permanently unless necessary.
+   Prefer a workflow-time temporary edit if possible.
+7) Update README only if the user-facing workflow behavior meaningfully changes.
+8) Run:
+   - npm run lint
+   - npm run typecheck
+   - ./scripts/verify.sh
+
+Output:
+- Patch diff
+- Final workflow YAML
+- Short explanation of whether CI-only alternate ports were needed
+Suggested commit:
+ci(smoke): simplify local supabase smoke workflow
+```
+#### Result
+- Simplified `.github/workflows/smoke-local-supabase.yml` so `pnpm -C statrumble smoke:readme` owns the Supabase lifecycle instead of the workflow pre-starting, resetting, and seeding.
+- Added a pre-smoke diagnostic snapshot of `ss -ltn` and `docker ps -a`, while keeping failure-only diagnostics upload for postmortem logs.
+- Did not add CI-only alternate port rewrites because the repo does not contain a committed Supabase `config.toml`; removing the redundant lifecycle steps addressed the immediate port collision without changing developer defaults.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
 ### Prompt ID: CI-02
 #### Prompt
 ```text

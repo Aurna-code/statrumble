@@ -49,20 +49,12 @@ jobs:
           set -euo pipefail
           docker version 2>&1 | tee "$ARTIFACT_DIR/docker-version.log"
 
-      - name: Start local Supabase
+      - name: Snapshot local ports and containers
         run: |
           set -euo pipefail
-          pnpm -C statrumble exec supabase start 2>&1 | tee "$ARTIFACT_DIR/supabase-start.log"
-
-      - name: Reset local Supabase database
-        run: |
-          set -euo pipefail
-          pnpm -C statrumble exec supabase db reset --yes 2>&1 | tee "$ARTIFACT_DIR/supabase-db-reset.log"
-
-      - name: Seed deterministic demo users
-        run: |
-          set -euo pipefail
-          pnpm -C statrumble demo:seed-users 2>&1 | tee "$ARTIFACT_DIR/demo-seed-users.log"
+          ss -ltn 2>&1 | tee "$ARTIFACT_DIR/ss-ltn.log"
+          ss -ltn | grep -E ':(5432[0-9]|5542[0-9])\b' 2>&1 | tee "$ARTIFACT_DIR/supabase-port-snapshot.log" || true
+          docker ps -a 2>&1 | tee "$ARTIFACT_DIR/docker-ps-before-smoke.log"
 
       - name: Run README smoke flow
         run: |
@@ -82,12 +74,6 @@ jobs:
               docker logs "$name" > "$ARTIFACT_DIR/${name}.log" 2>&1 || true
             fi
           done < "$ARTIFACT_DIR/docker-container-names.txt"
-
-      - name: Stop local Supabase
-        if: always()
-        run: |
-          set +e
-          pnpm -C statrumble exec supabase stop > "$ARTIFACT_DIR/supabase-stop.log" 2>&1
 
       - name: Upload smoke diagnostics
         if: failure()

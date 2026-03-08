@@ -225,6 +225,19 @@ pnpm -C statrumble dev
 - Prompt-by-prompt history is logged in `docs/CODEX_LOG.md`.
 - The app uses system font stacks, so `next build` does not require remote font downloads.
 
+## CI Verification
+GitHub Actions runs the repo-root verification contract on `pull_request`, pushes to `main`, and manual `workflow_dispatch`. The workflow installs dependencies once at the repository root, then runs `pnpm verify`, which delegates to `./scripts/verify.sh` so CI and local verification stay aligned.
+
+Run the same verification locally from the repository root:
+
+```bash
+pnpm install
+pnpm verify
+```
+
+## Smoke Workflow
+`Smoke Local Supabase` is separate from normal CI because it boots Docker/local Supabase and runs the heavier deterministic README demo smoke path. Invoke it manually from the GitHub Actions tab with `workflow_dispatch`, or run the same flow locally with `pnpm -C statrumble smoke:readme`.
+
 ## Roadmap
 ### Now
 - Improve collaboration UX (author display names, better commenting flow).

@@ -1,0 +1,99 @@
+name: Smoke Local Supabase
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARTIFACT_DIR: .artifacts/smoke
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Prepare diagnostic directory
+        run: mkdir -p "$ARTIFACT_DIR"
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile 2>&1 | tee "$ARTIFACT_DIR/pnpm-install.log"
+
+      - name: Verify Docker availability
+        run: |
+          set -euo pipefail
+          docker version 2>&1 | tee "$ARTIFACT_DIR/docker-version.log"
+
+      - name: Start local Supabase
+        run: |
+          set -euo pipefail
+          pnpm -C statrumble exec supabase start 2>&1 | tee "$ARTIFACT_DIR/supabase-start.log"
+
+      - name: Reset local Supabase database
+        run: |
+          set -euo pipefail
+          pnpm -C statrumble exec supabase db reset --yes 2>&1 | tee "$ARTIFACT_DIR/supabase-db-reset.log"
+
+      - name: Seed deterministic demo users
+        run: |
+          set -euo pipefail
+          pnpm -C statrumble demo:seed-users 2>&1 | tee "$ARTIFACT_DIR/demo-seed-users.log"
+
+      - name: Run README smoke flow
+        run: |
+          set -euo pipefail
+          pnpm -C statrumble smoke:readme 2>&1 | tee "$ARTIFACT_DIR/readme-smoke.log"
+
+      - name: Capture failure diagnostics
+        if: failure()
+        run: |
+          set +e
+          pnpm -C statrumble exec supabase status -o env > "$ARTIFACT_DIR/supabase-status.log" 2>&1
+          docker ps -a > "$ARTIFACT_DIR/docker-ps.log" 2>&1
+          docker images > "$ARTIFACT_DIR/docker-images.log" 2>&1
+          docker ps -a --format '{{.Names}}' > "$ARTIFACT_DIR/docker-container-names.txt" 2>&1
+          while IFS= read -r name; do
+            if [ -n "$name" ]; then
+              docker logs "$name" > "$ARTIFACT_DIR/${name}.log" 2>&1 || true
+            fi
+          done < "$ARTIFACT_DIR/docker-container-names.txt"
+
+      - name: Stop local Supabase
+        if: always()
+        run: |
+          set +e
+          pnpm -C statrumble exec supabase stop > "$ARTIFACT_DIR/supabase-stop.log" 2>&1
+
+      - name: Upload smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-local-supabase-diagnostics-${{ github.run_id }}
+          path: .artifacts/smoke/**
+          if-no-files-found: warn
+          retention-days: 7

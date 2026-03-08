@@ -2,6 +2,146 @@
 
 Chronological log of Codex-assisted changes in this repository. Each entry records prompt intent, key changes, and verification when available.
 
+### Prompt ID: CI-02
+#### Prompt
+```text
+[Prompt CI-02] Add an optional smoke workflow for local-Supabase demo validation
+
+Context:
+- StatRumble now has a deterministic local two-user demo path and a README smoke flow.
+- Full smoke depends on Docker/local Supabase and is heavier than normal verify checks.
+- We do NOT want to slow down every PR with the full smoke path unless the implementation is clearly reliable and worth it.
+
+Goal:
+Add a separate GitHub Actions workflow for smoke validation, designed for manual runs first (and optionally scheduled later).
+
+Tasks:
+1) Create `.github/workflows/smoke-local-supabase.yml`.
+2) Trigger on:
+   - `workflow_dispatch`
+   - optionally a low-frequency `schedule` (only if the implementation is clean and not noisy)
+3) Use `ubuntu-latest`.
+4) Set up:
+   - checkout
+   - pnpm
+   - Node.js 20
+   - pnpm cache
+5) Install dependencies.
+6) Start local Supabase using the existing repo workflow/commands.
+7) Run the deterministic local demo bootstrap:
+   - reset DB
+   - seed demo users
+8) Execute the repo’s smoke path for the README/demo flow.
+9) Fail clearly if Docker/Supabase cannot start.
+10) Upload useful failure diagnostics as artifacts only on failure:
+   - concise logs
+   - any generated smoke output that helps debug
+11) Add a short README note explaining:
+   - this smoke workflow is separate from normal CI
+   - how to invoke it manually
+12) Run local validation after editing:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `./scripts/verify.sh`
+
+Implementation preferences:
+- Keep this workflow separate from the main CI workflow.
+- Prefer manual dispatch first; do not force it onto every pull request.
+- Reuse existing scripts/commands instead of re-implementing business logic in YAML.
+- If a piece of the smoke path is too flaky for GitHub-hosted runners, document the limitation instead of hiding it.
+
+Output:
+- Patch diff
+- Final workflow YAML
+- Exact commands used inside the smoke workflow
+- Recommendation on whether schedule should be enabled now or later
+Suggested commit:
+ci: add manual local-supabase smoke workflow
+
+Append the prompt/result summary to `docs/CODEX_LOG.md` if that is the repo convention.
+```
+#### Result
+- Added `.github/workflows/smoke-local-supabase.yml` as a separate manual-only smoke workflow on `ubuntu-latest`.
+- The workflow installs root dependencies once, verifies Docker, starts local Supabase, resets the database, seeds deterministic demo users, and runs `pnpm -C statrumble smoke:readme`.
+- Added failure-only diagnostics upload for smoke logs and Docker/Supabase state, plus a README note explaining that smoke is separate from normal CI and is manually invoked.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
+### Prompt ID: CI-01
+#### Prompt
+```text
+[Prompt CI-01] Add a lean GitHub Actions CI workflow for StatRumble
+
+Context:
+- This repo is a pnpm workspace with app code in `statrumble/`.
+- The repository already has a root verification contract:
+  - root `package.json` exposes `lint`, `typecheck`, `test`, `verify`
+  - `verify` runs `./scripts/verify.sh`
+- `./scripts/verify.sh` is the canonical verification chain and already runs the app-level checks plus extra custom guards.
+- We want GitHub Actions CI that is small, reliable, and aligned with the repo’s existing verification contract.
+- Do not add broad new test logic in this prompt.
+- Keep changes minimal and directly tied to CI.
+
+Goal:
+Create a GitHub Actions workflow that runs the existing verification chain on pull requests and pushes to `main`.
+
+Tasks:
+1) Create `.github/workflows/ci.yml`.
+2) Trigger on:
+   - `pull_request`
+   - `push` to `main`
+   - optional `workflow_dispatch`
+3) Add workflow-level concurrency so outdated runs on the same branch/PR are canceled.
+4) Use least-privilege permissions for a read-only CI workflow.
+5) Set up the environment on `ubuntu-latest` with:
+   - checkout
+   - pnpm
+   - Node.js 20
+   - pnpm dependency caching
+6) Install dependencies once at repo root with pnpm.
+7) Run the existing canonical verification chain from repo root:
+   - `npm run verify`
+   or `pnpm verify`
+   Choose the most direct path consistent with the repo.
+8) Do not duplicate the internals of `verify.sh` into YAML unless strictly necessary.
+9) Add a short README note describing:
+   - what the CI workflow runs
+   - when it triggers
+   - how to run the same verification locally
+10) If useful, upload a small artifact only for failure diagnostics (for example a compact log file), but keep this optional and minimal.
+11) Run local validation after editing:
+   - `npm run lint`
+   - `npm run typecheck`
+   - `./scripts/verify.sh`
+
+Implementation preferences:
+- Use current stable major versions of official/setup actions.
+- Keep the workflow readable and boring.
+- Avoid clever matrix logic unless there is a clear payoff.
+- Do not add deployment logic.
+- Do not add secrets.
+- Do not push automatically.
+
+Output:
+- Patch diff
+- Final `.github/workflows/ci.yml`
+- Brief explanation of why the workflow delegates to `verify.sh`
+Suggested commit:
+ci: add GitHub Actions verify workflow
+
+Append the prompt/result summary to `docs/CODEX_LOG.md` if that is the repo convention.
+```
+#### Result
+- Added `.github/workflows/ci.yml` with a single `ubuntu-latest` verify job for `pull_request`, pushes to `main`, and `workflow_dispatch`.
+- Configured workflow-level concurrency, read-only permissions, `actions/checkout`, `pnpm/action-setup`, `actions/setup-node`, pnpm cache, root `pnpm install --frozen-lockfile`, and root `pnpm verify`.
+- Added a README note documenting what CI runs, when it triggers, and how to run the same verification locally.
+#### Manual Checklist
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `./scripts/verify.sh`
+
 ### Prompt ID: Normalize transform_spec + show validation issues
 #### Prompt
 ```text
